@@ -1,0 +1,128 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A VetAxis user account (doctor, clinic, assistant, or pet owner)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The Firebase Auth user ID" },
+        "name": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "role": { "type": "string", "enum": ["doctor", "clinic", "assistant", "user"], "description": "Account role" },
+        "expertise": { "type": "string", "description": "Professional expertise (doctors/assistants only)" },
+        "facilities": { "type": "string", "description": "Clinic facilities listed (clinics only)" },
+        "address": { "type": "string", "description": "Physical address" },
+        "profilePic": { "type": "string", "description": "Base64 image string or default string" },
+        "createdAt": { "type": "number", "description": "Creation timestamp in milliseconds" },
+        "location": {
+          "type": "object",
+          "description": "Geographical location object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "address": { "type": "string" }
+          }
+        },
+        "isVerified": { "type": "boolean" },
+        "avgRating": { "type": "number" },
+        "totalReviews": { "type": "number" }
+      },
+      "required": ["name", "email", "role", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A review with a rating left by another user",
+      "type": "object",
+      "properties": {
+        "reviewerEmail": { "type": "string" },
+        "reviewerName": { "type": "string" },
+        "reviewerRole": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "date": { "type": "number" }
+      },
+      "required": ["reviewerEmail", "reviewerName", "rating", "date"]
+    },
+    "PetAd": {
+      "title": "PetAd",
+      "description": "An advertisement for pet adoption or sale",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adType": { "type": "string", "enum": ["sale", "adoption"] },
+        "petType": { "type": "string" },
+        "breed": { "type": "string" },
+        "age": { "type": "number" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "image": { "type": "string" },
+        "ownerEmail": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerRole": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["adType", "petType", "description", "location", "whatsapp", "ownerEmail", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A pet accessory or product for sale in the marketplace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "number" },
+        "description": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "image": { "type": "string" },
+        "ownerEmail": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerRole": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "price", "quantity", "description", "whatsapp", "ownerEmail", "createdAt"]
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "A message or query shared on the public community board",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorEmail": { "type": "string" },
+        "authorName": { "type": "string" },
+        "role": { "type": "string" },
+        "profilePic": { "type": "string" },
+        "text": { "type": "string" },
+        "category": { "type": "string", "enum": ["lost", "adoption", "help", "general"] },
+        "ts": { "type": "number" },
+        "reactions": { "type": "object" }
+      },
+      "required": ["authorEmail", "authorName", "text", "category", "ts"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Subscribers' personal configuration, location, role details"
+    },
+    "/users/{userId}/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Feedback reviews left for a specific doctor, clinic, or assistant"
+    },
+    "/pet_ads/{adId}": {
+      "schema": "PetAd",
+      "description": "Registered classified ads for pet adoptions and sales"
+    },
+    "/marketplace_products/{productId}": {
+      "schema": "Product",
+      "description": "Items listed by doctors or clinics on the shop board"
+    },
+    "/community_posts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Broadcast notifications and collaborative bulletin boards"
+    }
+  }
+}

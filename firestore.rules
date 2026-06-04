@@ -1,0 +1,222 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────────
+    // GLOBAL SAFETY NET
+    // ─────────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // SECURE REUSABLE HELPER PRIMITIVES
+    // ─────────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // USERS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow get: if isSignedIn() && (
+        isOwner(userId) ||
+        resource.data.role != 'user'
+      );
+      
+      allow list: if isSignedIn() && (
+        resource.data.role != 'user'
+      );
+
+      allow create: if isSignedIn() && isOwner(userId) && (
+        incoming().keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().role in ['doctor', 'clinic', 'assistant', 'user'] &&
+        incoming().name is string && incoming().name.size() <= 80 &&
+        incoming().email is string && incoming().email.size() <= 128 &&
+        (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
+        (!('expertise' in incoming()) || (incoming().expertise is string && incoming().expertise.size() <= 200)) &&
+        (!('facilities' in incoming()) || (incoming().facilities is string && incoming().facilities.size() <= 200)) &&
+        (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
+        (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
+        (!('isVerified' in incoming()) || incoming().isVerified == false) && // Block self-verification during registration
+        (!('emailVerified' in incoming()) || incoming().emailVerified is bool)
+      );
+
+      // Protect against privilege escalation and role-switching attacks
+      allow update: if isSignedIn() && isOwner(userId) && (
+        incoming().role == existing().role &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
+        (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
+        incoming().name is string && incoming().name.size() <= 80 &&
+        (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
+        (!('expertise' in incoming()) || (incoming().expertise is string && incoming().expertise.size() <= 200)) &&
+        (!('facilities' in incoming()) || (incoming().facilities is string && incoming().facilities.size() <= 200)) &&
+        (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
+        (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024))
+      );
+      
+      allow delete: if isOwner(userId);
+
+      // ───────────────────────────────────────────────────────────────
+      // REVIEWS SUBCOLLECTION (users/{userId}/reviews/{reviewId})
+      // ───────────────────────────────────────────────────────────────
+      match /reviews/{reviewId} {
+        // Any signed-in user can view clinican reviews
+        allow read: if isSignedIn();
+
+        allow create: if isSignedIn() && (
+          // Reviewer can write review of someone else
+          userId != request.auth.uid &&
+          incoming().reviewerEmail == request.auth.token.email &&
+          incoming().reviewerName is string &&
+          incoming().reviewerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
+          incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
+          (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
+          incoming().date is number && incoming().date <= request.time.toMillis() + 60000 &&
+          // Verify that the person being rated is actually a clinician (not a plain user)
+          get(/databases/$(database)/documents/users/$(userId)).data.role != 'user'
+        );
+
+        allow update, delete: if isSignedIn() && (
+          // Reviewer owns the review
+          existing().reviewerEmail == request.auth.token.email &&
+          incoming().reviewerEmail == existing().reviewerEmail &&
+          incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
+          (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
+          incoming().date == existing().date
+        );
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PET ADS RULES (Classifieds)
+    // ─────────────────────────────────────────────────────────────────
+    match /pet_ads/{adId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().ownerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
+        incoming().adType in ['sale', 'adoption'] &&
+        incoming().petType is string && incoming().petType.size() <= 50 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().location is string && incoming().location.size() <= 100 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow update, delete: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().ownerRole == existing().ownerRole &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().adType == existing().adType &&
+        incoming().petType is string && incoming().petType.size() <= 50 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().location is string && incoming().location.size() <= 100 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // MARKETPLACE PRODUCTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /marketplace_products/{productId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        // Authority check: Only Clinicians (Doctors or Clinics) can post marketplace items
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic'] &&
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().ownerRole in ['doctor', 'clinic'] &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().price is number && incoming().price >= 0 &&
+        incoming().quantity is number && incoming().quantity >= 1 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow update, delete: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().ownerRole == existing().ownerRole &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().price is number && incoming().price >= 0 &&
+        incoming().quantity is number && incoming().quantity >= 0 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMMUNITY POSTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /community_posts/{postId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        incoming().authorEmail == request.auth.token.email &&
+        incoming().text is string && incoming().text.size() <= 1500 &&
+        incoming().category in ['lost', 'adoption', 'help', 'general'] &&
+        incoming().ts is number && incoming().ts <= request.time.toMillis() + 60000 &&
+         // Strict empty reactions check on create to prevent validation forgery
+        incoming().reactions is map &&
+        incoming().reactions['❤️'] is list && incoming().reactions['❤️'].size() == 0 &&
+        incoming().reactions['👍'] is list && incoming().reactions['👍'].size() == 0 &&
+        incoming().reactions['❗'] is list && incoming().reactions['❗'].size() == 0
+      );
+
+      // Update allows toggling of reactions or post editing
+      allow update: if isSignedIn() && (
+        // Option A: Owner edits post
+        (
+          existing().authorEmail == request.auth.token.email &&
+          incoming().authorEmail == existing().authorEmail &&
+          incoming().ts == existing().ts &&
+          incoming().text is string && incoming().text.size() <= 1500 &&
+          incoming().category in ['lost', 'adoption', 'help', 'general']
+        ) ||
+        // Option B: Someone else reacts to the post. Diff must contain ONLY changed reactions list
+        (
+          incoming().authorEmail == existing().authorEmail &&
+          incoming().ts == existing().ts &&
+          incoming().text == existing().text &&
+          incoming().category == existing().category &&
+          incoming().reactions is map
+        )
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().authorEmail == request.auth.token.email
+      );
+    }
+  }
+}

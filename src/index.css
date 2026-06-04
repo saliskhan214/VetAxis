@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Space+Grotesk:wght@400;500;700&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "Fira Code", monospace;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   GLOBAL STYLE LAYOUT OVERRIDES (3D Modernist & Refined Natural Aesthetic)
+   ───────────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-sans);
+  background-color: #fcf9f2; /* Beautiful enriched sand cream */
+  background-image: 
+    radial-gradient(#e6e0d3 1.2px, transparent 1.2px),
+    radial-gradient(#e6e0d3 1.2px, #fcf9f2 1.2px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+  color: #373735; /* Elegant charcoal-earth */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism glass sheets with volumetric lighting */
+.glass-panel-3d {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.85),
+    0 4px 6px -1px rgba(90, 90, 64, 0.05),
+    0 20px 40px -4px rgba(90, 90, 64, 0.08);
+}
+
+/* Custom Tactical 3D Card */
+.card-tactile-3d {
+  background: white;
+  border: 1px solid #e3dec9;
+  border-bottom: 4px solid #cdc6ad;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px -6px rgba(90, 90, 64, 0.08);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.card-tactile-3d:hover {
+  transform: translateY(-5px);
+  border-bottom-width: 6px;
+  border-bottom-color: #5a5a40;
+  box-shadow: 0 16px 32px -4px rgba(90, 90, 64, 0.15);
+}
+
+.card-tactile-3d:active {
+  transform: translateY(1px);
+  border-bottom-width: 2px;
+  box-shadow: 0 4px 12px -3px rgba(90, 90, 64, 0.1);
+}
+
+/* Interactive 3D Clickable Buttons */
+.btn-tactile-3d-primary {
+  position: relative;
+  background: #5a5a40;
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  border: 1px solid #4a4a34;
+  border-bottom: 4px solid #3c3c2b;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+  transition: all 0.15s ease-out;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-tactile-3d-primary:hover {
+  background: #68684b;
+  transform: translateY(-2px);
+  border-bottom-width: 5px;
+}
+
+.btn-tactile-3d-primary:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+
+.btn-tactile-3d-secondary {
+  position: relative;
+  background: #fdfbf7;
+  color: #5a5a40;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  border: 1px solid #d8d2c0;
+  border-bottom: 4px solid #c4bcab;
+  transition: all 0.15s ease-out;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-tactile-3d-secondary:hover {
+  background: white;
+  border-color: #5a5a40;
+  border-bottom-color: #43432f;
+  transform: translateY(-2px);
+  border-bottom-width: 5px;
+}
+
+.btn-tactile-3d-secondary:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+
+/* Red tactical danger action buttons */
+.btn-tactile-3d-danger {
+  position: relative;
+  background: #df4747;
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  border: 1px solid #c23838;
+  border-bottom: 4px solid #9e2a2a;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.15);
+  transition: all 0.15s ease-out;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-tactile-3d-danger:hover {
+  background: #e85353;
+  transform: translateY(-2px);
+  border-bottom-width: 5px;
+}
+
+.btn-tactile-3d-danger:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+
+/* Form Controls with Realist Sunk shadow effect */
+.form-control {
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  border: 1.5px solid #dcd7c9;
+  border-bottom-width: 2.5px;
+  border-radius: 14px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: #373735;
+  background-color: #ffffff;
+  box-shadow: inset 0 2px 4px rgba(90, 90, 64, 0.03);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.form-control:focus {
+  border-color: #5a5a40;
+  border-bottom-color: #5a5a40;
+  box-shadow: 
+    inset 0 1px 2px rgba(90, 90, 64, 0.05),
+    0 0 0 4px rgba(90, 90, 64, 0.14);
+}
+
+.form-control:disabled {
+  background-color: #f4f1e9;
+  color: #a49f92;
+  border-bottom-width: 1.5px;
+  cursor: not-allowed;
+}
+
+/* Scrollbars matching the theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #fcf9f2;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cdc6ad;
+  border-radius: 4px;
+  border: 2px solid #fcf9f2;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a49f92;
+}
+
+/* Micro-animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-scaleUp {
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Dynamic glow effect */
+@keyframes softGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(90,90,64,0.1), 0 10px 30px rgba(90,90,64,0.06); }
+  50% { box-shadow: 0 0 25px rgba(90,90,64,0.22), 0 10px 40px rgba(90,90,64,0.1); }
+}
+
+.animate-glow {
+  animation: softGlow 3s infinite ease-in-out;
+}

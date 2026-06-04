@@ -1,0 +1,1135 @@
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  getDocFromServer
+} from 'firebase/firestore';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile as fbUpdateProfile,
+  updatePassword as fbUpdatePassword,
+  sendEmailVerification,
+  signInWithPopup,
+  GoogleAuthProvider,
+  deleteUser as fbDeleteUser
+} from 'firebase/auth';
+
+import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation } from '../types';
+
+// ─────────────────────────────────────────────────────────────────
+// MOCK FALLBACK DATABASE ACTIONS (LocalStorage)
+// ─────────────────────────────────────────────────────────────────
+const LOCAL_USERS_KEY = 'va_users';
+const LOCAL_SESSION_KEY = 'va_session';
+const LOCAL_ACC_KEY = 'va_accessories';
+const LOCAL_PETS_KEY = 'va_pet_ads';
+const LOCAL_POSTS_KEY = 'va_community_posts';
+
+function getLocalUsers(): UserProfile[] {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalUsers(list: UserProfile[]) {
+  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(list));
+}
+
+export function getLocalSession(): UserProfile | null {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_SESSION_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalSession(user: UserProfile | null) {
+  if (user) {
+    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(LOCAL_SESSION_KEY);
+  }
+}
+
+function cleanUndefined<T extends object>(obj: T): T {
+  const result = { ...obj } as any;
+  Object.keys(result).forEach(key => {
+    if (result[key] === undefined) {
+      delete result[key];
+    }
+  });
+  return result;
+}
+
+// Ensure first-time boot has some default demo professionals populated so the preview isn't blank
+function populateInitialSeeds() {
+  const users = getLocalUsers();
+  if (users.length === 0) {
+    const seeds: UserProfile[] = [
+      {
+        uid: 'seed_doc_1',
+        name: 'Dr. Sarah Alizai',
+        email: 'sarah.alizai@vetaxis.pk',
+        phone: '03001234567',
+        role: 'doctor',
+        expertise: 'Feline Specialist, General Surgery',
+        createdAt: Date.now() - 5 * 24 * 3600000,
+        isVerified: true,
+        avgRating: 4.8,
+        totalReviews: 12,
+        reviews: [
+          {
+            id: 'rev_1',
+            reviewerEmail: 'user1@test.com',
+            reviewerName: 'Ali Khan',
+            reviewerRole: 'user',
+            rating: 5,
+            comment: 'Dr. Sarah saved my cat! She is extremely thorough and caring.',
+            date: Date.now() - 2 * 24 * 3600000
+          }
+        ]
+      },
+      {
+        uid: 'seed_doc_2',
+        name: 'Dr. Faisal Shah',
+        email: 'faisal.shah@vetaxis.pk',
+        phone: '03217654321',
+        role: 'doctor',
+        expertise: 'Avian Medicine, Surgery & Orthopedics',
+        createdAt: Date.now() - 15 * 24 * 3600000,
+        isVerified: true,
+        avgRating: 4.5,
+        totalReviews: 6,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_1',
+        name: 'Peshawar Animal Hospital',
+        email: 'peshawar.vet@clinic.pk',
+        phone: '0915222222',
+        role: 'clinic',
+        facilities: 'Digital X-Ray, ICU, Laboratory, 24/7 Emergency',
+        address: 'Khyber Road, Peshawar Cantonment',
+        createdAt: Date.now() - 30 * 24 * 3600000,
+        isVerified: true,
+        location: {
+          lat: 34.0151,
+          lng: 71.5249,
+          address: 'Khyber Road, Peshawar Cantonment'
+        },
+        avgRating: 4.9,
+        totalReviews: 15,
+        reviews: []
+      },
+      {
+        uid: 'seed_assistant_1',
+        name: 'Haris Qureshi',
+        email: 'haris.q@vetaxis.pk',
+        phone: '03339090901',
+        role: 'assistant',
+        expertise: 'Wound dressing, vaccination schedules, post-op care',
+        createdAt: Date.now() - 2 * 24 * 3600000,
+        isVerified: false,
+        avgRating: 4.0,
+        totalReviews: 2,
+        reviews: []
+      }
+    ];
+    saveLocalUsers(seeds);
+  }
+
+  // Seed default marketplace items
+  if (!localStorage.getItem(LOCAL_ACC_KEY)) {
+    const marketSeeds: Product[] = [
+      {
+        id: 'p_seed_1',
+        name: 'Organic Anti-Flea Shampoo',
+        price: 1250,
+        quantity: 25,
+        description: 'Clinically proven herbal anti-flea formula for kittens and dogs. Free from harsh chemicals.',
+        whatsapp: '923001234567',
+        ownerEmail: 'sarah.alizai@vetaxis.pk',
+        ownerName: 'Dr. Sarah Alizai',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 1 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_2',
+        name: 'Premium Calcium Tablets for Canines',
+        price: 850,
+        quantity: 50,
+        description: 'Supports absolute bone density and joint strength. Specially formulated for retrievers and large breeds.',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Dr. Faisal Shah',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 3 * 24 * 3600000
+      }
+    ];
+    localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(marketSeeds));
+  }
+
+  // Seed default pet ads
+  if (!localStorage.getItem(LOCAL_PETS_KEY)) {
+    const petSeeds: PetAd[] = [
+      {
+        id: 'ad_seed_1',
+        adType: 'adoption',
+        petType: 'Cat',
+        breed: 'Persian Crossbreed',
+        age: 3,
+        price: 0,
+        description: 'Extremely playful kitten vaccinated and trained. Looking for a warm home.',
+        location: 'Gulshan Iqbal, Karachi',
+        whatsapp: '923001234567',
+        ownerEmail: 'user1@test.com',
+        ownerName: 'Ali Khan',
+        ownerRole: 'user',
+        createdAt: Date.now() - 2 * 24 * 3600000
+      }
+    ];
+    localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(petSeeds));
+  }
+
+  // Seed community posts
+  if (!localStorage.getItem(LOCAL_POSTS_KEY)) {
+    const postSeeds: CommunityPost[] = [
+      {
+        id: 'post_seed_1',
+        authorEmail: 'sarah.alizai@vetaxis.pk',
+        authorName: 'Dr. Sarah Alizai',
+        role: 'doctor',
+        profilePic: 'default',
+        text: 'Hello everyone! I noticed a sudden spike in ticks in Peshawar cantonment area due to early summer. Please check your dogs paws, ears, and belly after walks. Use standard fipronil protective drops if needed!',
+        category: 'help',
+        ts: Date.now() - 4 * 3600000,
+        reactions: { '❤️': ['user1@test.com'], '👍': ['faisal.shah@vetaxis.pk'], '❗': [] }
+      }
+    ];
+    localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(postSeeds));
+  }
+}
+
+// Execute seeds init on import to guarantee user isn't greeting an empty screen
+populateInitialSeeds();
+
+// ─────────────────────────────────────────────────────────────────
+// AUTH ENGINE (Live Firebase or LocalStorage Fallback)
+// ─────────────────────────────────────────────────────────────────
+export const AuthService = {
+  async signUp(email: string, password: string, name: string, phone: string, role: string, extra: any): Promise<UserProfile> {
+    const emailLower = email.toLowerCase().trim();
+
+    if (isFirebaseConfigured && auth && db) {
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, emailLower, password);
+        const uid = userCredential.user.uid;
+
+        // Create user document in Firestore users collection
+        const profile: UserProfile = {
+          uid,
+          name: name.trim(),
+          email: emailLower,
+          phone: phone.trim() || undefined,
+          role: role as any,
+          expertise: extra.expertise || undefined,
+          facilities: extra.facilities || undefined,
+          address: extra.address || undefined,
+          profilePic: 'default',
+          createdAt: Date.now(),
+          location: extra.location || null,
+          isVerified: false,
+          emailVerified: false
+        };
+
+        await setDoc(doc(db, 'users', uid), cleanUndefined(profile));
+        await fbUpdateProfile(userCredential.user, { displayName: name });
+        
+        // Trigger verification email send (non-blocking so signup still succeeds)
+        try {
+          await sendEmailVerification(userCredential.user);
+          console.log('[VetAxis] Verification email dispatched.');
+        } catch (sendErr) {
+          console.error('[VetAxis] Failed to dispatch verification email during signUp:', sendErr);
+        }
+
+        saveLocalSession(profile);
+        return profile;
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        if (msg.includes('operation-not-allowed')) {
+          throw new Error("Email/Password registration is disabled in this limited Sandbox Firebase project. Please use \"Continue with Google\" to register. Google Sign-In supports ANY email provider (like Yahoo, Outlook, or corporate addresses) if they are registered as Google Accounts.");
+        }
+        throw new Error(msg || 'Registration failed.');
+      }
+    } else {
+      // Local Fallback Sign Up
+      const users = getLocalUsers();
+      if (users.some(u => u.email === emailLower)) {
+        throw new Error('An account with this email address already exists.');
+      }
+
+      const uid = 'usr_' + Date.now();
+      const profile: UserProfile = {
+        uid,
+        name: name.trim(),
+        email: emailLower,
+        phone: phone.trim() || undefined,
+        role: role as any,
+        expertise: extra.expertise || undefined,
+        facilities: extra.facilities || undefined,
+        address: extra.address || undefined,
+        profilePic: 'default',
+        createdAt: Date.now(),
+        location: extra.location || null,
+        isVerified: false,
+        emailVerified: false,
+        reviews: []
+      };
+
+      // Also support mock password matching
+      (profile as any)._password = password;
+
+      users.push(profile);
+      saveLocalUsers(users);
+      saveLocalSession(profile);
+      return profile;
+    }
+  },
+
+  async signIn(email: string, password: string): Promise<UserProfile> {
+    const emailLower = email.toLowerCase().trim();
+
+    if (isFirebaseConfigured && auth && db) {
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, emailLower, password);
+        const uid = userCredential.user.uid;
+
+        // Fetch user doc from Firestore
+        const userDoc = await getDoc(doc(db, 'users', uid));
+        if (!userDoc.exists()) {
+          throw new Error('User profile does not exist in Firestore. Please register again.');
+        }
+
+        const profile = userDoc.data() as UserProfile;
+        saveLocalSession(profile);
+        return profile;
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        if (msg.includes('operation-not-allowed')) {
+          throw new Error("Email/Password sign-in is disabled in this limited Sandbox Firebase project. Please use \"Continue with Google\" to sign in. Google Sign-In supports ANY email provider (like Yahoo, Outlook, or corporate addresses) if they are registered as Google Accounts.");
+        }
+        throw new Error(msg || 'Incorrect password or authentication error.');
+      }
+    } else {
+      // Local Fallback Sign In
+      const users = getLocalUsers();
+      const user = users.find(u => u.email === emailLower);
+      if (!user || (user as any)._password !== password) {
+        throw new Error('Incorrect email address or password.');
+      }
+
+      saveLocalSession(user);
+      return user;
+    }
+  },
+
+  async signOut(): Promise<void> {
+    if (isFirebaseConfigured && auth) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error('Firebase signout error:', err);
+      }
+    }
+    saveLocalSession(null);
+  },
+
+  async updateProfile(uid: string, fields: Partial<UserProfile>): Promise<UserProfile> {
+    if (isFirebaseConfigured && db) {
+      try {
+        const userRef = doc(db, 'users', uid);
+        await updateDoc(userRef, cleanUndefined(fields));
+        
+        // Fetch fresh copy
+        const freshDoc = await getDoc(userRef);
+        const freshProfile = freshDoc.data() as UserProfile;
+        saveLocalSession(freshProfile);
+        return freshProfile;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `users/${uid}`);
+      }
+    } else {
+      // Local fallback
+      const users = getLocalUsers();
+      const idx = users.findIndex(u => u.uid === uid);
+      if (idx !== -1) {
+        users[idx] = { ...users[idx], ...fields };
+        saveLocalUsers(users);
+        saveLocalSession(users[idx]);
+        return users[idx];
+      }
+      throw new Error('User not found.');
+    }
+  },
+
+  async changePassword(newPw: string): Promise<void> {
+    const session = getLocalSession();
+    if (!session) throw new Error('No active login session.');
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await fbUpdatePassword(auth.currentUser, newPw);
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : 'Failed to change password. Retype credentials.');
+      }
+    } else {
+      // Local fallback
+      const users = getLocalUsers();
+      const idx = users.findIndex(u => u.email === session.email);
+      if (idx !== -1) {
+        (users[idx] as any)._password = newPw;
+        saveLocalUsers(users);
+      }
+    }
+  },
+
+  async resendVerification(): Promise<void> {
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+      } catch (err: any) {
+        throw new Error(err.message || 'Failed to resend verification email.');
+      }
+    } else {
+      // Local fallback
+      const session = getLocalSession();
+      if (!session) throw new Error('No active login session.');
+      console.log('Mocked resent verification email for', session.email);
+    }
+  },
+
+  async reloadUser(): Promise<UserProfile> {
+    const session = getLocalSession();
+    if (!session) throw new Error('No active login session.');
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await auth.currentUser.reload();
+        const firebaseVerified = auth.currentUser.emailVerified;
+        
+        // Update both local session and Firestore document
+        const freshProfile = { ...session, emailVerified: firebaseVerified };
+        const userRef = doc(db, 'users', session.uid);
+        await updateDoc(userRef, { emailVerified: firebaseVerified });
+        
+        saveLocalSession(freshProfile);
+        return freshProfile;
+      } catch (err: any) {
+        throw new Error(err.message || 'Failed to reload user from Firebase.');
+      }
+    } else {
+      // Local fallback - clicking reload/verify button instantly verifies in local mock mode
+      const users = getLocalUsers();
+      const idx = users.findIndex(u => u.uid === session.uid);
+      if (idx !== -1) {
+        users[idx].emailVerified = true;
+        saveLocalUsers(users);
+        saveLocalSession(users[idx]);
+        return users[idx];
+      }
+      throw new Error('User not found.');
+    }
+  },
+
+  async signInWithGoogle(roleForSignUp: string = 'user'): Promise<any> {
+    if (isFirebaseConfigured && auth && db) {
+      try {
+        const provider = new GoogleAuthProvider();
+        const userCredential = await signInWithPopup(auth, provider);
+        const uid = userCredential.user.uid;
+        const email = userCredential.user.email || '';
+        const displayName = userCredential.user.displayName || 'Google User';
+        const photoURL = userCredential.user.photoURL || 'default';
+
+        // Check if user already exists in Firestore
+        const userRef = doc(db, 'users', uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          // Returning user
+          const profile = userDoc.data() as UserProfile;
+          profile.emailVerified = userCredential.user.emailVerified;
+          await updateDoc(userRef, { emailVerified: profile.emailVerified });
+          saveLocalSession(profile);
+          return { exists: true, profile };
+        } else {
+          // New Google Sign Up
+          return {
+            exists: false,
+            pendingInfo: {
+              uid,
+              name: displayName,
+              email: email.toLowerCase(),
+              profilePic: photoURL,
+              emailVerified: userCredential.user.emailVerified
+            }
+          };
+        }
+      } catch (err: any) {
+        throw new Error(err.message || 'Google Sign-In failed.');
+      }
+    } else {
+      // Local Fallback Mock
+      const users = getLocalUsers();
+      let profile = users.find(u => u.email === 'google@test.com');
+      if (profile) {
+        saveLocalSession(profile);
+        return { exists: true, profile };
+      } else {
+        return {
+          exists: false,
+          pendingInfo: {
+            uid: 'google_user_1',
+            name: 'Google Dummy User',
+            email: 'google@test.com',
+            profilePic: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+            emailVerified: true
+          }
+        };
+      }
+    }
+  },
+
+  async registerGoogleUser(
+    pendingInfo: { uid: string; name: string; email: string; profilePic: string; emailVerified: boolean },
+    role: string,
+    phone: string,
+    extra: any
+  ): Promise<UserProfile> {
+    const profile: UserProfile = {
+      uid: pendingInfo.uid,
+      name: pendingInfo.name,
+      email: pendingInfo.email,
+      phone: phone.trim() || undefined,
+      role: role as any,
+      expertise: extra.expertise || undefined,
+      facilities: extra.facilities || undefined,
+      address: extra.address || undefined,
+      profilePic: pendingInfo.profilePic,
+      createdAt: Date.now(),
+      isVerified: false,
+      emailVerified: pendingInfo.emailVerified
+    };
+
+    if (isFirebaseConfigured && db) {
+      await setDoc(doc(db, 'users', pendingInfo.uid), cleanUndefined(profile));
+    } else {
+      const users = getLocalUsers();
+      users.push(profile);
+      saveLocalUsers(users);
+    }
+
+    saveLocalSession(profile);
+    return profile;
+  },
+
+  async validateUserProfile(uid: string): Promise<boolean> {
+    if (isFirebaseConfigured && db) {
+      try {
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userRef);
+        return userSnap.exists();
+      } catch (err) {
+        console.error("Failed to validate user profile:", err);
+        // If error (network/permission), assume valid to prevent false positive logouts
+        return true; 
+      }
+    } else {
+      const users = getLocalUsers();
+      return users.some(u => u.uid === uid);
+    }
+  },
+
+  async deleteAccount(uid: string): Promise<void> {
+    const session = getLocalSession();
+    if (!session) throw new Error('No active login session.');
+    const userEmail = session.email;
+
+    if (isFirebaseConfigured && db) {
+      try {
+        // 1. Delete user profile doc
+        await deleteDoc(doc(db, 'users', uid));
+
+        // 2. Delete pet ads matching the user's email
+        try {
+          const adsQuery = query(collection(db, 'pet_ads'), where('ownerEmail', '==', userEmail));
+          const adsSnap = await getDocs(adsQuery);
+          for (const d of adsSnap.docs) {
+            await deleteDoc(doc(db, 'pet_ads', d.id));
+          }
+        } catch (adErr) {
+          console.error('Error deleting user ads during account erasure:', adErr);
+        }
+
+        // 3. Delete marketplace products matching the user's email
+        try {
+          const prodQuery = query(collection(db, 'marketplace_products'), where('ownerEmail', '==', userEmail));
+          const prodSnap = await getDocs(prodQuery);
+          for (const d of prodSnap.docs) {
+            await deleteDoc(doc(db, 'marketplace_products', d.id));
+          }
+        } catch (prodErr) {
+          console.error('Error deleting user products during account erasure:', prodErr);
+        }
+
+        // 4. Delete community posts matching the user's email
+        try {
+          const postQuery = query(collection(db, 'community_posts'), where('authorEmail', '==', userEmail));
+          const postSnap = await getDocs(postQuery);
+          for (const d of postSnap.docs) {
+            await deleteDoc(doc(db, 'community_posts', d.id));
+          }
+        } catch (postErr) {
+          console.error('Error deleting user community posts during account erasure:', postErr);
+        }
+
+        // 5. Delete from Firebase Auth if current user matches
+        if (auth?.currentUser && auth.currentUser.uid === uid) {
+          try {
+            await fbDeleteUser(auth.currentUser);
+          } catch (authErr: any) {
+            console.error('Firebase Auth account delete failed:', authErr);
+            // Sign out regardless so they are logged out
+            await signOut(auth);
+          }
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `users/${uid}`);
+      }
+    } else {
+      // Local fallback
+      // 1. Delete user from users storage
+      const users = getLocalUsers();
+      const filteredUsers = users.filter(u => u.uid !== uid);
+      saveLocalUsers(filteredUsers);
+
+      // 2. Delete ads
+      const adsJson = localStorage.getItem(LOCAL_PETS_KEY);
+      if (adsJson) {
+        try {
+          const ads = JSON.parse(adsJson) as PetAd[];
+          const filteredAds = ads.filter(a => a.ownerEmail !== userEmail);
+          localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(filteredAds));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // 3. Delete marketplace products
+      const prodJson = localStorage.getItem(LOCAL_ACC_KEY);
+      if (prodJson) {
+        try {
+          const prods = JSON.parse(prodJson) as Product[];
+          const filteredProds = prods.filter(p => p.ownerEmail !== userEmail);
+          localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(filteredProds));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // 4. Delete community posts
+      const postsJson = localStorage.getItem(LOCAL_POSTS_KEY);
+      if (postsJson) {
+        try {
+          const posts = JSON.parse(postsJson) as CommunityPost[];
+          const filteredPosts = posts.filter(p => p.authorEmail !== userEmail);
+          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(filteredPosts));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    // 6. Complete erasure from client session
+    saveLocalSession(null);
+  }
+};
+
+const SEED_EMAILS = new Set([
+  'sarah.alizai@vetaxis.pk',
+  'faisal.shah@vetaxis.pk',
+  'peshawar.vet@clinic.pk',
+  'haris.q@vetaxis.pk',
+  'user1@test.com'
+]);
+
+class WildcardSet extends Set<string> {
+  has(value: string): boolean {
+    return true;
+  }
+}
+
+async function getValidUserEmails(): Promise<Set<string>> {
+  if (isFirebaseConfigured && db) {
+    // In Firebase mode, we do not query the entire '/users' collection on client side
+    // to search for emails (which breaks rules under PII security and leaks user details).
+    // Any post, ad, or product is already guaranteed to be authored by a authenticated user on creation.
+    return new WildcardSet();
+  }
+  const emails = new Set<string>(SEED_EMAILS);
+  const users = getLocalUsers();
+  users.forEach(u => {
+    if (u.email) {
+      emails.add(u.email.toLowerCase().trim());
+    }
+  });
+  return emails;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// EXPLORE SERVICE (Sorting, Reviews, Geolocation distance haversine)
+// ─────────────────────────────────────────────────────────────────
+export const LocationService = {
+  haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // earth radius in km
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+};
+
+export const ExploreService = {
+  async fetchProfessionals(role: 'doctor' | 'clinic' | 'assistant'): Promise<UserProfile[]> {
+    const validEmails = await getValidUserEmails();
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'users'), where('role', '==', role));
+        const snapshots = await getDocs(q);
+        const list: UserProfile[] = [];
+        
+        for (const userDoc of snapshots.docs) {
+          const profile = userDoc.data() as UserProfile;
+          // Subcollection reviews fetch
+          const revSnap = await getDocs(collection(db, 'users', profile.uid, 'reviews'));
+          const reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
+          
+          const filteredReviews = reviews.filter(rev => {
+            const email = (rev.reviewerEmail || '').toLowerCase().trim();
+            return !email || validEmails.has(email);
+          });
+          profile.reviews = filteredReviews;
+          
+          // Recompute stats inline safely
+          if (filteredReviews.length > 0) {
+            const sum = filteredReviews.reduce((s, r) => s + r.rating, 0);
+            profile.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
+            profile.totalReviews = filteredReviews.length;
+          } else {
+            profile.avgRating = 0;
+            profile.totalReviews = 0;
+          }
+          list.push(profile);
+        }
+        return list;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'users');
+      }
+    } else {
+      // Local Fallback list
+      const users = getLocalUsers();
+      return users.filter(u => u.role === role).map(u => {
+        const reviews = u.reviews || [];
+        const filteredReviews = reviews.filter(rev => {
+          const email = (rev.reviewerEmail || '').toLowerCase().trim();
+          return !email || validEmails.has(email);
+        });
+        u.reviews = filteredReviews;
+        if (filteredReviews.length > 0) {
+          const sum = filteredReviews.reduce((acc, r) => acc + r.rating, 0);
+          u.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
+          u.totalReviews = filteredReviews.length;
+        } else {
+          u.avgRating = 0;
+          u.totalReviews = 0;
+        }
+        return u;
+      });
+    }
+  },
+
+  sortUsers(list: UserProfile[], sortType: SORT_TYPES, userLoc: GeoLocation | null): UserProfile[] {
+    const listCopy = [...list];
+
+    switch (sortType) {
+      case SORT_TYPES.HIGHEST:
+        return listCopy.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+      case SORT_TYPES.RECENT:
+        return listCopy.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      case SORT_TYPES.NEAREST: {
+        if (!userLoc) return listCopy.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+        return listCopy.sort((a, b) => {
+          const distA = a.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, a.location.lat, a.location.lng) : 99999;
+          const distB = b.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, b.location.lat, b.location.lng) : 99999;
+          return distA - distB;
+        });
+      }
+      case SORT_TYPES.RECOMMENDED: {
+        // Boost factor equation: (Rating * 10) - (DistanceInKm * 1.5) + (recent bonus if age <= 30 days)
+        return listCopy.sort((a, b) => {
+          const score = (p: UserProfile) => {
+            const rScore = (p.avgRating || 0) * 10;
+            let dScore = 0;
+            if (userLoc && p.location?.lat) {
+              const km = LocationService.haversine(userLoc.lat, userLoc.lng, p.location.lat, p.location.lng);
+              dScore = -(km * 1.5);
+            }
+            const isRecent = Date.now() - p.createdAt < 30 * 24 * 3600000 ? 5 : 0;
+            return rScore + dScore + isRecent;
+          };
+          return score(b) - score(a);
+        });
+      }
+      default:
+        return listCopy;
+    }
+  },
+
+  async addReview(targetUid: string, rating: number, comment: string, reviewer: UserProfile): Promise<Review[]> {
+    const newReview: Review = {
+      id: 'rev_' + Date.now(),
+      reviewerEmail: reviewer.email,
+      reviewerName: reviewer.name,
+      reviewerRole: reviewer.role,
+      rating,
+      comment: comment.trim(),
+      date: Date.now()
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        const reviewColRef = collection(db, 'users', targetUid, 'reviews');
+        // Check for duplicates/existing review from same author
+        const authorQ = query(reviewColRef, where('reviewerEmail', '==', reviewer.email));
+        const existingDocs = await getDocs(authorQ);
+        if (existingDocs.docs.length > 0) {
+          // Overwrite/Update existing review
+          const docId = existingDocs.docs[0].id;
+          await setDoc(doc(db, 'users', targetUid, 'reviews', docId), newReview);
+        } else {
+          // Add new
+          await addDoc(reviewColRef, newReview);
+        }
+
+        // Return full review list
+        const snapshot = await getDocs(reviewColRef);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
+
+        // Re-write total stats on user profile document atomically
+        const sum = list.reduce((s, r) => s + r.rating, 0);
+        const avg = parseFloat((sum / list.length).toFixed(1));
+        await updateDoc(doc(db, 'users', targetUid), { avgRating: avg, totalReviews: list.length });
+
+        return list;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${targetUid}/reviews`);
+      }
+    } else {
+      // Local fallback reviews
+      const users = getLocalUsers();
+      const idx = users.findIndex(u => u.uid === targetUid);
+      if (idx !== -1) {
+        if (!users[idx].reviews) users[idx].reviews = [];
+        
+        // Remove existing review from same reviewer if present
+        users[idx].reviews = (users[idx].reviews || []).filter(r => r.reviewerEmail !== reviewer.email);
+        users[idx].reviews?.push(newReview);
+
+        const list = users[idx].reviews || [];
+        const sum = list.reduce((s, r) => s + r.rating, 0);
+        users[idx].avgRating = parseFloat((sum / list.length).toFixed(1));
+        users[idx].totalReviews = list.length;
+
+        saveLocalUsers(users);
+        return list;
+      }
+      throw new Error('Clinician not found.');
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// COMMUNITY POSTS SERVICE
+// ─────────────────────────────────────────────────────────────────
+export const CommunityService = {
+  async fetchPosts(): Promise<CommunityPost[]> {
+    let list: CommunityPost[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'community_posts'), orderBy('ts', 'desc'));
+        const snapshot = await getDocs(q);
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CommunityPost[];
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'community_posts');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_POSTS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+    const validEmails = await getValidUserEmails();
+    return list.filter(post => {
+      const email = (post.authorEmail || '').toLowerCase().trim();
+      return !email || validEmails.has(email);
+    });
+  },
+
+  async createPost(text: string, category: any, author: UserProfile): Promise<CommunityPost> {
+    const post: CommunityPost = {
+      id: 'post_' + Date.now(),
+      authorEmail: author.email,
+      authorName: author.name,
+      role: author.role,
+      profilePic: author.profilePic || 'default',
+      text: text.trim(),
+      category,
+      ts: Date.now(),
+      reactions: { '❤️': [], '👍': [], '❗': [] }
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        // Enforce exact structure rules requirement on creation
+        await setDoc(doc(db, 'community_posts', post.id), post);
+        return post;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, 'community_posts');
+      }
+    } else {
+      const posts = await this.fetchPosts();
+      posts.unshift(post);
+      localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+      return post;
+    }
+  },
+
+  async toggleReaction(postId: string, emoji: string, userEmail: string): Promise<CommunityPost> {
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, 'community_posts', postId);
+        const postSnap = await getDoc(docRef);
+        if (!postSnap.exists()) throw new Error('Post not found in database.');
+        
+        const post = postSnap.data() as CommunityPost;
+        const index = (post.reactions[emoji] || []).indexOf(userEmail);
+        if (index === -1) {
+          post.reactions[emoji] = [...(post.reactions[emoji] || []), userEmail];
+        } else {
+          post.reactions[emoji] = (post.reactions[emoji] || []).filter(email => email !== userEmail);
+        }
+
+        await updateDoc(docRef, { reactions: post.reactions });
+        return { ...post, id: postId };
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `community_posts/${postId}`);
+      }
+    } else {
+      const posts = await this.fetchPosts();
+      const idx = posts.findIndex(p => p.id === postId);
+      if (idx !== -1) {
+        const reactions = posts[idx].reactions || { '❤️': [], '👍': [], '❗': [] };
+        if (!reactions[emoji]) reactions[emoji] = [];
+        const index = reactions[emoji].indexOf(userEmail);
+        if (index === -1) {
+          reactions[emoji].push(userEmail);
+        } else {
+          reactions[emoji] = reactions[emoji].filter(email => email !== userEmail);
+        }
+        posts[idx].reactions = reactions;
+        localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+        return posts[idx];
+      }
+      throw new Error('Post not found.');
+    }
+  },
+
+  async deletePost(postId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'community_posts', postId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `community_posts/${postId}`);
+      }
+    } else {
+      const posts = await this.fetchPosts();
+      const filtered = posts.filter(p => p.id !== postId);
+      localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(filtered));
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// PET ADS SERVICE
+// ─────────────────────────────────────────────────────────────────
+export const PetAdsService = {
+  async fetchAds(): Promise<PetAd[]> {
+    let list: PetAd[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'pet_ads'), orderBy('createdAt', 'desc')));
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PetAd[];
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'pet_ads');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_PETS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+    const validEmails = await getValidUserEmails();
+    return list.filter(ad => {
+      const email = (ad.ownerEmail || '').toLowerCase().trim();
+      return !email || validEmails.has(email);
+    });
+  },
+
+  async createAd(adData: Partial<PetAd>, owner: UserProfile): Promise<PetAd> {
+    const ad: PetAd = {
+      id: 'ad_' + Date.now(),
+      adType: adData.adType || 'adoption',
+      petType: adData.petType || 'Other',
+      breed: adData.breed || 'Not specified',
+      age: adData.age !== undefined ? adData.age : null,
+      price: adData.price || 0,
+      description: adData.description || '',
+      location: adData.location || '',
+      whatsapp: adData.whatsapp || '',
+      image: adData.image || '',
+      ownerEmail: owner.email,
+      ownerName: owner.name,
+      ownerRole: owner.role,
+      createdAt: Date.now()
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'pet_ads', ad.id), ad);
+        return ad;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `pet_ads/${ad.id}`);
+      }
+    } else {
+      const ads = await this.fetchAds();
+      ads.unshift(ad);
+      localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(ads));
+      return ad;
+    }
+  },
+
+  async deleteAd(adId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'pet_ads', adId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `pet_ads/${adId}`);
+      }
+    } else {
+      const ads = await this.fetchAds();
+      const filtered = ads.filter(a => a.id !== adId);
+      localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(filtered));
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// MARKETPLACE PRODUCT SERVICE
+// ─────────────────────────────────────────────────────────────────
+export const MarketplaceService = {
+  async fetchProducts(): Promise<Product[]> {
+    let list: Product[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'marketplace_products'), orderBy('createdAt', 'desc')));
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'marketplace_products');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_ACC_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+    const validEmails = await getValidUserEmails();
+    return list.filter(p => {
+      const email = (p.ownerEmail || '').toLowerCase().trim();
+      return !email || validEmails.has(email);
+    });
+  },
+
+  async createProduct(prodData: Partial<Product>, owner: UserProfile): Promise<Product> {
+    const product: Product = {
+      id: 'p_' + Date.now(),
+      name: prodData.name || '',
+      price: prodData.price || 0,
+      quantity: prodData.quantity || 1,
+      description: prodData.description || '',
+      whatsapp: prodData.whatsapp || '',
+      image: prodData.image || '',
+      ownerEmail: owner.email,
+      ownerName: owner.name,
+      ownerRole: owner.role,
+      createdAt: Date.now()
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'marketplace_products', product.id), product);
+        return product;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `marketplace_products/${product.id}`);
+      }
+    } else {
+      const products = await this.fetchProducts();
+      products.unshift(product);
+      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(products));
+      return product;
+    }
+  },
+
+  async deleteProduct(productId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'marketplace_products', productId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `marketplace_products/${productId}`);
+      }
+    } else {
+      const products = await this.fetchProducts();
+      const filtered = products.filter(p => p.id !== productId);
+      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(filtered));
+    }
+  }
+};
