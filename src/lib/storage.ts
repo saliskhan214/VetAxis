@@ -25,7 +25,7 @@ import {
 } from 'firebase/auth';
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation } from '../types';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview } from '../types';
 
 // ─────────────────────────────────────────────────────────────────
 // MOCK FALLBACK DATABASE ACTIONS (LocalStorage)
@@ -825,6 +825,15 @@ export const ExploreService = {
 
     if (isFirebaseConfigured && db) {
       try {
+        const targetDoc = await getDoc(doc(db, 'users', targetUid));
+        const targetData = targetDoc.data() as UserProfile | undefined;
+        if (!targetData) {
+          throw new Error('Target profile not found.');
+        }
+        if (!canUserReview(reviewer.role, targetData.role)) {
+          throw new Error('You do not have permission to rate or review this role.');
+        }
+
         const reviewColRef = collection(db, 'users', targetUid, 'reviews');
         // Check for duplicates/existing review from same author
         const authorQ = query(reviewColRef, where('reviewerEmail', '==', reviewer.email));
@@ -856,6 +865,10 @@ export const ExploreService = {
       const users = getLocalUsers();
       const idx = users.findIndex(u => u.uid === targetUid);
       if (idx !== -1) {
+        const target = users[idx];
+        if (!canUserReview(reviewer.role, target.role)) {
+          throw new Error('You do not have permission to rate or review this role.');
+        }
         if (!users[idx].reviews) users[idx].reviews = [];
         
         // Remove existing review from same reviewer if present

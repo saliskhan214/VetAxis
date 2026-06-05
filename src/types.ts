@@ -1,5 +1,35 @@
 export type UserRole = 'doctor' | 'clinic' | 'assistant' | 'user';
 
+export function canUserReview(reviewerRole: UserRole, targetRole: UserRole): boolean {
+  // 1. Roles as Doctors cant rate or give reviews doctors
+  if (reviewerRole === 'doctor' && targetRole === 'doctor') {
+    return false;
+  }
+  // 2. Roles as clinics cant rate or give reviews clinics
+  if (reviewerRole === 'clinic' && targetRole === 'clinic') {
+    return false;
+  }
+  // 3. Helpers (assistant) cant rate and give reviews to helpers (assistant)
+  if (reviewerRole === 'assistant' && targetRole === 'assistant') {
+    return false;
+  }
+  // 4. Helpers (assistant) can give rate and reviews to clinics and doctors
+  if (reviewerRole === 'assistant' && (targetRole === 'clinic' || targetRole === 'doctor')) {
+    return true;
+  }
+  // 5. Only General users can rate and give reviews to Clinics, doctors, and helpers
+  if (reviewerRole === 'user') {
+    return targetRole === 'clinic' || targetRole === 'doctor' || targetRole === 'assistant';
+  }
+  // 6. Clinics can rate or give reviews to doctors and helpers
+  if (reviewerRole === 'clinic' && (targetRole === 'doctor' || targetRole === 'assistant')) {
+    return true;
+  }
+
+  // Fallback / any other combination (e.g. doctors trying to rate non-doctors, etc.)
+  return false;
+}
+
 export interface GeoLocation {
   lat: number;
   lng: number;

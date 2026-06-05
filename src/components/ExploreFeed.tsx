@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { UserProfile, Review, SORT_TYPES, UserRole } from '../types';
+import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview } from '../types';
 import { ExploreService, LocationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, Award, Compass, MessageSquare, ShoppingBag, Grid } from 'lucide-react';
@@ -150,6 +150,10 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const handleSubmitReview = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedProfile) return;
+    if (!canUserReview(currentUser.role, selectedProfile.role)) {
+      setReviewError('You do not have permission to rate or review this role.');
+      return;
+    }
     if (reviewRating === 0) {
       setReviewError('Please pick a star rating between 1 and 5.');
       return;
@@ -674,7 +678,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                   </div>
 
                   {/* Write a review forms */}
-                  {currentUser.uid !== selectedProfile.uid && (
+                  {currentUser.uid !== selectedProfile.uid && canUserReview(currentUser.role, selectedProfile.role) && (
                     <form onSubmit={handleSubmitReview} className="bg-[#fcf9f2] border border-[#e3dec9] p-5 rounded-2xl space-y-4">
                       <div className="text-xs font-black text-[#5a5a40] uppercase tracking-wider">Write client evaluation</div>
                       
