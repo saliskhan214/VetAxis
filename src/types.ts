@@ -58,11 +58,15 @@ export interface UserProfile {
   profilePic?: string;   // base64 or 'default'
   createdAt: number;
   location?: GeoLocation | null;
-  isVerified?: boolean;
+  isVerified?: boolean; // legacy
+  subscriptionTier?: 'Silver' | 'Gold' | 'Platinum';
+  subscriptionExpiresAt?: number;
   emailVerified?: boolean;
   avgRating?: number;
   totalReviews?: number;
   reviews?: Review[]; // For local schema backward compatibility
+  isOnline?: boolean;
+  lastSeen?: number; // timestamp in milliseconds
 }
 
 export interface PetAd {
@@ -115,4 +119,64 @@ export enum SORT_TYPES {
   HIGHEST = 'highestRated',
   RECENT = 'recent',
   RECOMMENDED = 'recommended',
+}
+
+export interface JobPost {
+  id: string;
+  clinicId: string;
+  clinicName: string;
+  clinicEmail: string;
+  title: string;
+  jobType: 'Full-time' | 'Part-time' | 'Freelance' | 'Internship';
+  location: string;
+  salaryMin: number;
+  salaryMax: number;
+  experience: string;
+  workingHours: string;
+  genderPreference: 'No Preference' | 'Male' | 'Female';
+  deadline: string;
+  positions: number;
+  status: 'open' | 'closed';
+  screeningQuestions: string[];
+  requiredDocuments: string[];
+  minQualificationGate: 'none' | 'assistant' | 'doctor';
+  createdAt: number;
+  clinicAddress?: string;
+  clinicWebsite?: string;
+  clinicContactPhone?: string;
+  clinicFacilities?: string;
+}
+
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  clinicId: string;
+  clinicEmail?: string;
+  applicantId: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  applicantRole: UserRole;
+  answers: string[];
+  submittedDocs: {
+    cvText?: string;
+    degreeLinkOrText?: string;
+    licenseNumber?: string;
+    references?: string;
+  };
+  status: 'Pending' | 'Reviewed' | 'Shortlisted' | 'Rejected' | 'Hired';
+  createdAt: number;
+}
+
+export interface VetNotification {
+  id: string;
+  userId: string;
+  senderId: string;
+  senderName: string;
+  type: 'like' | 'comment' | 'apply' | 'status_change';
+  targetId: string;
+  targetType: 'post' | 'job' | 'application';
+  message: string;
+  read: boolean;
+  createdAt: number;
 }

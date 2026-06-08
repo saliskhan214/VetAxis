@@ -20,7 +20,7 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
 
   // Profile data inputs for first-time Google Sign Up
   const [phone, setPhone] = useState<string>('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('doctor');
   const [expertise, setExpertise] = useState<string>('');
   const [facilities, setFacilities] = useState<string>('');
   const [address, setAddress] = useState<string>('');
@@ -29,12 +29,12 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
     setError(null);
     setLoading(true);
     try {
-      const result = await authService.signInWithGoogle('user');
+      const result = await authService.signInWithGoogle('doctor');
       if (result.exists) {
         onAuthSuccess(result.profile);
       } else {
         setGooglePendingInfo(result.pendingInfo);
-        setSelectedRole('user'); // default to user on onboarding start
+        setSelectedRole('doctor'); // default to doctor on onboarding start
       }
     } catch (err: any) {
       setError(err.message || 'Google Authentication failed.');
@@ -61,7 +61,7 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
     setLoading(true);
     try {
       const extra: any = {};
-      if (selectedRole === 'doctor' || selectedRole === 'assistant') {
+      if (selectedRole === 'doctor') {
         extra.expertise = expertise.trim() || 'General Practitioner';
       }
       if (selectedRole === 'clinic') {
@@ -235,10 +235,8 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                 <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-1 block">Designate Your Platform Role *</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: 'user', icon: '🐾', title: 'Pet Owner', desc: 'Consult vets & browse products' },
                     { id: 'doctor', icon: '🩺', title: 'Clinical Doctor', desc: 'Licensed practitioner portfolio' },
-                    { id: 'clinic', icon: '🏥', title: 'Clinic Facility', desc: 'Hospital register & profiles' },
-                    { id: 'assistant', icon: '👩‍⚕️', title: 'Home Assistant', desc: 'Certified nursing support' }
+                    { id: 'clinic', icon: '🏥', title: 'Clinic Facility', desc: 'Hospital register & profiles' }
                   ].map((roleOpt) => {
                     const isSelected = selectedRole === roleOpt.id;
                     return (
@@ -265,7 +263,7 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
 
               {/* CONDITIONAL SUBFORMS */}
               <AnimatePresence mode="wait">
-                {(selectedRole === 'doctor' || selectedRole === 'assistant') && (
+                {(selectedRole === 'doctor') && (
                   <motion.div
                     key="pro-form"
                     initial={{ opacity: 0, y: 15 }}

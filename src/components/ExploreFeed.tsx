@@ -2,7 +2,8 @@ import { useState, useEffect, FormEvent } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview } from '../types';
 import { ExploreService, LocationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
-import { Star, MapPin, Search, Phone, Trophy, ChevronRight, Award, Compass, MessageSquare, ShoppingBag, Grid } from 'lucide-react';
+import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid } from 'lucide-react';
+import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 
 interface ExploreFeedProps {
   currentUser: UserProfile;
@@ -10,6 +11,45 @@ interface ExploreFeedProps {
   activeSection?: string;
   onNavigate?: (section: string) => void;
 }
+
+const SPONSOR_PROMOS = [
+  {
+    id: 'promo_hills',
+    sponsorName: "Hill's Science Diet",
+    title: "Support Joint & Mobility Health",
+    description: "Veterinarian recommended diet formula engineered with EPA. Protect cartilage and improve active daily movement.",
+    couponCode: "HILLS15",
+    ctaText: "Claim 15% Vet Voucher",
+    ctaUrl: "https://www.hillspet.com",
+    bgGradient: "from-[#201d14] via-[#3a3928] to-[#201d14]",
+    badge: "Official Sponsor",
+    icon: "🐕"
+  },
+  {
+    id: 'promo_zoetis',
+    sponsorName: "Zoetis Animal Health",
+    title: "Advanced Vet Diagnostics & Vaccines",
+    description: "Anti-itching Cytopoint therapies to professional canine vaccines. Helping veterinarians protect cats and dog patients.",
+    couponCode: "ZOECARE",
+    ctaText: "Clinical Resource Hub",
+    ctaUrl: "https://www.zoetis.com",
+    bgGradient: "from-stone-850 via-stone-800 to-stone-900",
+    badge: "Accredited Partner",
+    icon: "💉"
+  },
+  {
+    id: 'promo_purina',
+    sponsorName: "Purina Veterinary Diets",
+    title: "Specialist Digestive Probiotic Formulas",
+    description: "Customized clinical probiotics & food formulas designed to soothe and resolve animal gastrointestinal discomfort.",
+    couponCode: "PURINAVET",
+    ctaText: "Request Clinical Pack",
+    ctaUrl: "https://www.purina.com",
+    bgGradient: "from-[#281a0e] via-[#432d18] to-[#281a0e]",
+    badge: "Premium Sponsor",
+    icon: "🐈"
+  }
+];
 
 export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNavigate }: ExploreFeedProps) {
   const [activeTab, setActiveTab] = useState<UserRole>('doctor');
@@ -31,6 +71,21 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const [reviewSort, setReviewSort] = useState<'newest' | 'highest'>('newest');
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+
+  // Sliding sponsor promotion states
+  const [showPromos, setShowPromos] = useState<boolean>(() => {
+    return localStorage.getItem('va_hide_promos') !== 'true';
+  });
+  const [currentPromoIdx, setCurrentPromoIdx] = useState<number>(0);
+  const [promoPaused, setPromoPaused] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!showPromos || promoPaused) return;
+    const timer = setInterval(() => {
+      setCurrentPromoIdx((prev) => (prev + 1) % SPONSOR_PROMOS.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [showPromos, promoPaused]);
 
   // Load specialists on mount or tab change
   const loadData = async () => {
@@ -257,6 +312,115 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         </div>
       </div>
 
+      {/* SLIDING PROMOTIONAL ADS CAROUSEL (NON-ANNOYING, SPONSORE-BACKED AND PAUSABLE) */}
+      <AnimatePresence mode="wait">
+        {showPromos && (
+          <motion.div
+            key={SPONSOR_PROMOS[currentPromoIdx].id}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.4 }}
+            onMouseEnter={() => setPromoPaused(true)}
+            onMouseLeave={() => setPromoPaused(false)}
+            className={`relative rounded-3xl overflow-hidden p-6 md:p-8 text-white shadow-lg border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-r ${SPONSOR_PROMOS[currentPromoIdx].bgGradient}`}
+          >
+            {/* Sponsor Label */}
+            <div className="absolute top-3 left-4 bg-white/15 backdrop-blur-xs px-2.5 py-1 rounded-full text-[8.5px] uppercase font-black tracking-widest border border-white/10 flex items-center gap-1 select-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>📌 Sponsored Campaign</span>
+            </div>
+
+            {/* Dismiss button */}
+            <button
+              onClick={() => {
+                localStorage.setItem('va_hide_promos', 'true');
+                setShowPromos(false);
+              }}
+              className="absolute top-3 right-4 text-white/50 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer z-10"
+              title="Dismiss Ads Permanently"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Main content body */}
+            <div className="flex items-center gap-5 w-full md:max-w-2xl text-left mt-3.5 md:mt-0 select-none">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-white/10 text-3xl flex items-center justify-center shrink-0 border border-white/10 shadow-inner">
+                {SPONSOR_PROMOS[currentPromoIdx].icon}
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
+                  {SPONSOR_PROMOS[currentPromoIdx].sponsorName} • {SPONSOR_PROMOS[currentPromoIdx].badge}
+                </span>
+                <h3 className="font-serif font-black text-sm md:text-md text-white leading-tight">
+                  {SPONSOR_PROMOS[currentPromoIdx].title}
+                </h3>
+                <p className="text-[11px] text-white/80 font-semibold leading-relaxed max-w-xl">
+                  {SPONSOR_PROMOS[currentPromoIdx].description}
+                </p>
+              </div>
+            </div>
+
+            {/* Interactions */}
+            <div className="flex items-center justify-between md:justify-end gap-3.5 w-full md:w-auto mt-2 md:mt-0 pt-3.5 md:pt-0 border-t border-white/10 md:border-t-0 shrink-0 z-10">
+              
+              {/* Promo Coupon Card */}
+              {SPONSOR_PROMOS[currentPromoIdx].couponCode && (
+                <div 
+                  onClick={() => {
+                    navigator.clipboard.writeText(SPONSOR_PROMOS[currentPromoIdx].couponCode || '');
+                    alert(`📋 Copied coupon code "${SPONSOR_PROMOS[currentPromoIdx].couponCode}" to your clipboard!`);
+                  }}
+                  className="bg-dashed border border-white/20 hover:border-white/40 cursor-pointer bg-white/5 hover:bg-white/10 rounded-xl px-3 py-1.5 text-center select-none"
+                  title="Click to copy coupon code"
+                >
+                  <span className="block text-[8px] uppercase tracking-widest text-white/60 font-black">Copy Code</span>
+                  <span className="font-mono text-[10px] font-black tracking-wider text-amber-300">
+                    {SPONSOR_PROMOS[currentPromoIdx].couponCode}
+                  </span>
+                </div>
+              )}
+
+              {/* Action Link out */}
+              <a
+                href={SPONSOR_PROMOS[currentPromoIdx].ctaUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-white hover:bg-stone-100 text-stone-900 border-b-2 border-b-stone-300 px-4.5 py-2.5 rounded-xl text-[10px] font-black tracking-wider uppercase transition-transform active:scale-95 flex items-center gap-1 w-fit cursor-pointer decoration-none shadow-sm"
+              >
+                <span>{SPONSOR_PROMOS[currentPromoIdx].ctaText}</span>
+              </a>
+
+              {/* Carousel controls */}
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentPromoIdx((prev) => (prev - 1 + SPONSOR_PROMOS.length) % SPONSOR_PROMOS.length);
+                  }}
+                  className="p-1.5 border border-white/10 hover:border-white/30 hover:bg-white/5 text-white/70 hover:text-white rounded-xl transition-all cursor-pointer"
+                  title="Previous Sponsor"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentPromoIdx((prev) => (prev + 1) % SPONSOR_PROMOS.length);
+                  }}
+                  className="p-1.5 border border-white/10 hover:border-white/30 hover:bg-white/5 text-white/70 hover:text-white rounded-xl transition-all cursor-pointer"
+                  title="Next Sponsor"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* FILTER & OPTION CONTROLS BAR */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl shadow-sm text-left">
         
@@ -265,8 +429,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
           <div className="bg-[#fcf9f2] border border-[#e3dec9] p-1.5 rounded-2xl flex gap-1 items-center relative">
             {[
               { id: 'doctor', icon: '🩺', label: 'Doctors' },
-              { id: 'clinic', icon: '🏥', label: 'Clinics' },
-              { id: 'assistant', icon: '👩‍⚕️', label: 'Helpers' }
+              { id: 'clinic', icon: '🏥', label: 'Clinics' }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -310,50 +473,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             <span>{currentUser.location ? '📍 Distance Sort Active' : 'Enable My GPS'}</span>
           </motion.button>
 
-          {/* Quick Browse Action dropdown */}
-          <div className="relative inline-block z-50">
-            <button
-              onClick={() => setExploreMenuOpen(!exploreMenuOpen)}
-              className="cursor-pointer inline-flex items-center gap-2.5 px-4.5 py-3 rounded-2xl border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] text-xs font-bold bg-white hover:bg-[#fcf9f2] text-[#5a5a40]"
-            >
-              <span>🧭 Explore Sections</span>
-              <span className="text-[9px]">{exploreMenuOpen ? '▲' : '▼'}</span>
-            </button>
-            <AnimatePresence>
-              {exploreMenuOpen && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute left-0 mt-2 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-2xl shadow-2xl p-2 w-56 z-[300] flex flex-col gap-1"
-                >
-                  <p className="px-3.5 py-1.5 text-[9px] font-black text-[#a49f92] uppercase tracking-wider border-b border-[#f4f1e9] mb-1">
-                    Direct Directory Navigation
-                  </p>
-                  {[
-                    { id: 'explore', label: '🩺 Explore Medical Roster', icon: Compass },
-                    { id: 'community', label: '💬 Community Bulletins', icon: MessageSquare },
-                    { id: 'marketplace', label: '🛒 Medical Marketplace', icon: ShoppingBag },
-                    { id: 'pet_ads', label: '🐾 Pet Classified Ads', icon: Grid }
-                  ].map((dest) => (
-                    <button
-                      key={dest.id}
-                      onClick={() => {
-                        setExploreMenuOpen(false);
-                        if (onNavigate) onNavigate(dest.id);
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 hover:bg-[#fcf9f2] transition-colors border-none bg-transparent cursor-pointer ${
-                        activeSection === dest.id ? 'bg-[#5a5a40]/10 text-[#5a5a40]' : 'text-[#3c3c3b]'
-                      }`}
-                    >
-                      <dest.icon className="w-4 h-4 shrink-0 text-[#5a5a40]" />
-                      <span>{dest.label}</span>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+
 
           {gpsError && (
             <span className="text-[10px] text-red-600 bg-red-150 py-1.5 px-3 rounded-xl border border-red-200 font-bold">
@@ -422,92 +542,13 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             }
 
             return (
-              <motion.div
+              <ThreeDPremiumCard
                 key={prof.uid}
-                layout
-                whileHover={{ y: -6 }}
+                profile={prof}
                 onClick={() => handleOpenDetails(prof)}
-                className="bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 hover:shadow-xl hover:border-[#5a5a40] hover:border-b-[#323223] transition-all cursor-pointer relative flex flex-col justify-between overflow-hidden"
-              >
-                <div>
-                  <div className="flex items-start gap-4 mb-4">
-                    {prof.profilePic && prof.profilePic !== 'default' ? (
-                      <img
-                        src={prof.profilePic}
-                        className="w-16 h-16 rounded-2xl object-cover shrink-0 border-2 border-[#e3dec9] shadow-sm bg-neutral-50"
-                        alt=""
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-2xl bg-[#f4f1e9] text-[#5a5a40] text-xl font-black flex items-center justify-center font-serif shrink-0 border-2 border-[#e3dec9]">
-                        {initials}
-                      </div>
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-black text-base text-[#373735] leading-snug flex items-center gap-1.5 truncate">
-                        <span>{prof.name}</span>
-                        {prof.isVerified && (
-                          <span
-                            title="Verified Practitioner"
-                            className="bg-[#2e7d32] text-white rounded-full text-[9px] font-black w-4 h-4 flex items-center justify-center shrink-0 border border-white shadow-sm"
-                          >
-                            ✓
-                          </span>
-                        )}
-                      </h4>
-                      <span className="inline-block px-3 py-1 mt-1.5 rounded-xl text-[9px] uppercase font-black tracking-widest bg-[#f4f1e9] text-[#5a5a40] border border-[#e3dec9]">
-                        {prof.role === 'doctor'
-                          ? 'Practitioner'
-                          : prof.role === 'clinic'
-                          ? 'Hospital Centre'
-                          : 'Assistant Nurse'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Rating Evaluation Bar */}
-                  {prof.totalReviews && prof.totalReviews > 0 ? (
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#3c3c3b] mb-4 bg-[#fcf9f2] border border-[#e3dec9] px-3 py-1.5 rounded-xl w-fit">
-                      <span className="text-[#f5a623] text-sm leading-none">★</span>
-                      <span className="font-mono">{prof.avgRating?.toFixed(1)}</span>
-                      <span className="text-[#a49f92] font-semibold">({prof.totalReviews} evaluations)</span>
-                    </div>
-                  ) : (
-                    <div className="text-[11px] font-bold text-[#a49f92] uppercase tracking-wider mb-4 bg-stone-100 p-2.5 rounded-xl w-fit">
-                      ⭐ No client logs
-                    </div>
-                  )}
-
-                  {/* Subtitle Details Portfolio */}
-                  <div className="space-y-2 text-xs font-semibold text-[#a49f92]">
-                    {prof.expertise && (
-                      <div className="truncate text-[#373735]"><span className="text-[#a49f92] font-extrabold uppercase text-[9px] tracking-wider block">Specialty:</span> {prof.expertise}</div>
-                    )}
-                    {prof.facilities && (
-                      <div className="truncate text-[#373735]"><span className="text-[#a49f92] font-extrabold uppercase text-[9px] tracking-wider block">Equipped System:</span> {prof.facilities}</div>
-                    )}
-                    {prof.address && (
-                      <div className="truncate text-[#373735]"><span className="text-[#a49f92] font-extrabold uppercase text-[9px] tracking-wider block">Address:</span> {prof.address}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-[#f4f1e9] flex items-center justify-between">
-                  {distance !== null ? (
-                    <span className="px-3 py-1.5 text-[9px] font-black tracking-wider rounded-xl bg-[#edf6ef] border border-emerald-200 text-emerald-700 uppercase font-mono">
-                      📍 {distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`} distance
-                    </span>
-                  ) : (
-                    <div />
-                  )}
-
-                  <span className="text-xs font-black text-[#5a5a40] hover:underline flex items-center gap-1">
-                    <span>Profile Detail</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </span>
-                </div>
-
-              </motion.div>
+                distance={distance}
+                initials={initials}
+              />
             );
           })}
         </div>
@@ -554,13 +595,50 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                   <div className="text-center sm:text-left min-w-0">
                     <h3 className="font-serif font-black text-2.5xl text-[#373735] flex items-center justify-center sm:justify-start gap-2">
                       <span>{selectedProfile.name}</span>
-                      {selectedProfile.isVerified && (
+                      {selectedProfile.subscriptionTier ? (
+                        <span className={`text-white text-[10px] font-black px-2.5 py-1 rounded-lg border shadow-xs uppercase tracking-widest ${
+                          selectedProfile.subscriptionTier === 'Silver' ? 'bg-slate-500 border-slate-400' :
+                          selectedProfile.subscriptionTier === 'Gold' ? 'bg-amber-600 border-amber-500' :
+                          'bg-indigo-600 border-indigo-500 animate-pulse'
+                        }`}>
+                          👑 {selectedProfile.subscriptionTier}
+                        </span>
+                      ) : selectedProfile.isVerified ? (
                         <span className="bg-[#2e7d32] text-white border border-white shadow-md rounded-full text-[10px] w-5 h-5 flex items-center justify-center">✓</span>
-                      )}
+                      ) : null}
                     </h3>
-                    <span className="inline-block mt-1.5 px-3 py-1 rounded-xl text-[10px] uppercase font-black tracking-widest bg-[#f4f1e9] text-[#5a5a40] border border-[#e3dec9]">
-                      Verified {selectedProfile.role}
-                    </span>
+                    <div className="flex flex-wrap gap-2 items-center justify-center sm:justify-start mt-1.5">
+                      <span className="inline-block px-3 py-1 rounded-xl text-[10px] uppercase font-black tracking-widest bg-[#f4f1e9] text-[#5a5a40] border border-[#e3dec9]">
+                        {selectedProfile.subscriptionTier ? `${selectedProfile.subscriptionTier} Certified` : 'Verified'} {selectedProfile.role}
+                      </span>
+                      {selectedProfile.isOnline ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] uppercase font-black tracking-widest bg-[#edf6ef] text-[#2ebd4d] border border-[#b2dfdb]/50">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          <span>Online</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] uppercase font-black tracking-widest bg-stone-50 text-stone-500 border border-stone-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-stone-400 inline-block"></span>
+                          <span>
+                            Last seen {(() => {
+                              const ts = selectedProfile.lastSeen;
+                              if (!ts) return 'Offline';
+                              const diff = Date.now() - ts;
+                              if (diff < 60000) return 'Just now';
+                              const mins = Math.floor(diff / 60000);
+                              if (mins < 60) return `${mins}m ago`;
+                              const hrs = Math.floor(mins / 60);
+                              if (hrs < 24) return `${hrs}h ago`;
+                              const days = Math.floor(hrs / 24);
+                              return `${days}d ago`;
+                            })()}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

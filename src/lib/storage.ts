@@ -25,7 +25,7 @@ import {
 } from 'firebase/auth';
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview } from '../types';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification } from '../types';
 
 // ─────────────────────────────────────────────────────────────────
 // MOCK FALLBACK DATABASE ACTIONS (LocalStorage)
@@ -35,40 +35,117 @@ const LOCAL_SESSION_KEY = 'va_session';
 const LOCAL_ACC_KEY = 'va_accessories';
 const LOCAL_PETS_KEY = 'va_pet_ads';
 const LOCAL_POSTS_KEY = 'va_community_posts';
+const LOCAL_JOBS_KEY = 'va_job_posts';
+const LOCAL_APPLICATIONS_KEY = 'va_job_applications';
+const LOCAL_NOTIFICATIONS_KEY = 'va_notifications';
+
+export function injectPresence(profile: UserProfile | null): UserProfile | null {
+  if (!profile) return null;
+  
+  // If this user already has explicit on/off info set, respect it
+  if (profile.isOnline !== undefined) {
+    return profile;
+  }
+
+  // Get active session UID
+  let activeUid: string | null = null;
+  try {
+    const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.uid) {
+        activeUid = parsed.uid;
+      }
+    }
+  } catch {}
+
+  // If this profile is the logged-in user, they are online
+  if (activeUid && activeUid === profile.uid) {
+    profile.isOnline = true;
+    profile.lastSeen = Date.now();
+    return profile;
+  }
+
+  // Otherwise, create stable pseudo-random online status based on uid character sum
+  const charSum = profile.uid.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
+  const isOnline = (charSum % 2 === 0);
+  profile.isOnline = isOnline;
+  
+  if (isOnline) {
+    profile.lastSeen = Date.now();
+  } else {
+    // Generate an offset that's fixed for this user ID
+    const minutesAgo = (charSum % 55) + 5; // offset between 5 and 60 minutes
+    const hoursAgo = (charSum % 23) + 1; // offset between 1 and 24 hours
+    const daysAgo = (charSum % 5) + 1; // offset between 1 and 5 days
+    
+    let offsetMs = minutesAgo * 60 * 1000;
+    if (charSum % 3 === 1) {
+      offsetMs = hoursAgo * 60 * 60 * 1000;
+    } else if (charSum % 3 === 2) {
+      offsetMs = daysAgo * 24 * 60 * 60 * 1000;
+    }
+    
+    profile.lastSeen = Date.now() - offsetMs;
+  }
+
+  return profile;
+}
 
 function getLocalUsers(): UserProfile[] {
   try {
-    return JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || '[]');
+    const list = JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || '[]');
+    return list.map((u: any) => injectPresence(injectTemporaryPlatinum(u)) as UserProfile);
   } catch {
     return [];
   }
 }
 
 function saveLocalUsers(list: UserProfile[]) {
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(list));
+  const mapped = list.map(u => injectPresence(injectTemporaryPlatinum(u)) as UserProfile);
+  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(mapped));
+}
+
+export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile | null {
+  if (user && user.email && user.email.toLowerCase().trim() === 'saliskhan214@gmail.com') {
+    user.subscriptionTier = 'Gold';
+    user.subscriptionExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    user.isVerified = true;
+  }
+  return user;
 }
 
 export function getLocalSession(): UserProfile | null {
   try {
-    return JSON.parse(localStorage.getItem(LOCAL_SESSION_KEY) || 'null');
+    const u = JSON.parse(localStorage.getItem(LOCAL_SESSION_KEY) || 'null');
+    return injectPresence(injectTemporaryPlatinum(u));
   } catch {
     return null;
   }
 }
 
 function saveLocalSession(user: UserProfile | null) {
-  if (user) {
-    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(user));
+  const finalUser = injectPresence(injectTemporaryPlatinum(user));
+  if (finalUser) {
+    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(finalUser));
   } else {
     localStorage.removeItem(LOCAL_SESSION_KEY);
   }
 }
 
-function cleanUndefined<T extends object>(obj: T): T {
+function cleanUndefined<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanUndefined(item)) as any;
+  }
   const result = { ...obj } as any;
   Object.keys(result).forEach(key => {
     if (result[key] === undefined) {
       delete result[key];
+    } else if (typeof result[key] === 'object' && result[key] !== null) {
+      result[key] = cleanUndefined(result[key]);
     }
   });
   return result;
@@ -220,6 +297,61 @@ function populateInitialSeeds() {
       }
     ];
     localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(postSeeds));
+  }
+
+  // Seed default job postings
+  if (!localStorage.getItem(LOCAL_JOBS_KEY)) {
+    const jobSeeds: JobPost[] = [
+      {
+        id: 'job_seed_1',
+        clinicId: 'seed_clinic_1',
+        clinicName: 'Peshawar Animal Hospital',
+        clinicEmail: 'peshawar.vet@clinic.pk',
+        title: 'Junior Veterinarian Surgery Specialist',
+        jobType: 'Full-time',
+        location: 'Khyber Road, Peshawar Cantonment',
+        salaryMin: 85000,
+        salaryMax: 130000,
+        experience: '2+ years experience in soft tissue surgery or orthopedics.',
+        workingHours: '9:00 AM - 6:00 PM, rotatory emergency support',
+        genderPreference: 'No Preference',
+        deadline: '2026-07-20',
+        positions: 2,
+        status: 'open',
+        screeningQuestions: [
+          'Do you have independent surgery experience?',
+          'How many years of clinical veterinary practice do you have?'
+        ],
+        requiredDocuments: ['CV', 'Degree Certificate', 'License Number'],
+        minQualificationGate: 'doctor',
+        createdAt: Date.now() - 3 * 24 * 3600000
+      },
+      {
+        id: 'job_seed_2',
+        clinicId: 'seed_clinic_1',
+        clinicName: 'Peshawar Animal Hospital',
+        clinicEmail: 'peshawar.vet@clinic.pk',
+        title: 'Vet Clinic Assistant & Dressing Helper',
+        jobType: 'Part-time',
+        location: 'Khyber Road, Peshawar Cantonment',
+        salaryMin: 40000,
+        salaryMax: 55000,
+        experience: '1 year in hand-dressing, animal restraint, and basic hygiene care.',
+        workingHours: '12:00 PM - 6:00 PM, weekends on call',
+        genderPreference: 'No Preference',
+        deadline: '2026-06-30',
+        positions: 1,
+        status: 'open',
+        screeningQuestions: [
+          'Are you comfortable handling aggressive canine/feline patients?',
+          'Are you familiar with basic vaccination scheduled dose logs?'
+        ],
+        requiredDocuments: ['CV', 'Reference Contacts'],
+        minQualificationGate: 'assistant',
+        createdAt: Date.now() - 5 * 24 * 3600000
+      }
+    ];
+    localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobSeeds));
   }
 }
 
@@ -746,7 +878,7 @@ export const ExploreService = {
             profile.avgRating = 0;
             profile.totalReviews = 0;
           }
-          list.push(profile);
+          list.push(injectPresence(injectTemporaryPlatinum(profile)) as UserProfile);
         }
         return list;
       } catch (err) {
@@ -770,7 +902,7 @@ export const ExploreService = {
           u.avgRating = 0;
           u.totalReviews = 0;
         }
-        return u;
+        return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
       });
     }
   },
@@ -778,22 +910,40 @@ export const ExploreService = {
   sortUsers(list: UserProfile[], sortType: SORT_TYPES, userLoc: GeoLocation | null): UserProfile[] {
     const listCopy = [...list];
 
+    const getTierOrder = (p: UserProfile) => {
+      if (p.subscriptionTier === 'Platinum') return 3;
+      if (p.subscriptionTier === 'Gold') return 2;
+      if (p.subscriptionTier === 'Silver') return 1;
+      return 0;
+    };
+
     switch (sortType) {
       case SORT_TYPES.HIGHEST:
-        return listCopy.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
-      case SORT_TYPES.RECENT:
-        return listCopy.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      case SORT_TYPES.NEAREST: {
-        if (!userLoc) return listCopy.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
         return listCopy.sort((a, b) => {
+          const tierDiff = getTierOrder(b) - getTierOrder(a);
+          if (tierDiff !== 0) return tierDiff;
+          return (b.avgRating || 0) - (a.avgRating || 0);
+        });
+      case SORT_TYPES.RECENT:
+        return listCopy.sort((a, b) => {
+          const tierDiff = getTierOrder(b) - getTierOrder(a);
+          if (tierDiff !== 0) return tierDiff;
+          return (b.createdAt || 0) - (a.createdAt || 0);
+        });
+      case SORT_TYPES.NEAREST: {
+        return listCopy.sort((a, b) => {
+          const tierDiff = getTierOrder(b) - getTierOrder(a);
+          if (tierDiff !== 0) return tierDiff;
+          if (!userLoc) return (b.avgRating || 0) - (a.avgRating || 0);
           const distA = a.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, a.location.lat, a.location.lng) : 99999;
           const distB = b.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, b.location.lat, b.location.lng) : 99999;
           return distA - distB;
         });
       }
       case SORT_TYPES.RECOMMENDED: {
-        // Boost factor equation: (Rating * 10) - (DistanceInKm * 1.5) + (recent bonus if age <= 30 days)
         return listCopy.sort((a, b) => {
+          const tierDiff = getTierOrder(b) - getTierOrder(a);
+          if (tierDiff !== 0) return tierDiff;
           const score = (p: UserProfile) => {
             const rScore = (p.avgRating || 0) * 10;
             let dScore = 0;
@@ -932,7 +1082,7 @@ export const CommunityService = {
     if (isFirebaseConfigured && db) {
       try {
         // Enforce exact structure rules requirement on creation
-        await setDoc(doc(db, 'community_posts', post.id), post);
+        await setDoc(doc(db, 'community_posts', post.id), cleanUndefined(post));
         return post;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, 'community_posts');
@@ -1047,7 +1197,7 @@ export const PetAdsService = {
 
     if (isFirebaseConfigured && db) {
       try {
-        await setDoc(doc(db, 'pet_ads', ad.id), ad);
+        await setDoc(doc(db, 'pet_ads', ad.id), cleanUndefined(ad));
         return ad;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `pet_ads/${ad.id}`);
@@ -1119,7 +1269,7 @@ export const MarketplaceService = {
 
     if (isFirebaseConfigured && db) {
       try {
-        await setDoc(doc(db, 'marketplace_products', product.id), product);
+        await setDoc(doc(db, 'marketplace_products', product.id), cleanUndefined(product));
         return product;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `marketplace_products/${product.id}`);
@@ -1143,6 +1293,338 @@ export const MarketplaceService = {
       const products = await this.fetchProducts();
       const filtered = products.filter(p => p.id !== productId);
       localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(filtered));
+    }
+  }
+};
+
+export const JobBoardService = {
+  async fetchJobs(): Promise<JobPost[]> {
+    let list: JobPost[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'job_posts'), orderBy('createdAt', 'desc')));
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as JobPost[];
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'job_posts');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_JOBS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+    return list;
+  },
+
+  async createJob(jobData: Partial<JobPost>, clinic: UserProfile): Promise<JobPost> {
+    const job: JobPost = {
+      id: 'job_' + Date.now(),
+      clinicId: clinic.uid,
+      clinicName: clinic.name,
+      clinicEmail: clinic.email,
+      title: jobData.title || '',
+      jobType: jobData.jobType || 'Full-time',
+      location: jobData.location || '',
+      salaryMin: jobData.salaryMin || 0,
+      salaryMax: jobData.salaryMax || 0,
+      experience: jobData.experience || '',
+      workingHours: jobData.workingHours || '',
+      genderPreference: jobData.genderPreference || 'No Preference',
+      deadline: jobData.deadline || '',
+      positions: jobData.positions || 1,
+      status: 'open',
+      screeningQuestions: jobData.screeningQuestions || [],
+      requiredDocuments: jobData.requiredDocuments || [],
+      minQualificationGate: jobData.minQualificationGate || 'none',
+      createdAt: Date.now(),
+      clinicAddress: jobData.clinicAddress || '',
+      clinicWebsite: jobData.clinicWebsite || '',
+      clinicContactPhone: jobData.clinicContactPhone || '',
+      clinicFacilities: jobData.clinicFacilities || ''
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'job_posts', job.id), cleanUndefined(job));
+        return job;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `job_posts/${job.id}`);
+      }
+    } else {
+      const jobs = await this.fetchJobs();
+      jobs.unshift(job);
+      localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+      return job;
+    }
+  },
+
+  async updateJob(jobId: string, updatedData: Partial<JobPost>): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, 'job_posts', jobId), cleanUndefined(updatedData));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `job_posts/${jobId}`);
+      }
+    } else {
+      const jobs = await this.fetchJobs();
+      const idx = jobs.findIndex(j => j.id === jobId);
+      if (idx !== -1) {
+        jobs[idx] = { ...jobs[idx], ...updatedData } as JobPost;
+        localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+      }
+    }
+  },
+
+  async deleteJob(jobId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'job_posts', jobId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `job_posts/${jobId}`);
+      }
+    } else {
+      const jobs = await this.fetchJobs();
+      const filtered = jobs.filter(j => j.id !== jobId);
+      localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(filtered));
+    }
+  },
+
+  async fetchApplications(filter: { jobId?: string; applicantId?: string; clinicId?: string; clinicEmail?: string }): Promise<JobApplication[]> {
+    let list: JobApplication[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const qConstraints = [];
+        if (filter.jobId) {
+          qConstraints.push(where('jobId', '==', filter.jobId));
+        }
+        if (filter.applicantId) {
+          qConstraints.push(where('applicantId', '==', filter.applicantId));
+        }
+        if (filter.clinicId) {
+          qConstraints.push(where('clinicId', '==', filter.clinicId));
+        }
+        if (filter.clinicEmail) {
+          qConstraints.push(where('clinicEmail', '==', filter.clinicEmail));
+        }
+        const ref = collection(db, 'job_applications');
+        const snap = qConstraints.length > 0
+          ? await getDocs(query(ref, ...qConstraints))
+          : await getDocs(ref);
+        list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as JobApplication[];
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'job_applications');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_APPLICATIONS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      if (filter.jobId) {
+        list = list.filter(a => a.jobId === filter.jobId);
+      }
+      if (filter.applicantId) {
+        list = list.filter(a => a.applicantId === filter.applicantId);
+      }
+      if (filter.clinicId) {
+        list = list.filter(a => a.clinicId === filter.clinicId);
+      }
+      if (filter.clinicEmail) {
+        list = list.filter(a => a.clinicEmail === filter.clinicEmail);
+      }
+    }
+    return list;
+  },
+
+  async applyForJob(appData: Partial<JobApplication>, applicant: UserProfile, job: JobPost): Promise<JobApplication> {
+    const application: JobApplication = {
+      id: 'app_' + Date.now(),
+      jobId: job.id,
+      clinicId: job.clinicId,
+      clinicEmail: job.clinicEmail || '',
+      applicantId: applicant.uid,
+      applicantName: applicant.name,
+      applicantEmail: applicant.email,
+      applicantPhone: applicant.phone || '',
+      applicantRole: applicant.role,
+      answers: appData.answers || [],
+      submittedDocs: appData.submittedDocs || {},
+      status: 'Pending',
+      createdAt: Date.now()
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'job_applications', application.id), cleanUndefined(application));
+        return application;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `job_applications/${application.id}`);
+      }
+    } else {
+      let apps = [];
+      try {
+        apps = JSON.parse(localStorage.getItem(LOCAL_APPLICATIONS_KEY) || '[]');
+      } catch {
+        apps = [];
+      }
+      apps.unshift(application);
+      localStorage.setItem(LOCAL_APPLICATIONS_KEY, JSON.stringify(apps));
+      return application;
+    }
+  },
+
+  async updateApplicationStatus(applicationId: string, newStatus: JobApplication['status']): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, 'job_applications', applicationId), { status: newStatus });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `job_applications/${applicationId}`);
+      }
+    } else {
+      let apps = [];
+      try {
+        apps = JSON.parse(localStorage.getItem(LOCAL_APPLICATIONS_KEY) || '[]');
+      } catch {
+        apps = [];
+      }
+      const idx = apps.findIndex(a => a.id === applicationId);
+      if (idx !== -1) {
+        apps[idx].status = newStatus;
+        localStorage.setItem(LOCAL_APPLICATIONS_KEY, JSON.stringify(apps));
+      }
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// NOTIFICATIONS SERVICE
+// ─────────────────────────────────────────────────────────────────
+export const NotificationService = {
+  async findUserByEmail(email: string): Promise<UserProfile | null> {
+    const emailLower = email.toLowerCase().trim();
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'users'), where('email', '==', emailLower));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const docData = snap.docs[0].data();
+          return { uid: snap.docs[0].id, ...docData } as UserProfile;
+        }
+      } catch (err) {
+        console.error('findUserByEmail error:', err);
+      }
+    } else {
+      const users = getLocalUsers();
+      const found = users.find(u => u.email.toLowerCase().trim() === emailLower);
+      if (found) return found;
+    }
+    return null;
+  },
+
+  async fetchNotifications(userId: string): Promise<VetNotification[]> {
+    let list: VetNotification[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(
+          collection(db, 'notifications'),
+          where('userId', '==', userId)
+        );
+        const snapshot = await getDocs(q);
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as VetNotification[];
+        list.sort((a, b) => b.createdAt - a.createdAt);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'notifications');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      list = list.filter(n => n.userId === userId).sort((a, b) => b.createdAt - a.createdAt);
+    }
+    return list;
+  },
+
+  async createNotification(data: Partial<VetNotification>): Promise<VetNotification> {
+    const notification: VetNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      userId: data.userId || '',
+      senderId: data.senderId || '',
+      senderName: data.senderName || 'Someone',
+      type: data.type || 'like',
+      targetId: data.targetId || '',
+      targetType: data.targetType || 'post',
+      message: data.message || '',
+      read: false,
+      createdAt: Date.now()
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'notifications', notification.id), cleanUndefined(notification));
+        return notification;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `notifications/${notification.id}`);
+      }
+    } else {
+      let list: VetNotification[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      list.unshift(notification);
+      localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+      return notification;
+    }
+    return notification;
+  },
+
+  async markAllAsRead(userId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        const list = await this.fetchNotifications(userId);
+        const unread = list.filter(n => !n.read);
+        await Promise.all(unread.map(async (n) => {
+          await updateDoc(doc(db, 'notifications', n.id), { read: true });
+        }));
+      } catch (err) {
+        console.error('Failed to mark live notifications read:', err);
+      }
+    } else {
+      let list: VetNotification[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      list.forEach(n => {
+        if (n.userId === userId) {
+          n.read = true;
+        }
+      });
+      localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+    }
+  },
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'notifications', notificationId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `notifications/${notificationId}`);
+      }
+    } else {
+      let list: VetNotification[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      const filtered = list.filter(n => n.id !== notificationId);
+      localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(filtered));
     }
   }
 };

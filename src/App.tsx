@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { UserProfile } from './types';
-import { getLocalSession, AuthService } from './lib/storage';
+import { UserProfile, VetNotification } from './types';
+import { getLocalSession, AuthService, NotificationService } from './lib/storage';
 import { testConnection } from './lib/firebase';
+import { motion, AnimatePresence } from 'motion/react';
+import { X } from 'lucide-react';
 
 // Import modular layouts
 import { Navbar } from './components/Navbar';
@@ -11,10 +13,90 @@ import { CommunityFeed } from './components/CommunityFeed';
 import { Marketplace } from './components/Marketplace';
 import { PetAds } from './components/PetAds';
 import { ProfilePage } from './components/ProfilePage';
+import { JobBoard } from './components/JobBoard';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
   const [activeSection, setActiveSection] = useState<string>('explore');
+  const [notifications, setNotifications] = useState<VetNotification[]>([]);
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: string }[]>([]);
+
+  // Polling loop for real-time popup notifications
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
+
+    let isMounted = true;
+    const seenIds = new Set<string>();
+
+    const checkNotifications = async (isFirstRun: boolean) => {
+      try {
+        const list = await NotificationService.fetchNotifications(currentUser.uid);
+        if (!isMounted) return;
+
+        if (isFirstRun) {
+          // On first boot, mark existing unread notifications as seen so we don't spam popups for old interactions
+          list.forEach(n => seenIds.add(n.id));
+        } else {
+          // Find any unread notification that we haven't seen in this session yet
+          const newUnreads = list.filter(n => !n.read && !seenIds.has(n.id));
+          newUnreads.forEach(n => {
+            seenIds.add(n.id);
+            const toastId = 'toast_' + n.id + '_' + Date.now();
+            
+            // Push toast popup
+            setToasts(prev => [...prev, { id: toastId, message: n.message, type: n.type }]);
+            
+            // Auto fade out after 5 seconds
+            setTimeout(() => {
+              if (isMounted) {
+                setToasts(prev => prev.filter(t => t.id !== toastId));
+              }
+            }, 5000);
+          });
+        }
+
+        // Always sync the overall notifications list to keep badging correct
+        setNotifications(list);
+      } catch (err) {
+        console.error('Error fetching notification logs:', err);
+      }
+    };
+
+    // Run immediately first time
+    checkNotifications(true);
+
+    // Polling interval every 6 seconds to capture likes, applications, and status updates instantly
+    const interval = setInterval(() => {
+      checkNotifications(false);
+    }, 6000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser?.uid]);
+
+  const handleMarkAllAsRead = async () => {
+    if (!currentUser) return;
+    try {
+      await NotificationService.markAllAsRead(currentUser.uid);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (err) {
+      console.error('Failed to mark notifications read:', err);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      await NotificationService.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
 
   // Unified Firebase test connection check on initial system boot
   useEffect(() => {
@@ -74,6 +156,9 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={setActiveSection}
         onLogout={handleLogout}
+        notifications={notifications}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onDeleteNotification={handleDeleteNotification}
       />
 
       {currentUser && !currentUser.emailVerified && (
@@ -111,6 +196,10 @@ export default function App() {
           <PetAds currentUser={currentUser} />
         )}
 
+        {activeSection === 'jobs' && (
+          <JobBoard currentUser={currentUser} />
+        )}
+
         {activeSection === 'profile' && (
           <ProfilePage
             currentUser={currentUser}
@@ -132,6 +221,41 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Popup Toast Alerts System */}
+      <div className="fixed bottom-5 right-5 z-[1000] flex flex-col gap-3 max-w-sm w-[90%] pointer-events-none">
+        <AnimatePresence>
+          {toasts.map(toast => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 50, scale: 0.9 }}
+              className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto"
+            >
+              <div className="text-xl filter drop-shadow select-none mt-0.5">
+                {toast.type === 'like' && '❤️'}
+                {toast.type === 'comment' && '💬'}
+                {toast.type === 'apply' && '📄'}
+                {toast.type === 'status_change' && '✨'}
+              </div>
+              <div className="flex-1 pr-6 text-left">
+                <span className="text-[9px] tracking-wider uppercase font-black text-[#5a5a40] block leading-none">ACTIVITY BULLETIN</span>
+                <p className="text-[11px] text-[#3c3c3b] font-bold leading-tight mt-1.5">
+                  {toast.message}
+                </p>
+              </div>
+              <button
+                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className="absolute top-2 right-2 p-1 rounded-full text-[#a49f92] hover:text-[#5a5a40] hover:bg-[#fcf9f2] border-none bg-transparent cursor-pointer"
+                aria-label="Dismiss toast"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
     </div>
   );

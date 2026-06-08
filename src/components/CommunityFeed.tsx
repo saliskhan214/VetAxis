@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { UserProfile, CommunityPost } from '../types';
-import { CommunityService } from '../lib/storage';
+import { CommunityService, NotificationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, MessageCircle, AlertCircle, Heart, ThumbsUp, AlertTriangle, ShieldCheck, TrendingUp, Users } from 'lucide-react';
 
@@ -68,8 +68,27 @@ export function CommunityFeed({ currentUser }: CommunityFeedProps) {
 
   const handleToggleReaction = async (postId: string, emoji: string) => {
     try {
+      const originalPost = posts.find(p => p.id === postId);
       const updated = await CommunityService.toggleReaction(postId, emoji, currentUser.email);
       setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+
+      if (originalPost && originalPost.authorEmail.toLowerCase() !== currentUser.email.toLowerCase()) {
+        const isAddingReaction = !originalPost.reactions[emoji]?.includes(currentUser.email);
+        if (isAddingReaction) {
+          const authorProfile = await NotificationService.findUserByEmail(originalPost.authorEmail);
+          if (authorProfile) {
+            await NotificationService.createNotification({
+              userId: authorProfile.uid,
+              senderId: currentUser.uid,
+              senderName: currentUser.name,
+              type: 'like',
+              targetId: postId,
+              targetType: 'post',
+              message: `${currentUser.name} reacted with ${emoji} to your community bulletin post`
+            });
+          }
+        }
+      }
     } catch (err: any) {
       triggerToast('Failed to log reaction.', 'error');
     }

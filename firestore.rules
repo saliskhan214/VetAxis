@@ -57,6 +57,8 @@ service cloud.firestore {
         (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
         (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
         (!('isVerified' in incoming()) || incoming().isVerified == false) && // Block self-verification during registration
+        (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum']) &&
+        (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number) &&
         (!('emailVerified' in incoming()) || incoming().emailVerified is bool)
       );
 
@@ -66,6 +68,8 @@ service cloud.firestore {
         incoming().email == existing().email &&
         incoming().createdAt == existing().createdAt &&
         (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
+        (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum']) &&
+        (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number) &&
         (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
         incoming().name is string && incoming().name.size() <= 80 &&
         (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
@@ -216,6 +220,126 @@ service cloud.firestore {
 
       allow delete: if isSignedIn() && (
         existing().authorEmail == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // JOB POSTS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /job_posts/{jobId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'clinic' &&
+        incoming().get('clinicId', '') == request.auth.uid &&
+        incoming().get('clinicEmail', '') == request.auth.token.email &&
+        incoming().title is string && incoming().title.size() <= 150 &&
+        incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
+        incoming().location is string && incoming().location.size() <= 150 &&
+        incoming().salaryMin is number && incoming().salaryMin >= 0 &&
+        incoming().salaryMax is number && incoming().salaryMax >= incoming().salaryMin &&
+        incoming().experience is string && incoming().experience.size() <= 1000 &&
+        incoming().workingHours is string && incoming().workingHours.size() <= 1000 &&
+        incoming().genderPreference in ['No Preference', 'Male', 'Female'] &&
+        incoming().deadline is string && incoming().deadline.size() <= 50 &&
+        incoming().positions is number && incoming().positions >= 1 &&
+        incoming().status == 'open' &&
+        incoming().screeningQuestions is list &&
+        incoming().requiredDocuments is list &&
+        incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
+        incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
+        incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
+        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
+      );
+
+      allow update: if isSignedIn() && (
+        (existing().get('clinicId', '') == request.auth.uid || existing().get('clinicEmail', '') == request.auth.token.email) &&
+        incoming().get('clinicId', '') == existing().get('clinicId', '') &&
+        incoming().get('createdAt', 0) == existing().get('createdAt', 0) &&
+        incoming().title is string && incoming().title.size() <= 150 &&
+        incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
+        incoming().location is string && incoming().location.size() <= 150 &&
+        incoming().salaryMin is number && incoming().salaryMin >= 0 &&
+        incoming().salaryMax is number && incoming().salaryMax >= incoming().salaryMin &&
+        incoming().experience is string && incoming().experience.size() <= 1000 &&
+        incoming().workingHours is string && incoming().workingHours.size() <= 1000 &&
+        incoming().genderPreference in ['No Preference', 'Male', 'Female'] &&
+        incoming().deadline is string && incoming().deadline.size() <= 50 &&
+        incoming().positions is number && incoming().positions >= 1 &&
+        incoming().status in ['open', 'closed'] &&
+        incoming().screeningQuestions is list &&
+        incoming().requiredDocuments is list &&
+        incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
+        incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
+        incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
+        incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
+        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().get('clinicId', '') == request.auth.uid ||
+        existing().get('clinicEmail', '') == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // JOB APPLICATIONS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /job_applications/{applicationId} {
+      allow read: if isSignedIn() && (
+        resource.data.get('applicantId', '') == request.auth.uid ||
+        resource.data.get('clinicId', '') == request.auth.uid ||
+        resource.data.get('clinicEmail', '') == request.auth.token.email
+      );
+
+      allow create: if isSignedIn() && (
+        incoming().get('applicantId', '') == request.auth.uid &&
+        incoming().get('applicantEmail', '') == request.auth.token.email &&
+        incoming().applicantName is string && incoming().applicantName.size() <= 150 &&
+        incoming().applicantPhone is string && incoming().applicantPhone.size() <= 24 &&
+        incoming().status == 'Pending' &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000
+      );
+
+      allow update: if isSignedIn() && (
+        // Only the clinic owning the job post can update the application status
+        (existing().get('clinicId', '') == request.auth.uid || existing().get('clinicEmail', '') == request.auth.token.email) &&
+        incoming().get('clinicId', '') == existing().get('clinicId', '') &&
+        incoming().get('jobId', '') == existing().get('jobId', '') &&
+        incoming().get('applicantId', '') == existing().get('applicantId', '') &&
+        incoming().get('applicantEmail', '') == existing().get('applicantEmail', '') &&
+        incoming().get('applicantName', '') == existing().get('applicantName', '') &&
+        incoming().get('applicantPhone', '') == existing().get('applicantPhone', '') &&
+        incoming().answers == existing().answers &&
+        incoming().submittedDocs == existing().submittedDocs &&
+        incoming().get('createdAt', 0) == existing().get('createdAt', 0) &&
+        incoming().status in ['Pending', 'Reviewed', 'Shortlisted', 'Rejected', 'Hired']
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().get('applicantId', '') == request.auth.uid ||
+        existing().get('clinicId', '') == request.auth.uid ||
+        existing().get('clinicEmail', '') == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NOTIFICATIONS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read, delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+      );
+      
+      allow create: if isSignedIn();
+      
+      allow update: if isSignedIn() && (
+        existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().senderId == existing().senderId &&
+        incoming().message == existing().message
       );
     }
   }

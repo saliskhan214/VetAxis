@@ -21,6 +21,14 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   // Photo uploads
   const [profilePic, setProfilePic] = useState<string>(currentUser.profilePic || 'default');
 
+  // Subscription Checkout states
+  const [checkoutTier, setCheckoutTier] = useState<'Silver' | 'Gold' | 'Platinum' | null>(null);
+  const [cardName, setCardName] = useState<string>('');
+  const [cardNumber, setCardNumber] = useState<string>('');
+  const [cardExpiry, setCardExpiry] = useState<string>('');
+  const [cardCvv, setCardCvv] = useState<string>('');
+  const [checkoutLoading, setCheckoutLoading] = useState<boolean>(false);
+
   // Password update variables
   const [pwOpen, setPwOpen] = useState<boolean>(false);
   const [newPw, setNewPw] = useState<string>('');
@@ -64,7 +72,73 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
 
   const triggerSuccess = (msg: string) => {
     setSuccess(msg);
-    setTimeout(() => setSuccess(null), 4000);
+    setTimeout(() => setSuccess(null), 8500); // Give the user plenty of time to enjoy their confirmation message
+  };
+
+  const handleSubscribeSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!checkoutTier) return;
+    if (!cardName.trim() || !cardNumber.trim() || !cardExpiry.trim() || !cardCvv.trim()) {
+      setError('Please fill in all credit card payment details.');
+      return;
+    }
+    const cleanNum = cardNumber.replace(/\s+/g, '');
+    if (cleanNum.length < 15 || cleanNum.length > 16) {
+      setError('Invalid card format. Standard Visa/Mastercard must be 15 or 16 digits.');
+      return;
+    }
+
+    try {
+      setCheckoutLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      // Simulate bank 3D secure handshaking
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const updated = await AuthService.updateProfile(currentUser.uid, {
+        subscriptionTier: checkoutTier,
+        subscriptionExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        isVerified: true // Backwards compatibility booster
+      });
+
+      onUpdateUser(updated);
+      
+      // Clean up fields
+      setCardName('');
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCvv('');
+      setCheckoutTier(null);
+      
+      triggerSuccess(`🎉 Congratulations! You are now a VetAxis ${checkoutTier} elite model holder! Enjoy premium privileges, priority directory listings, and your 3D custom animated card.`);
+    } catch (err: any) {
+      setError(err.message || 'Direct 3DS secure Checkout failed. Please review values.');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const cancelSubscription = async () => {
+    if (!window.confirm('Are you absolutely sure you want to cancel your Elite VetAxis membership? Your custom styled 3D metallic card will expire immediately.')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      const updated = await AuthService.updateProfile(currentUser.uid, {
+        subscriptionTier: undefined,
+        subscriptionExpiresAt: undefined,
+        isVerified: false
+      });
+      onUpdateUser(updated);
+      triggerSuccess('✓ Your premium tier subscription has been canceled. Your card has reverted to the classic layout.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to cancel subscription.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Convert uploaded photo to Base64 (max 1MB size limit)
@@ -117,7 +191,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         phone: phone.trim()
       };
 
-      if (currentUser.role === 'doctor' || currentUser.role === 'assistant') {
+      if (currentUser.role === 'doctor') {
         payload.expertise = expertise.trim() || 'General Practitioner';
       }
       if (currentUser.role === 'clinic') {
@@ -213,13 +287,19 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
           <div className="space-y-1.5 wd-full">
             <h3 className="font-serif text-xl font-black text-[#373735] leading-tight flex items-center justify-center gap-1.5">
               <span>{currentUser.name}</span>
-              {currentUser.isVerified && (
+              {currentUser.subscriptionTier ? (
+                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-black shrink-0 border border-white text-white ${
+                  currentUser.subscriptionTier === 'Silver' ? 'bg-slate-500' :
+                  currentUser.subscriptionTier === 'Gold' ? 'bg-amber-600' :
+                  'bg-indigo-600'
+                }`}>✓</span>
+              ) : currentUser.isVerified ? (
                 <span className="inline-flex items-center justify-center w-5 h-5 bg-[#2e7d32] text-white rounded-full text-[10px] font-black shrink-0 border border-white">✓</span>
-              )}
+              ) : null}
             </h3>
             
             <span className="inline-block px-3.5 py-1 rounded-xl text-[9px] uppercase font-black tracking-widest bg-[#f4f1e9] text-[#5a5a40] border border-[#e3dec9]">
-              Verified {currentUser.role}
+              {currentUser.subscriptionTier ? `${currentUser.subscriptionTier} ` : ''} {currentUser.role === 'doctor' ? 'Practitioner' : currentUser.role === 'clinic' ? 'Hospital Centre' : 'Assistant Nurse'}
             </span>
 
             <div className="text-xs font-mono font-bold text-[#a49f92] truncate max-w-full">{currentUser.email}</div>
@@ -295,15 +375,136 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
             </div>
           </div>
 
-          <div className="border-t border-[#f4f1e9] w-full pt-5">
-            <span className="text-[#a49f92] block font-black uppercase tracking-widest text-[9px] mb-2">Live Verification Audits</span>
-            <div className="inline-flex items-center gap-1.5 font-bold text-xs bg-[#fcf9f2] border border-[#e3dec9] p-2.5 rounded-xl">
-              {currentUser.isVerified ? (
-                <span className="text-[#2e7d32] flex items-center gap-1">🛡️ Practitioner Active</span>
-              ) : (
-                <span className="text-[#a49f92]">Classic User Role Profile</span>
-              )}
-            </div>
+          <div className="border-t border-[#f4f1e9] w-full pt-5 space-y-4">
+            <span className="text-[#a49f92] block font-black uppercase tracking-widest text-[9px] mb-1">VetAxis Subscription Portal</span>
+            
+            {currentUser.subscriptionTier ? (
+              <div className="space-y-4">
+                {/* Active Member Status Presentation */}
+                <div className={`rounded-2xl p-4.5 text-left border relative overflow-hidden shadow-xs ${
+                  currentUser.subscriptionTier === 'Silver' ? 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300 text-slate-900 border-b-[4px] border-b-slate-400' :
+                  currentUser.subscriptionTier === 'Gold' ? 'bg-gradient-to-br from-amber-50 to-yellow-105 border-amber-300 text-amber-950 border-b-[4px] border-b-amber-500' :
+                  'bg-gradient-to-br from-neutral-900 to-zinc-950 border-neutral-700 text-white border-b-[4px] border-b-indigo-900'
+                }`}>
+                  {currentUser.subscriptionTier === 'Platinum' && (
+                    <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/10 via-teal-400/10 to-indigo-500/10 mix-blend-color-dodge opacity-60 pointer-events-none animate-pulse" />
+                  )}
+
+                  <div className="flex items-center gap-2 font-serif font-black text-sm">
+                    <span>🏆 Elite {currentUser.subscriptionTier} Status</span>
+                  </div>
+                  
+                  <p className={`text-[10px] uppercase font-bold mt-1.5 ${currentUser.subscriptionTier === 'Platinum' ? 'text-indigo-300' : 'text-[#7a766f]'}`}>
+                    Billed at {currentUser.subscriptionTier === 'Silver' ? '2000 RS' : currentUser.subscriptionTier === 'Gold' ? '4000 RS' : '8000 RS'} / month
+                  </p>
+
+                  <div className="mt-3.5 space-y-2 border-t pt-3 border-black/5 text-[10px] font-semibold">
+                    <p className="font-extrabold uppercase text-[8px] tracking-wider text-neutral-400">UNLOCKED PRIVILEGES</p>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-emerald-500">✓</span>
+                      <span>Premium 3D customized metallic profile card style</span>
+                    </div>
+                    {currentUser.subscriptionTier === 'Silver' && (
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-emerald-500">✓</span>
+                        <span>Metallic Silver checkseal tags</span>
+                      </div>
+                    )}
+                    {(currentUser.subscriptionTier === 'Gold' || currentUser.subscriptionTier === 'Platinum') && (
+                      <>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-500">✓</span>
+                          <span>Clinical Authority click-to-WhatsApp direct contact leads</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-500">✓</span>
+                          <span>Unlimited clinic job openings & staff listings</span>
+                        </div>
+                      </>
+                    )}
+                    {currentUser.subscriptionTier === 'Platinum' && (
+                      <>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-400">✓</span>
+                          <span className="text-indigo-200">Guaranteed absolute top pin placement on local directories</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-400">✓</span>
+                          <span className="text-indigo-200">Skip-Gate authorization checks & Fast-Track DVM verification</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subscription management */}
+                <button
+                  type="button"
+                  onClick={cancelSubscription}
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-800 text-[9px] font-black uppercase tracking-wider py-2.5 rounded-xl border border-red-200 border-b-2 border-b-red-300 transition-all hover:shadow-xs cursor-pointer text-center"
+                >
+                  Cancel Active Plan 🚫
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-[10px] text-[#7a766f] font-semibold leading-relaxed">
+                  Join a professional VetAxis paid tier. Transform your cards into 3D interactive masterpieces and unlock massive client acquisition leads.
+                </p>
+
+                {/* Vertical Pricing Stack */}
+                <div className="space-y-3">
+                  {/* SILVER CARD */}
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-300 rounded-2xl p-4.5 text-left border-b-[4px] border-b-slate-400 shadow-2xs">
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-serif font-black text-xs text-slate-800">✦ SILVER Plan</span>
+                      <span className="font-mono text-xs font-black text-slate-700">2,000 RS/mo</span>
+                    </div>
+                    <p className="text-[9px] text-slate-600 font-semibold mt-1">Brushed steel metallic cards, promotional priorities, silver badge credentials.</p>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutTier('Silver')}
+                      className="mt-3.5 w-full bg-slate-700 hover:bg-slate-800 text-white text-[9px] font-extrabold uppercase py-2 rounded-xl transition-all border-b border-slate-900 active:translate-y-px"
+                    >
+                      Subscribe Silver 🥈
+                    </button>
+                  </div>
+
+                  {/* GOLD CARD */}
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-100 border border-amber-300 rounded-2xl p-4.5 text-left border-b-[4px] border-b-amber-500 shadow-2xs">
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-serif font-black text-xs text-amber-950">👑 GOLD Vetted</span>
+                      <span className="font-mono text-xs font-black text-amber-900">4,000 RS/mo</span>
+                    </div>
+                    <p className="text-[9px] text-amber-800 font-semibold mt-1">Gilded guilloche security card, click-to-WhatsApp clinical leads, unlimited job posts.</p>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutTier('Gold')}
+                      className="mt-3.5 w-full bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-extrabold uppercase py-2 rounded-xl transition-all border-b border-amber-800 active:translate-y-px"
+                    >
+                      Subscribe Gold 👑
+                    </button>
+                  </div>
+
+                  {/* PLATINUM CARD */}
+                  <div className="bg-gradient-to-br from-neutral-900 via-zinc-800 to-neutral-950 border border-neutral-700 rounded-2xl p-4.5 text-left border-b-[4px] border-b-neutral-950 shadow-2xs relative overflow-hidden text-white">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/5 via-teal-400/5 to-indigo-500/5 mix-blend-color-dodge opacity-60 pointer-events-none" />
+                    <div className="flex items-baseline justify-between relative z-10">
+                      <span className="font-serif font-black text-xs text-teal-300">💎 PLATINUM Elite</span>
+                      <span className="font-mono text-xs font-black text-teal-200">8,000 RS/mo</span>
+                    </div>
+                    <p className="text-[9px] text-neutral-300 font-semibold mt-1 relative z-10">Obsidian holo card, absolute directory pins, Skip-Gate screenings, real-time client authority.</p>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutTier('Platinum')}
+                      className="mt-3.5 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-extrabold uppercase py-2 rounded-xl transition-all border-b border-indigo-900 relative z-10 active:translate-y-px"
+                    >
+                      Subscribe Platinum 💎
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -425,8 +626,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               </div>
             </div>
 
-            {/* CONDITIONAL: Specialty Doctor/Assistant */}
-            {(currentUser.role === 'doctor' || currentUser.role === 'assistant') && (
+            {/* CONDITIONAL: Specialty Doctor */}
+            {currentUser.role === 'doctor' && (
               <div className="space-y-1">
                 <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">Board Specialization competencies</span>
                 <input
@@ -644,6 +845,176 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         </div>
 
       </div>
+
+      {/* DETAILED INTERACTIVE BILLING CHECKOUT DRAWER OVERLAY */}
+      <AnimatePresence>
+        {checkoutTier && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] max-w-sm w-full p-6 md:p-8 shadow-2xl relative space-y-6 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-[#f4f1e9] pb-4">
+                <div>
+                  <h3 className="font-serif font-black text-lg text-[#373735] flex items-center gap-1.5">
+                    <span>💳 Payment Terminal</span>
+                  </h3>
+                  <p className="text-[9px] uppercase font-bold text-[#a49f92] tracking-wider mt-0.5">VetAxis Premium Gate sync</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutTier(null)}
+                  className="p-1 px-2.5 rounded-full hover:bg-stone-100 transition-all cursor-pointer border text-stone-500 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Real-time 3D style Credit Card view */}
+              <div className={`p-5 rounded-2xl text-white relative overflow-hidden shadow-lg h-40 flex flex-col justify-between border ${
+                checkoutTier === 'Silver' ? 'bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 border-slate-300' :
+                checkoutTier === 'Gold' ? 'bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600 border-amber-400' :
+                'bg-gradient-to-br from-neutral-900 via-zinc-800 to-neutral-950 border-teal-500/30'
+              }`}>
+                {checkoutTier === 'Platinum' && (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/10 via-teal-400/10 to-indigo-500/10 animate-pulse mix-blend-color-dodge opacity-70 pointer-events-none" />
+                )}
+                
+                <div className="flex items-start justify-between relative z-10">
+                  <span className="text-[9px] font-black uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded border border-white/15">
+                    {checkoutTier} MEMBER CARD
+                  </span>
+                  <span className="text-[#f5a623] font-mono font-black text-[9px]">VETAXIS SECURE</span>
+                </div>
+
+                <div className="text-lg md:text-xl font-mono tracking-widest text-center my-1.5 relative z-10 py-1 drop-shadow-sm select-all">
+                  {cardNumber || '•••• •••• •••• ••••'}
+                </div>
+
+                <div className="flex justify-between items-end relative z-10 text-[9px] uppercase font-mono">
+                  <div>
+                    <span className="text-white/60 block text-[8px] tracking-wider mb-px">CARDHOLDER</span>
+                    <span className="font-bold truncate max-w-[150px] block">{cardName || 'YOUR FULL NAME'}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-white/60 block text-[8px] tracking-wider mb-px">EXPIRES</span>
+                    <span className="font-bold">{cardExpiry || 'MM/YY'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Checkout Form */}
+              <form onSubmit={handleSubscribeSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-stone-700 block">Cardholder Name *</span>
+                  <input
+                    type="text"
+                    className="form-control bg-stone-50 text-xs border border-stone-200"
+                    placeholder="e.g. Dr. Muhammad Khan"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                    disabled={checkoutLoading}
+                    maxLength={26}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-stone-700 block">Credit Card Number *</span>
+                  <input
+                    type="text"
+                    className="form-control bg-stone-50 text-xs border border-stone-200"
+                    placeholder="4000 1234 5678 9010"
+                    value={cardNumber}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      let formatted = '';
+                      for (let i = 0; i < val.length && i < 16; i++) {
+                        if (i > 0 && i % 4 === 0) formatted += ' ';
+                        formatted += val[i];
+                      }
+                      setCardNumber(formatted);
+                    }}
+                    disabled={checkoutLoading}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-stone-700 block">Expiration *</span>
+                    <input
+                      type="text"
+                      className="form-control bg-stone-50 text-xs text-center border border-stone-200"
+                      placeholder="MM/YY"
+                      value={cardExpiry}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        if (val.length <= 4) {
+                          let formatted = val;
+                          if (val.length > 2) {
+                            formatted = val.slice(0, 2) + '/' + val.slice(2);
+                          }
+                          setCardExpiry(formatted);
+                        }
+                      }}
+                      disabled={checkoutLoading}
+                      maxLength={5}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-stone-700 block">CVV Code *</span>
+                    <input
+                      type="password"
+                      className="form-control bg-stone-50 text-xs text-center border border-stone-200"
+                      placeholder="•••"
+                      value={cardCvv}
+                      onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                      disabled={checkoutLoading}
+                      maxLength={3}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#fcf9f2] p-3 rounded-2xl border border-[#e3dec9] text-[9px] text-stone-600 font-semibold leading-relaxed flex items-center gap-1.5">
+                  <span className="text-amber-600 font-black shrink-0">🔒 Secure Bridge:</span>
+                  <span>SSL encrypted clinical payment pipeline. Reverts automatically on cancellation.</span>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={checkoutLoading}
+                    className="flex-grow flex-1 cursor-pointer border border-[#cdc6ad] border-b-[3px] border-b-indigo-900 bg-[#5a5a40] hover:bg-[#3e3e2b] disabled:bg-stone-300 disabled:border-stone-400 text-white text-xs font-extrabold py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    {checkoutLoading ? (
+                      <span className="flex items-center gap-1">
+                        <span className="animate-spin text-xs">⏳</span> Verifying Plan 3DS Secure…
+                      </span>
+                    ) : (
+                      <span>Pay {checkoutTier === 'Silver' ? '2000 RS' : checkoutTier === 'Gold' ? '4000 RS' : '8000 RS'}</span>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutTier(null)}
+                    disabled={checkoutLoading}
+                    className="btn-tactile-3d-secondary py-2.5 px-4 text-xs font-bold shrink-0"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

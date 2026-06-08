@@ -25,6 +25,8 @@
           }
         },
         "isVerified": { "type": "boolean" },
+        "subscriptionTier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
+        "subscriptionExpiresAt": { "type": "number" },
         "avgRating": { "type": "number" },
         "totalReviews": { "type": "number" }
       },
@@ -101,6 +103,71 @@
         "reactions": { "type": "object" }
       },
       "required": ["authorEmail", "authorName", "text", "category", "ts"]
+    },
+    "JobPost": {
+      "title": "JobPost",
+      "description": "A veterinary or assistant job posting published by a clinic",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "clinicName": { "type": "string" },
+        "clinicEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "jobType": { "type": "string", "enum": ["Full-time", "Part-time", "Freelance", "Internship"] },
+        "location": { "type": "string" },
+        "salaryMin": { "type": "number" },
+        "salaryMax": { "type": "number" },
+        "experience": { "type": "string" },
+        "workingHours": { "type": "string" },
+        "genderPreference": { "type": "string", "enum": ["No Preference", "Male", "Female"] },
+        "deadline": { "type": "string" },
+        "positions": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "screeningQuestions": { "type": "array" },
+        "requiredDocuments": { "type": "array" },
+        "minQualificationGate": { "type": "string", "enum": ["none", "assistant", "doctor"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["clinicId", "clinicName", "clinicEmail", "title", "jobType", "location", "salaryMin", "salaryMax", "deadline", "createdAt"]
+    },
+    "JobApplication": {
+      "title": "JobApplication",
+      "description": "An application submitted by a candidate for a clinic job posting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "applicantId": { "type": "string" },
+        "applicantName": { "type": "string" },
+        "applicantEmail": { "type": "string" },
+        "applicantPhone": { "type": "string" },
+        "applicantRole": { "type": "string" },
+        "answers": { "type": "array" },
+        "submittedDocs": { "type": "object" },
+        "status": { "type": "string", "enum": ["Pending", "Reviewed", "Shortlisted", "Rejected", "Hired"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["jobId", "clinicId", "applicantId", "applicantName", "applicantEmail", "status", "createdAt"]
+    },
+    "VetNotification": {
+      "title": "VetNotification",
+      "description": "A notification item representing an access, like, post reaction or job status update",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "The recipient's user UID" },
+        "senderId": { "type": "string", "description": "The initiator's user UID" },
+        "senderName": { "type": "string", "description": "Display name of the initiator" },
+        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change"], "description": "Type of event" },
+        "targetId": { "type": "string", "description": "ID of post or job or application" },
+        "targetType": { "type": "string", "enum": ["post", "job", "application"], "description": "Target entity category" },
+        "message": { "type": "string", "description": "Display text of the alert" },
+        "read": { "type": "boolean", "description": "Whether the user read the notification" },
+        "createdAt": { "type": "number", "description": "Event timestamp" }
+      },
+      "required": ["userId", "senderId", "senderName", "type", "targetId", "targetType", "message", "read", "createdAt"]
     }
   },
   "firestore": {
@@ -123,6 +190,18 @@
     "/community_posts/{postId}": {
       "schema": "CommunityPost",
       "description": "Broadcast notifications and collaborative bulletin boards"
+    },
+    "/job_posts/{jobId}": {
+      "schema": "JobPost",
+      "description": "Job listings published by clinics seeking doctor/assistant candidates"
+    },
+    "/job_applications/{applicationId}": {
+      "schema": "JobApplication",
+      "description": "Candidate applications detailing screening answers and qualification narratives"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "VetNotification",
+      "description": "Personal notifications for likes, job applications, or status updates targeted to a user"
     }
   }
 }
