@@ -160,14 +160,98 @@
         "userId": { "type": "string", "description": "The recipient's user UID" },
         "senderId": { "type": "string", "description": "The initiator's user UID" },
         "senderName": { "type": "string", "description": "Display name of the initiator" },
-        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change"], "description": "Type of event" },
-        "targetId": { "type": "string", "description": "ID of post or job or application" },
-        "targetType": { "type": "string", "enum": ["post", "job", "application"], "description": "Target entity category" },
+        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change", "farm_assign", "farm_response", "farm_reminder"], "description": "Type of event" },
+        "targetId": { "type": "string", "description": "ID of post or job or application or farm" },
+        "targetType": { "type": "string", "enum": ["post", "job", "application", "farm"], "description": "Target entity category" },
         "message": { "type": "string", "description": "Display text of the alert" },
         "read": { "type": "boolean", "description": "Whether the user read the notification" },
         "createdAt": { "type": "number", "description": "Event timestamp" }
       },
       "required": ["userId", "senderId", "senderName", "type", "targetId", "targetType", "message", "read", "createdAt"]
+    },
+    "LivestockFarm": {
+      "title": "LivestockFarm",
+      "description": "A farm registered under livestock management with veterinary assigned context",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "farmType": { "type": "string" },
+        "mixedOptions": { "type": "object" },
+        "ownerUid": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerEmail": { "type": "string" },
+        "managerUid": { "type": "string" },
+        "managerName": { "type": "string" },
+        "managerRole": { "type": "string" },
+        "managerStatus": { "type": "string", "enum": ["unassigned", "pending", "linked", "declined"] },
+        "managerDeclinedReason": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "team": { "type": "array" }
+      },
+      "required": ["name", "location", "farmType", "ownerUid", "ownerName", "ownerEmail", "managerStatus", "createdAt"]
+    },
+    "LivestockAnimal": {
+      "title": "LivestockAnimal",
+      "description": "An individual animal registered on a farm",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "farmId": { "type": "string" },
+        "animalId": { "type": "string" },
+        "species": { "type": "string" },
+        "tagNumber": { "type": "string" },
+        "gender": { "type": "string" },
+        "dob": { "type": "string" },
+        "breed": { "type": "string" },
+        "weight": { "type": "number" },
+        "healthStatus": { "type": "string" },
+        "entryType": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["farmId", "animalId", "species", "gender", "healthStatus", "entryType", "createdAt"]
+    },
+    "LivestockBatch": {
+      "title": "LivestockBatch",
+      "description": "A batch entry of multiple birds or animals, useful for poultry segments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "farmId": { "type": "string" },
+        "batchName": { "type": "string" },
+        "species": { "type": "string" },
+        "quantity": { "type": "number" },
+        "arrivalDate": { "type": "string" },
+        "breed": { "type": "string" },
+        "entryType": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Sold", "Archived"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["farmId", "batchName", "species", "quantity", "entryType", "status", "createdAt"]
+    },
+    "LivestockTask": {
+      "title": "LivestockTask",
+      "description": "A scheduled husbandry or medical service activity linked to an animal/batch",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "farmId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string" },
+        "targetName": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Completed"] },
+        "completedDate": { "type": "string" },
+        "vaccineUsed": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "completedByUid": { "type": "string" },
+        "completedByName": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["farmId", "targetId", "targetType", "targetName", "serviceType", "dueDate", "status", "createdBy", "createdAt"]
     }
   },
   "firestore": {
@@ -202,6 +286,22 @@
     "/notifications/{notificationId}": {
       "schema": "VetNotification",
       "description": "Personal notifications for likes, job applications, or status updates targeted to a user"
+    },
+    "/livestock_farms/{farmId}": {
+      "schema": "LivestockFarm",
+      "description": "Agricultural livestock farms managed by owners, teams, and veterinary physicians"
+    },
+    "/livestock_animals/{animalId}": {
+      "schema": "LivestockAnimal",
+      "description": "Individual animal profiles on a specific farm"
+    },
+    "/livestock_batches/{batchId}": {
+      "schema": "LivestockBatch",
+      "description": "Flock and batch entries registered on a farm"
+    },
+    "/livestock_tasks/{taskId}": {
+      "schema": "LivestockTask",
+      "description": "Hub of medical treatments, breeding tasks, and preventative vaccination events"
     }
   }
 }

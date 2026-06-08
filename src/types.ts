@@ -103,6 +103,7 @@ export interface Product {
 export interface CommunityPost {
   id: string;
   authorEmail: string;
+  authorUid?: string; // High-precision unique ID representing Auth UID
   authorName: string;
   role: UserRole;
   profilePic: string;
@@ -111,6 +112,17 @@ export interface CommunityPost {
   ts: number;
   reactions: {
     [key: string]: string[]; // maps '❤️' | '👍' | '❗' to array of user emails/UIDs
+  };
+  title?: string; // Professional posting titles
+  imageUrl?: string; // Rich media card support
+  images?: string[]; // Up to 2 base64 images, 1MB max each
+  isBoosted?: boolean; // Emergency Boost Flag
+  boostDetails?: {
+    amountPaid: number;
+    lastSeenLoc: GeoLocation;
+    radiusKm: number;
+    notifiedCount: number;
+    ts: number;
   };
 }
 
@@ -173,10 +185,97 @@ export interface VetNotification {
   userId: string;
   senderId: string;
   senderName: string;
-  type: 'like' | 'comment' | 'apply' | 'status_change';
+  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder';
   targetId: string;
-  targetType: 'post' | 'job' | 'application';
+  targetType: 'post' | 'job' | 'application' | 'farm';
   message: string;
   read: boolean;
   createdAt: number;
 }
+
+// ─────────────────────────────────────────────────────────────────
+// LIVESTOCK MANAGEMENT TYPES
+// ─────────────────────────────────────────────────────────────────
+
+export interface FarmTeamMember {
+  uid: string;
+  name: string;
+  email: string;
+  role: 'Owner' | 'Manager' | 'Worker' | 'Veterinarian' | 'Assistant';
+}
+
+export type FarmType = 'Poultry Farm' | 'Dairy Farm' | 'Buffalo Farm' | 'Goat Farm' | 'Sheep Farm' | 'Mixed Farm';
+
+export interface MixedFarmOptions {
+  cattle: boolean;
+  buffalo: boolean;
+  goats: boolean;
+  sheep: boolean;
+  poultry: boolean;
+}
+
+export interface LivestockFarm {
+  id: string;
+  name: string;
+  location: string;
+  farmType: FarmType;
+  mixedOptions?: MixedFarmOptions;
+  ownerUid: string;
+  ownerName: string;
+  ownerEmail: string;
+  managerUid?: string;       // Assigned Vet/Clinic UID
+  managerName?: string;      // Assigned Vet/Clinic Name
+  managerRole?: 'doctor' | 'clinic' | 'assistant';
+  managerStatus: 'unassigned' | 'pending' | 'linked' | 'declined';
+  managerDeclinedReason?: string;
+  createdAt: number;
+  team: FarmTeamMember[];
+}
+
+export interface LivestockAnimal {
+  id: string;
+  farmId: string;
+  animalId: string; // e.g. COW001, GOAT002
+  species: 'Cattle' | 'Buffalo' | 'Goat' | 'Sheep' | 'Poultry' | 'Other';
+  tagNumber?: string;
+  gender: 'Male' | 'Female';
+  dob?: string; // date string e.g. "2026-01-01"
+  breed?: string;
+  weight?: number; // weight in kg
+  healthStatus: 'Healthy' | 'Sick' | 'Under Treatment' | 'Quarantined';
+  entryType: 'individual';
+  createdAt: number;
+}
+
+export interface LivestockBatch {
+  id: string;
+  farmId: string;
+  batchName: string; // e.g. Broiler Batch #1
+  species: 'Cattle' | 'Buffalo' | 'Goat' | 'Sheep' | 'Poultry' | 'Other';
+  quantity: number;
+  arrivalDate?: string; // e.g. "2026-06-01"
+  breed?: string;
+  entryType: 'batch';
+  status: 'Active' | 'Sold' | 'Archived';
+  createdAt: number;
+}
+
+export interface LivestockTask {
+  id: string;
+  farmId: string;
+  targetId: string; // ID of animal or batch
+  targetType: 'individual' | 'batch';
+  targetName: string; // COW001 or "Broiler Batch #1"
+  serviceType: string; // e.g., "Vaccination", "Booster Vaccination", "Pregnancy Diagnosis"
+  dueDate: string; // "YYYY-MM-DD" style
+  status: 'Pending' | 'Completed';
+  completedDate?: string;
+  vaccineUsed?: string;
+  notes?: string;
+  createdBy: 'system' | 'manual';
+  completedByUid?: string;
+  completedByName?: string;
+  createdAt: number;
+  autoScheduleNext?: boolean; // if true, completion schedules next booster in 6 months
+}
+

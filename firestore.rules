@@ -187,10 +187,16 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn() && (
-        incoming().authorEmail == request.auth.token.email &&
+        (incoming().authorEmail == request.auth.token.email || ('authorUid' in incoming() && incoming().authorUid == request.auth.uid)) &&
         incoming().text is string && incoming().text.size() <= 1500 &&
         incoming().category in ['lost', 'adoption', 'help', 'general'] &&
         incoming().ts is number && incoming().ts <= request.time.toMillis() + 60000 &&
+        (!('title' in incoming()) || (incoming().title is string && incoming().title.size() <= 200)) &&
+        (!('imageUrl' in incoming()) || (incoming().imageUrl is string && incoming().imageUrl.size() <= 2000)) &&
+        (!('images' in incoming()) || (incoming().images is list)) &&
+        (!('authorUid' in incoming()) || (incoming().authorUid is string && incoming().authorUid == request.auth.uid)) &&
+        (!('isBoosted' in incoming()) || (incoming().isBoosted is bool)) &&
+        (!('boostDetails' in incoming()) || (incoming().boostDetails is map)) &&
          // Strict empty reactions check on create to prevent validation forgery
         incoming().reactions is map &&
         incoming().reactions['❤️'] is list && incoming().reactions['❤️'].size() == 0 &&
@@ -198,15 +204,18 @@ service cloud.firestore {
         incoming().reactions['❗'] is list && incoming().reactions['❗'].size() == 0
       );
 
-      // Update allows toggling of reactions or post editing
+      // Update allows toggling of reactions, post editing, or emergency radar boosting
       allow update: if isSignedIn() && (
         // Option A: Owner edits post
         (
-          existing().authorEmail == request.auth.token.email &&
+          (existing().authorEmail == request.auth.token.email || ('authorUid' in existing() && existing().authorUid == request.auth.uid)) &&
           incoming().authorEmail == existing().authorEmail &&
           incoming().ts == existing().ts &&
           incoming().text is string && incoming().text.size() <= 1500 &&
-          incoming().category in ['lost', 'adoption', 'help', 'general']
+          incoming().category in ['lost', 'adoption', 'help', 'general'] &&
+          (!('title' in incoming()) || (incoming().title is string && incoming().title.size() <= 200)) &&
+          (!('imageUrl' in incoming()) || (incoming().imageUrl is string && incoming().imageUrl.size() <= 2000)) &&
+          (!('images' in incoming()) || (incoming().images is list))
         ) ||
         // Option B: Someone else reacts to the post. Diff must contain ONLY changed reactions list
         (
@@ -215,11 +224,26 @@ service cloud.firestore {
           incoming().text == existing().text &&
           incoming().category == existing().category &&
           incoming().reactions is map
+        ) ||
+        // Option C: Owner triggers Priority Boost transaction state
+        (
+          (existing().authorEmail == request.auth.token.email || ('authorUid' in existing() && existing().authorUid == request.auth.uid)) &&
+          incoming().authorEmail == existing().authorEmail &&
+          incoming().ts == existing().ts &&
+          incoming().text == existing().text &&
+          incoming().category == existing().category &&
+          incoming().isBoosted == true &&
+          incoming().boostDetails is map &&
+          incoming().boostDetails.amountPaid is number &&
+          incoming().boostDetails.radiusKm is number &&
+          incoming().boostDetails.lastSeenLoc is map
         )
       );
 
       allow delete: if isSignedIn() && (
-        existing().authorEmail == request.auth.token.email
+        existing().authorEmail == request.auth.token.email ||
+        ('authorUid' in existing() && existing().authorUid == request.auth.uid) ||
+        existing().authorUid == request.auth.uid
       );
     }
 
@@ -341,6 +365,59 @@ service cloud.firestore {
         incoming().senderId == existing().senderId &&
         incoming().message == existing().message
       );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK FARMS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_farms/{farmId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn() && (
+        incoming().ownerUid == request.auth.uid &&
+        incoming().name is string && incoming().name.size() <= 150 &&
+        incoming().location is string && incoming().location.size() <= 200 &&
+        incoming().farmType in ['Poultry Farm', 'Dairy Farm', 'Buffalo Farm', 'Goat Farm', 'Sheep Farm', 'Mixed Farm']
+      );
+
+      allow update: if isSignedIn() && (
+        // Farm Owner can edit farm details
+        existing().ownerUid == request.auth.uid ||
+        // Or assigned vet can update status or notes
+        existing().managerUid == request.auth.uid ||
+        // Allow vet to link / decline when requested
+        (existing().get('managerStatus', '') == 'pending' && incoming().managerUid == request.auth.uid) ||
+        // Allow updating teams or records
+        (incoming().ownerUid == existing().ownerUid)
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerUid == request.auth.uid
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK ANIMALS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_animals/{animalId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK BATCHES RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_batches/{batchId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK TASKS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
   }
 }

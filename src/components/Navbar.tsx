@@ -42,6 +42,7 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
+    { id: 'livestock', label: 'Livestock', icon: '🐄' },
     { id: 'community', label: 'Community', icon: '💬' },
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },
@@ -63,38 +64,9 @@ export function Navbar({
               Vet<span className="text-[#a0522d] font-bold">Axis</span>
             </span>
           </motion.button>
-          
-          {/* Desktop Navigation Link Tabs with Real Layout Indicator */}
-          <div className="hidden md:flex items-center gap-2 relative">
-            {navItems.map(item => {
-              const isActive = activeSection === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onNavigate(item.id)}
-                  className={`relative cursor-pointer px-4 py-2.5 rounded-xl text-sm font-bold transition-colors duration-200 select-none border-none bg-transparent ${
-                    isActive ? 'text-white' : 'text-[#7a766f] hover:text-[#3c3c3b]'
-                  }`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeNavBackground"
-                      className="absolute inset-0 bg-[#5a5a40] rounded-xl border-b-[3px] border-[#3e3e2b]"
-                      style={{ originY: '0px' }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <span>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        {/* Right Header Navigation */}
+        {/* Right Header Navigation - Notification & Clean Profile Button */}
         <div className="flex items-center gap-3">
           
           {/* Notification Bell Dropdown */}
@@ -206,66 +178,39 @@ export function Navbar({
             </AnimatePresence>
           </div>
 
-          {/* Desktop Profile & Logout Trigger -> Opens sliding sidebar */}
-          <div className="hidden md:flex items-center gap-3">
-            <motion.button
-              whileHover={{ y: -1, scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setIsSidebarOpen(true)}
-              className={`flex items-center gap-2.5 text-sm font-bold p-1 py-1 pr-3 rounded-full border transition-all cursor-pointer ${
-                activeSection === 'profile'
-                  ? 'bg-[#5a5a40] text-white border-[#5a5a40] shadow-sm'
-                  : 'bg-[#f4f1e9] text-[#3c3c3b] border-[#e3dec9] hover:bg-white hover:shadow-xs'
-              }`}
-              title="Open Account Menu"
-            >
-              {user.profilePic && user.profilePic !== 'default' ? (
-                <img
-                  src={user.profilePic}
-                  alt={user.name}
-                  className={`w-8 h-8 rounded-full object-cover border-2 shadow-sm ${
-                    user.subscriptionTier === 'Platinum' ? 'border-indigo-500' :
-                    user.subscriptionTier === 'Gold' ? 'border-amber-400' :
-                    user.subscriptionTier === 'Silver' ? 'border-slate-400' :
-                    user.isVerified ? 'border-amber-400' : 'border-white'
-                  }`}
-                />
-              ) : (
-                <div className={`w-8 h-8 rounded-full font-black flex items-center justify-center text-xs shadow-sm ${
-                  user.subscriptionTier === 'Platinum' ? 'bg-indigo-600 text-white' :
-                  user.subscriptionTier === 'Gold' ? 'bg-amber-500 text-white' :
-                  user.subscriptionTier === 'Silver' ? 'bg-slate-500 text-white' :
-                  user.isVerified ? 'bg-amber-500 text-white' : 'bg-[#5a5a40] text-white'
-                }`}>
-                  {initials}
-                </div>
-              )}
-              <span className="max-w-[85px] truncate select-none text-[11px] font-black uppercase tracking-wider text-[#3c3c3b]">
-                {user.name.split(' ')[0]}
-              </span>
-              
-              {user.subscriptionTier ? (
-                <span className="text-xs shadow-2xs font-extrabold select-none" title={`${user.subscriptionTier} Subscription Member`}>
-                  {user.subscriptionTier === 'Platinum' ? '💎' :
-                   user.subscriptionTier === 'Gold' ? '👑' :
-                   '🥈'}
-                </span>
-              ) : user.isVerified ? (
-                <span className="text-amber-500 text-xs shadow-2xs font-extrabold select-none">
-                  ⭐
-                </span>
-              ) : null}
-            </motion.button>
-          </div>
-
-          {/* Mobile Menu Trigger Button */}
+          {/* Unified Profile & Menu Trigger Button */}
           <motion.button
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setIsSidebarOpen(true)}
-            className="flex md:hidden items-center justify-center p-3 rounded-xl border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] bg-white text-[#5a5a40] hover:bg-[#f4f1e9] transition-all cursor-pointer shadow-sm"
-            aria-label="Open menu"
+            className={`flex items-center justify-center p-0.5 rounded-full border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
+              isSidebarOpen 
+                ? 'border-[#5a5a40] border-b-[#3e3e2b]' 
+                : 'border-[#e3dec9] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
+            }`}
+            title="Open Menu & Account Options"
           >
-            <Menu className="w-5 h-5" />
+            {user.profilePic && user.profilePic !== 'default' ? (
+              <img
+                src={user.profilePic}
+                alt={user.name}
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 shadow-xs ${
+                  user.subscriptionTier === 'Platinum' ? 'border-indigo-500' :
+                  user.subscriptionTier === 'Gold' ? 'border-amber-400' :
+                  user.subscriptionTier === 'Silver' ? 'border-slate-400' :
+                  user.isVerified ? 'border-amber-400' : 'border-white'
+                }`}
+              />
+            ) : (
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-black flex items-center justify-center text-xs shadow-xs ${
+                user.subscriptionTier === 'Platinum' ? 'bg-indigo-600 text-white' :
+                user.subscriptionTier === 'Gold' ? 'bg-amber-500 text-[#3c3c3b]' :
+                user.subscriptionTier === 'Silver' ? 'bg-slate-500 text-white' :
+                user.isVerified ? 'bg-amber-500 text-[#3c3c3b]' : 'bg-[#5a5a40] text-white'
+              }`}>
+                {initials}
+              </div>
+            )}
           </motion.button>
         </div>
       </nav>

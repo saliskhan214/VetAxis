@@ -1066,21 +1066,79 @@ export const CommunityService = {
     });
   },
 
-  async createPost(text: string, category: any, author: UserProfile): Promise<CommunityPost> {
+  async createPost(
+    text: string,
+    category: any,
+    author: UserProfile,
+    title?: string,
+    imageUrl?: string,
+    isBoosted?: boolean,
+    boostDetails?: {
+      amountPaid: number;
+      lastSeenLoc: GeoLocation;
+      radiusKm: number;
+      notifiedCount: number;
+      ts: number;
+    },
+    images?: string[]
+  ): Promise<CommunityPost> {
     const post: CommunityPost = {
       id: 'post_' + Date.now(),
       authorEmail: (author.email || '').toLowerCase().trim(),
+      authorUid: author.uid,
       authorName: author.name,
       role: author.role,
       profilePic: author.profilePic || 'default',
       text: text.trim(),
       category,
       ts: Date.now(),
-      reactions: { '❤️': [], '👍': [], '❗': [] }
+      reactions: { '❤️': [], '👍': [], '❗': [] },
+      title: title?.trim() || undefined,
+      imageUrl: imageUrl?.trim() || undefined,
+      images: images || undefined,
+      isBoosted: isBoosted || undefined,
+      boostDetails: boostDetails || undefined
     };
 
     if (isFirebaseConfigured && db) {
       try {
+        if (isBoosted && boostDetails) {
+          // Find nearby users and send notifications in database
+          let nearbyCount = 0;
+          const usersSnap = await getDocs(collection(db, 'users'));
+          const allUsers = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[];
+
+          for (const user of allUsers) {
+            if (user.uid === author.uid) continue;
+            if (user.location && user.location.lat && user.location.lng) {
+              const distance = LocationService.haversine(
+                boostDetails.lastSeenLoc.lat,
+                boostDetails.lastSeenLoc.lng,
+                user.location.lat,
+                user.location.lng
+              );
+              if (distance <= boostDetails.radiusKm) {
+                nearbyCount++;
+                const notifId = 'notif_boost_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+                const notif: Partial<VetNotification> = {
+                  id: notifId,
+                  userId: user.uid,
+                  senderId: author.uid,
+                  senderName: author.name,
+                  type: 'status_change',
+                  targetId: post.id,
+                  targetType: 'post',
+                  message: `📢 PRIORITY RECOUP ALERT [${distance.toFixed(1)} km away]: Priority Lost Pet broadcast near ${boostDetails.lastSeenLoc.address}! Please double-check surrounding areas.`,
+                  read: false,
+                  createdAt: Date.now()
+                };
+                await setDoc(doc(db, 'notifications', notifId), notif);
+              }
+            }
+          }
+          post.boostDetails!.notifiedCount = nearbyCount;
+        }
+
         // Enforce exact structure rules requirement on creation
         await setDoc(doc(db, 'community_posts', post.id), cleanUndefined(post));
         return post;
@@ -1088,11 +1146,164 @@ export const CommunityService = {
         handleFirestoreError(err, OperationType.CREATE, 'community_posts');
       }
     } else {
+      if (isBoosted && boostDetails) {
+        // Offline notifications logic
+        const allUsers = getLocalUsers();
+        let nearbyCount = 0;
+        for (const user of allUsers) {
+          if (user.uid === author.uid) continue;
+          if (user.location && user.location.lat && user.location.lng) {
+            const distance = LocationService.haversine(
+              boostDetails.lastSeenLoc.lat,
+              boostDetails.lastSeenLoc.lng,
+              user.location.lat,
+              user.location.lng
+            );
+            if (distance <= boostDetails.radiusKm) {
+              nearbyCount++;
+              const localNotifs = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+              localNotifs.unshift({
+                id: 'notif_boost_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+                userId: user.uid,
+                senderId: author.uid,
+                senderName: author.name,
+                type: 'status_change',
+                targetId: post.id,
+                targetType: 'post',
+                message: `📢 PRIORITY RECOUP ALERT [${distance.toFixed(1)} km away]: Priority Lost Pet broadcast near ${boostDetails.lastSeenLoc.address}! Please double-check surrounding areas.`,
+                read: false,
+                createdAt: Date.now()
+              });
+              localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(localNotifs));
+            }
+          }
+        }
+        post.boostDetails!.notifiedCount = nearbyCount;
+      }
       const posts = await this.fetchPosts();
       posts.unshift(post);
       localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
       return post;
     }
+    return post;
+  },
+
+  async boostPost(postId: string, amount: number, lastSeenLoc: GeoLocation, radiusKm: number, currentUser: UserProfile): Promise<CommunityPost> {
+    let updatedPost: CommunityPost | null = null;
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, 'community_posts', postId);
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) throw new Error('Post not found in database.');
+        const post = snap.data() as CommunityPost;
+
+        post.isBoosted = true;
+        post.boostDetails = {
+          amountPaid: amount,
+          lastSeenLoc: lastSeenLoc,
+          radiusKm: radiusKm,
+          notifiedCount: 0,
+          ts: Date.now()
+        };
+
+        // Find nearby users
+        let nearbyCount = 0;
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const allUsers = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[];
+
+        for (const user of allUsers) {
+          if (user.uid === currentUser.uid) continue; // skip self
+          if (user.location && user.location.lat && user.location.lng) {
+            const distance = LocationService.haversine(
+              lastSeenLoc.lat,
+              lastSeenLoc.lng,
+              user.location.lat,
+              user.location.lng
+            );
+
+            if (distance <= radiusKm) {
+              nearbyCount++;
+              // Create notification
+              const notifId = 'notif_boost_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+              const notif: Partial<VetNotification> = {
+                id: notifId,
+                userId: user.uid,
+                senderId: currentUser.uid,
+                senderName: currentUser.name,
+                type: 'status_change', // triggers a prominent popup animation
+                targetId: postId,
+                targetType: 'post',
+                message: `📢 PRIORITY RECOUP ALERT [${distance.toFixed(1)} km away]: Priority Lost Pet broadcast near ${lastSeenLoc.address}! Please double-check surrounding areas.`,
+                read: false,
+                createdAt: Date.now()
+              };
+              await setDoc(doc(db, 'notifications', notifId), notif);
+            }
+          }
+        }
+
+        post.boostDetails.notifiedCount = nearbyCount;
+        await setDoc(docRef, cleanUndefined(post));
+        updatedPost = post;
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.UPDATE, `community_posts/${postId}`);
+      }
+    } else {
+      // Offline Local Storage fallback
+      const posts = await this.fetchPosts();
+      const idx = posts.findIndex(p => p.id === postId);
+      if (idx !== -1) {
+        posts[idx].isBoosted = true;
+        const allUsers = getLocalUsers();
+        let nearbyCount = 0;
+
+        for (const user of allUsers) {
+          if (user.uid === currentUser.uid) continue;
+          if (user.location && user.location.lat && user.location.lng) {
+            const distance = LocationService.haversine(
+              lastSeenLoc.lat,
+              lastSeenLoc.lng,
+              user.location.lat,
+              user.location.lng
+            );
+            if (distance <= radiusKm) {
+              nearbyCount++;
+              // Add a local notification
+              const localNotifs = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+              localNotifs.unshift({
+                id: 'notif_boost_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+                userId: user.uid,
+                senderId: currentUser.uid,
+                senderName: currentUser.name,
+                type: 'status_change',
+                targetId: postId,
+                targetType: 'post',
+                message: `📢 PRIORITY RECOUP ALERT [${distance.toFixed(1)} km away]: Priority Lost Pet broadcast near ${lastSeenLoc.address}! Please double-check surrounding areas.`,
+                read: false,
+                createdAt: Date.now()
+              });
+              localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(localNotifs));
+            }
+          }
+        }
+
+        posts[idx].boostDetails = {
+          amountPaid: amount,
+          lastSeenLoc,
+          radiusKm,
+          notifiedCount: nearbyCount,
+          ts: Date.now()
+        };
+        localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+        updatedPost = posts[idx];
+      }
+    }
+    
+    // Fallback if update fails
+    if (!updatedPost) {
+      throw new Error('Failed to boost post.');
+    }
+    return updatedPost;
   },
 
   async toggleReaction(postId: string, emoji: string, userEmail: string): Promise<CommunityPost> {

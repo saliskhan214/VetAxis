@@ -14,6 +14,7 @@ import { Marketplace } from './components/Marketplace';
 import { PetAds } from './components/PetAds';
 import { ProfilePage } from './components/ProfilePage';
 import { JobBoard } from './components/JobBoard';
+import LivestockManagement from './components/LivestockManagement';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -198,6 +199,10 @@ export default function App() {
 
         {activeSection === 'jobs' && (
           <JobBoard currentUser={currentUser} />
+        )}
+
+        {activeSection === 'livestock' && (
+          <LivestockManagement currentUser={currentUser} />
         )}
 
         {activeSection === 'profile' && (
