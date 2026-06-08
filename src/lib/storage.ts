@@ -1069,7 +1069,7 @@ export const CommunityService = {
   async createPost(text: string, category: any, author: UserProfile): Promise<CommunityPost> {
     const post: CommunityPost = {
       id: 'post_' + Date.now(),
-      authorEmail: author.email,
+      authorEmail: (author.email || '').toLowerCase().trim(),
       authorName: author.name,
       role: author.role,
       profilePic: author.profilePic || 'default',

@@ -722,7 +722,7 @@ export function JobBoard({ currentUser }: JobBoardProps) {
                       {job.experience}
                     </p>
                     <p className="text-[#7a766f] text-[11px]">
-                      <span className="font-bold">🧑‍🤝‍🧑 Gender Preference:</span> {job.genderPreference} · <span className="font-bold">📊 Openings:</span> {job.positions}
+                      <span className="font-bold">🧑‍🤝‍🧑 Gender Preference:</span> {job.genderPreference} · <span className="font-bold">📊 Number of Vacancies:</span> {job.positions}
                     </p>
                   </div>
 

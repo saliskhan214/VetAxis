@@ -295,7 +295,7 @@ export function CommunityFeed({ currentUser }: CommunityFeedProps) {
               <div className="space-y-5 text-left">
                 <AnimatePresence mode="popLayout">
                   {filteredPosts.map((post) => {
-                    const isAuthor = post.authorEmail === currentUser.email;
+                    const isAuthor = (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
                     const initials = post.authorName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
                     
                     const loved = post.reactions?.['❤️']?.includes(currentUser.email);
@@ -363,7 +363,7 @@ export function CommunityFeed({ currentUser }: CommunityFeedProps) {
                               onClick={() => handleDeletePost(post.id)}
                               className="bg-transparent border-none text-[10px] text-red-500 hover:text-red-700 font-extrabold uppercase tracking-widest cursor-pointer hover:underline py-1.5"
                             >
-                              ✕ Remove Bulletin
+                              ✕ Remove Post
                             </button>
                           )}
                         </div>
