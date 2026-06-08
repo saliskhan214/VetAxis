@@ -11,6 +11,7 @@ interface NavbarProps {
   notifications: VetNotification[];
   onMarkAllAsRead: () => void;
   onDeleteNotification: (id: string) => void;
+  onNotificationClick?: (notif: VetNotification) => void;
 }
 
 export function Navbar({ 
@@ -20,7 +21,8 @@ export function Navbar({
   onLogout,
   notifications,
   onMarkAllAsRead,
-  onDeleteNotification
+  onDeleteNotification,
+  onNotificationClick
 }: NavbarProps) {
   if (!user) return null;
 
@@ -138,7 +140,13 @@ export function Navbar({
                         notifications.map(n => (
                           <div 
                             key={n.id}
-                            className={`flex items-start justify-between gap-2.5 p-2.5 rounded-xl border transition-all ${
+                            onClick={() => {
+                              if (onNotificationClick) {
+                                onNotificationClick(n);
+                                setIsNotifOpen(false); // Auto collapse dropdown on click
+                              }
+                            }}
+                            className={`flex items-start justify-between gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer hover:bg-stone-50/50 ${
                               n.read 
                                 ? 'bg-[#fdfbf7]/40 border-[#f4f1e9]' 
                                 : 'bg-amber-50/10 border-amber-200/50 shadow-2xs'
@@ -162,7 +170,10 @@ export function Navbar({
                             </div>
 
                             <button
-                              onClick={() => onDeleteNotification(n.id)}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Avoid triggering navigation redirs when deleting
+                                onDeleteNotification(n.id);
+                              }}
                               className="text-[#a49f92] hover:text-red-700 p-0.5 rounded hover:bg-red-50/50 transition-colors border-none bg-transparent cursor-pointer ml-1.5"
                               title="Delete alert"
                             >

@@ -101,13 +101,17 @@ service cloud.firestore {
           get(/databases/$(database)/documents/users/$(userId)).data.role != 'user'
         );
 
-        allow update, delete: if isSignedIn() && (
-          // Reviewer owns the review
+        allow update: if isSignedIn() && (
+          // Reviewer update
           existing().reviewerEmail == request.auth.token.email &&
           incoming().reviewerEmail == existing().reviewerEmail &&
           incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
           (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
           incoming().date == existing().date
+        );
+
+        allow delete: if isSignedIn() && (
+          existing().reviewerEmail == request.auth.token.email
         );
       }
     }
@@ -131,7 +135,7 @@ service cloud.firestore {
         (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
       );
 
-      allow update, delete: if isSignedIn() && (
+      allow update: if isSignedIn() && (
         existing().ownerEmail == request.auth.token.email &&
         incoming().ownerEmail == existing().ownerEmail &&
         incoming().ownerRole == existing().ownerRole &&
@@ -143,6 +147,10 @@ service cloud.firestore {
         incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
         (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
         (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email
       );
     }
 
@@ -166,7 +174,7 @@ service cloud.firestore {
         (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
       );
 
-      allow update, delete: if isSignedIn() && (
+      allow update: if isSignedIn() && (
         existing().ownerEmail == request.auth.token.email &&
         incoming().ownerEmail == existing().ownerEmail &&
         incoming().ownerRole == existing().ownerRole &&
@@ -177,6 +185,10 @@ service cloud.firestore {
         incoming().description is string && incoming().description.size() <= 1500 &&
         incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
         (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email
       );
     }
 
@@ -241,9 +253,8 @@ service cloud.firestore {
       );
 
       allow delete: if isSignedIn() && (
-        existing().authorEmail == request.auth.token.email ||
-        ('authorUid' in existing() && existing().authorUid == request.auth.uid) ||
-        existing().authorUid == request.auth.uid
+        existing().get('authorEmail', '') == request.auth.token.email ||
+        existing().get('authorUid', '') == request.auth.uid
       );
     }
 

@@ -38,9 +38,10 @@ import {
 
 interface LivestockManagementProps {
   currentUser: UserProfile;
+  highlightFarmId?: string | null;
 }
 
-export default function LivestockManagement({ currentUser }: LivestockManagementProps) {
+export default function LivestockManagement({ currentUser, highlightFarmId }: LivestockManagementProps) {
   // Services & list state
   const [farms, setFarms] = useState<LivestockFarm[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<LivestockFarm | null>(null);
@@ -119,6 +120,16 @@ export default function LivestockManagement({ currentUser }: LivestockManagement
     loadGlobalData();
   }, [currentUser]);
 
+  // Redirect to a highlighted farm on demand
+  useEffect(() => {
+    if (highlightFarmId && farms.length > 0) {
+      const targetFarm = farms.find(f => f.id === highlightFarmId);
+      if (targetFarm) {
+        setSelectedFarm(targetFarm);
+      }
+    }
+  }, [highlightFarmId, farms]);
+
   // Reload details when selected farm shifts
   useEffect(() => {
     if (selectedFarm) {
@@ -139,8 +150,13 @@ export default function LivestockManagement({ currentUser }: LivestockManagement
       const assistants = await ExploreService.fetchProfessionals('assistant');
       setAllProfessionals([...(docs || []), ...(clinics || []), ...(assistants || [])]);
 
-      // 3. Auto select first farm if user is not clinician and farms exist
-      if (!isClinician && farmList.length > 0) {
+      // 3. Auto select highlight farm if matching, else default first farm
+      if (highlightFarmId) {
+        const targetFarm = farmList.find(f => f.id === highlightFarmId);
+        if (targetFarm) {
+          setSelectedFarm(targetFarm);
+        }
+      } else if (!isClinician && farmList.length > 0) {
         // filter farms where user resides in team
         const myFarms = farmList.filter(f =>
           f.ownerUid === currentUser.uid || f.team.some(member => member.uid === currentUser.uid)
@@ -191,7 +207,7 @@ export default function LivestockManagement({ currentUser }: LivestockManagement
 
   // Permissions helper
   const canModifyFarmDetails = userRoleInSelectedFarm === 'Owner' || userRoleInSelectedFarm === 'Manager';
-  const canModifyAnimals = userRoleInSelectedFarm === 'Owner' || userRoleInSelectedFarm === 'Manager' || userRoleInSelectedFarm === 'Worker';
+  const canModifyAnimals = userRoleInSelectedFarm === 'Owner' || userRoleInSelectedFarm === 'Manager' || userRoleInSelectedFarm === 'Worker' || userRoleInSelectedFarm === 'Veterinarian' || userRoleInSelectedFarm === 'Assistant';
   const canPerformClinicalTasks = userRoleInSelectedFarm === 'Owner' || userRoleInSelectedFarm === 'Veterinarian' || userRoleInSelectedFarm === 'Assistant';
 
   // ─────────────────────────────────────────────────────────────────

@@ -20,7 +20,13 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
-  const [toasts, setToasts] = useState<{ id: string; message: string; type: string }[]>([]);
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
+
+  // Highlight states for redirects
+  const [highlightPostId, setHighlightPostId] = useState<string | null>(null);
+  const [highlightJobId, setHighlightJobId] = useState<string | null>(null);
+  const [highlightApplicationId, setHighlightApplicationId] = useState<string | null>(null);
+  const [highlightFarmId, setHighlightFarmId] = useState<string | null>(null);
 
   // Polling loop for real-time popup notifications
   useEffect(() => {
@@ -47,8 +53,8 @@ export default function App() {
             seenIds.add(n.id);
             const toastId = 'toast_' + n.id + '_' + Date.now();
             
-            // Push toast popup
-            setToasts(prev => [...prev, { id: toastId, message: n.message, type: n.type }]);
+            // Push toast popup with full notification ref for click handling
+            setToasts(prev => [...prev, { id: toastId, message: n.message, type: n.type, notif: n }]);
             
             // Auto fade out after 5 seconds
             setTimeout(() => {
@@ -97,6 +103,48 @@ export default function App() {
     } catch (err) {
       console.error('Failed to delete notification:', err);
     }
+  };
+
+  // Redirect to source when user clicks a notification
+  const handleNotificationClick = async (notif: VetNotification) => {
+    // Optimistically mark this specific notification as read in the UI
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    try {
+      // Also sync all or this status to DB/localStorage
+      await NotificationService.markAllAsRead(currentUser!.uid);
+    } catch (err) {
+      console.warn('Failed to sync notification read status on click:', err);
+    }
+
+    // Reset other irrelevant highlights
+    setHighlightPostId(null);
+    setHighlightJobId(null);
+    setHighlightApplicationId(null);
+    setHighlightFarmId(null);
+
+    // Set correct highlight states based on targetType and redirect
+    if (notif.targetType === 'post') {
+      setHighlightPostId(notif.targetId);
+      setActiveSection('community');
+    } else if (notif.targetType === 'job') {
+      setHighlightJobId(notif.targetId);
+      setActiveSection('jobs');
+    } else if (notif.targetType === 'application') {
+      setHighlightApplicationId(notif.targetId);
+      setActiveSection('jobs');
+    } else if (notif.targetType === 'farm') {
+      setHighlightFarmId(notif.targetId);
+      setActiveSection('livestock');
+    }
+  };
+
+  const handleNavigate = (section: string) => {
+    setActiveSection(section);
+    // Clear highlight tags during manual user shifts
+    setHighlightPostId(null);
+    setHighlightJobId(null);
+    setHighlightApplicationId(null);
+    setHighlightFarmId(null);
   };
 
   // Unified Firebase test connection check on initial system boot
@@ -155,18 +203,19 @@ export default function App() {
       <Navbar
         user={currentUser}
         activeSection={activeSection}
-        onNavigate={setActiveSection}
+        onNavigate={handleNavigate}
         onLogout={handleLogout}
         notifications={notifications}
         onMarkAllAsRead={handleMarkAllAsRead}
         onDeleteNotification={handleDeleteNotification}
+        onNotificationClick={handleNotificationClick}
       />
 
       {currentUser && !currentUser.emailVerified && (
         <div className="bg-amber-50/80 border-b border-amber-200 text-amber-900 text-xs py-2.5 px-4 text-center font-medium flex items-center justify-center gap-3 animate-fadeIn">
           <span>⚠️ Your email is unverified. Please verify your email to ensure secure access.</span>
           <button
-            onClick={() => setActiveSection('profile')}
+            onClick={() => handleNavigate('profile')}
             className="underline font-bold hover:text-amber-700 bg-transparent border-none p-0 cursor-pointer text-xs"
           >
             Go to Profile configuration to resend link or check live status →
@@ -181,12 +230,15 @@ export default function App() {
             currentUser={currentUser}
             onUpdateUser={handleUpdateUserProfile}
             activeSection={activeSection}
-            onNavigate={setActiveSection}
+            onNavigate={handleNavigate}
           />
         )}
 
         {activeSection === 'community' && (
-          <CommunityFeed currentUser={currentUser} />
+          <CommunityFeed 
+            currentUser={currentUser} 
+            highlightPostId={highlightPostId}
+          />
         )}
 
         {activeSection === 'marketplace' && (
@@ -198,11 +250,18 @@ export default function App() {
         )}
 
         {activeSection === 'jobs' && (
-          <JobBoard currentUser={currentUser} />
+          <JobBoard 
+            currentUser={currentUser} 
+            highlightJobId={highlightJobId}
+            highlightApplicationId={highlightApplicationId}
+          />
         )}
 
         {activeSection === 'livestock' && (
-          <LivestockManagement currentUser={currentUser} />
+          <LivestockManagement 
+            currentUser={currentUser} 
+            highlightFarmId={highlightFarmId}
+          />
         )}
 
         {activeSection === 'profile' && (
@@ -236,7 +295,13 @@ export default function App() {
               initial={{ opacity: 0, x: 50, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 50, scale: 0.9 }}
-              className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto"
+              onClick={() => {
+                if (toast.notif) {
+                  handleNotificationClick(toast.notif);
+                  setToasts(prev => prev.filter(t => t.id !== toast.id));
+                }
+              }}
+              className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto cursor-pointer hover:bg-[#fcf9f2] transition-colors"
             >
               <div className="text-xl filter drop-shadow select-none mt-0.5">
                 {toast.type === 'like' && '❤️'}
@@ -245,14 +310,17 @@ export default function App() {
                 {toast.type === 'status_change' && '✨'}
               </div>
               <div className="flex-1 pr-6 text-left">
-                <span className="text-[9px] tracking-wider uppercase font-black text-[#5a5a40] block leading-none">ACTIVITY BULLETIN</span>
+                <span className="text-[9px] tracking-wider uppercase font-black text-[#5a5a40] block leading-none">ACTIVITY BULLETIN (CLICK to view)</span>
                 <p className="text-[11px] text-[#3c3c3b] font-bold leading-tight mt-1.5">
                   {toast.message}
                 </p>
               </div>
               <button
-                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                className="absolute top-2 right-2 p-1 rounded-full text-[#a49f92] hover:text-[#5a5a40] hover:bg-[#fcf9f2] border-none bg-transparent cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setToasts(prev => prev.filter(t => t.id !== toast.id));
+                }}
+                className="absolute top-2 right-2 p-1 rounded-full text-[#a49f92] hover:text-[#5a5a40] hover:bg-[#fcf9f2] border-none bg-transparent cursor-pointer z-[10]"
                 aria-label="Dismiss toast"
               >
                 <X className="w-3 h-3" />

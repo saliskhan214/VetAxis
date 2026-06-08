@@ -10,9 +10,10 @@ import {
 
 interface CommunityFeedProps {
   currentUser: UserProfile;
+  highlightPostId?: string | null;
 }
 
-export function CommunityFeed({ currentUser }: CommunityFeedProps) {
+export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedProps) {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -74,6 +75,27 @@ export function CommunityFeed({ currentUser }: CommunityFeedProps) {
   useEffect(() => {
     loadPosts();
   }, []);
+
+  // Highlighted notification post automatic scroll and filter alignment
+  useEffect(() => {
+    if (highlightPostId && posts.length > 0) {
+      const match = posts.find(p => p.id === highlightPostId);
+      if (match) {
+        // If selected category is filtering this post out, reset to show 'all'
+        if (activeFilter !== 'all' && match.category !== activeFilter) {
+          setActiveFilter('all');
+        }
+        
+        const scrollTimer = setTimeout(() => {
+          const postEl = document.getElementById(`post-${highlightPostId}`);
+          if (postEl) {
+            postEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 600);
+        return () => clearTimeout(scrollTimer);
+      }
+    }
+  }, [highlightPostId, posts, activeFilter]);
 
   // Update nearby user estimate when coordinate / radius changes
   useEffect(() => {
@@ -612,14 +634,17 @@ export function CommunityFeed({ currentUser }: CommunityFeedProps) {
                     return (
                       <motion.div
                         key={post.id}
+                        id={`post-${post.id}`}
                         layout
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         className={`bg-white rounded-3xl border ${
-                          post.isBoosted 
-                            ? 'border-red-500 ring-2 ring-red-500/10 shadow-lg' 
-                            : 'border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm'
+                          highlightPostId === post.id
+                            ? 'border-amber-500 ring-4 ring-amber-500/20 shadow-xl scale-[1.01] z-10'
+                            : post.isBoosted 
+                              ? 'border-red-500 ring-2 ring-red-500/10 shadow-lg' 
+                              : 'border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm'
                         } p-6 space-y-4 hover:shadow-md transition-all relative overflow-hidden`}
                       >
                         

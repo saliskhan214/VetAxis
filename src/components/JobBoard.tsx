@@ -10,9 +10,11 @@ import {
 
 interface JobBoardProps {
   currentUser: UserProfile;
+  highlightJobId?: string | null;
+  highlightApplicationId?: string | null;
 }
 
-export function JobBoard({ currentUser }: JobBoardProps) {
+export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }: JobBoardProps) {
   const [jobs, setJobs] = useState<JobPost[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -82,9 +84,51 @@ export function JobBoard({ currentUser }: JobBoardProps) {
   // Toast alert
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Local resolved highlight job ID
+  const [localHighlightJobId, setLocalHighlightJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (highlightJobId) {
+      setLocalHighlightJobId(highlightJobId);
+    }
+  }, [highlightJobId]);
+
+  useEffect(() => {
+    if (highlightApplicationId && applications.length > 0) {
+      const matchApp = applications.find(a => a.id === highlightApplicationId);
+      if (matchApp) {
+        setLocalHighlightJobId(matchApp.jobId);
+      }
+    }
+  }, [highlightApplicationId, applications]);
+
+  useEffect(() => {
+    if (localHighlightJobId && jobs.length > 0) {
+      const targetJob = jobs.find(j => j.id === localHighlightJobId);
+      if (targetJob) {
+        const isMyOwn = currentUser.role === 'clinic' && 
+          (targetJob.clinicId === currentUser.uid || targetJob.clinicEmail === currentUser.email);
+        
+        if (isMyOwn) {
+          setActiveTab('my_postings');
+        } else {
+          setActiveTab('browse');
+        }
+
+        const scrollTimer = setTimeout(() => {
+          const borderElement = document.getElementById(`job-${localHighlightJobId}`);
+          if (borderElement) {
+            borderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 650);
+        return () => clearTimeout(scrollTimer);
+      }
+    }
+  }, [localHighlightJobId, jobs]);
+
   useEffect(() => {
     loadJobs();
-    if (currentUser.role === 'clinic') {
+    if (currentUser.role === 'clinic' && !highlightJobId && !highlightApplicationId) {
       setActiveTab('my_postings');
     }
   }, []);
@@ -654,13 +698,16 @@ export function JobBoard({ currentUser }: JobBoardProps) {
             return (
               <motion.div
                 key={job.id}
+                id={`job-${job.id}`}
                 layout
                 className={`relative bg-white border rounded-2xl overflow-hidden p-5 flex flex-col justify-between transition-shadow hover:shadow-md ${
-                  job.status === 'closed' 
-                    ? 'border-[#ece8df] opacity-75 grayscale-xs' 
-                    : isMyOwn 
-                      ? 'border-[#a0522d]/40 shadow-xs border-b-[3px] border-b-[#a0522d]'
-                      : 'border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad]'
+                  localHighlightJobId === job.id
+                    ? 'border-amber-500 ring-4 ring-amber-500/20 shadow-lg scale-[1.01] z-10'
+                    : job.status === 'closed' 
+                      ? 'border-[#ece8df] opacity-75 grayscale-xs' 
+                      : isMyOwn 
+                        ? 'border-[#a0522d]/40 shadow-xs border-b-[3px] border-b-[#a0522d]'
+                        : 'border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad]'
                 }`}
               >
                 <div>
