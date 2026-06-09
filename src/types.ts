@@ -84,6 +84,7 @@ export interface PetAd {
   ownerName: string;
   ownerRole: UserRole;
   createdAt: number;
+  isPremium?: boolean;
 }
 
 export interface Product {
@@ -98,6 +99,7 @@ export interface Product {
   ownerName: string;
   ownerRole: UserRole;
   createdAt: number;
+  isPremium?: boolean;
 }
 
 export interface CommunityPost {

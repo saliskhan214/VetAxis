@@ -17,6 +17,12 @@ const LOCAL_ANIMALS_KEY = 'va_animals';
 const LOCAL_BATCHES_KEY = 'va_batches';
 const LOCAL_TASKS_KEY = 'va_tasks';
 
+let offlineOverride = false;
+
+function isCloud() {
+  return isFirebaseConfigured && db && !offlineOverride;
+}
+
 function cleanUndefined<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {
     return obj;
@@ -62,11 +68,60 @@ export function addMonths(dateStr: string | undefined, months: number): string {
 }
 
 export const LivestockService = {
+  // ─── Offline Mechanics ───────────────────────────────────────────
+  setOfflineOverride(val: boolean) {
+    offlineOverride = val;
+  },
+
+  async syncOfflineDataWithServer(): Promise<void> {
+    if (!isFirebaseConfigured || !db) return;
+
+    // 1. Sync Farms
+    try {
+      const farms: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+      for (const f of farms) {
+        await setDoc(doc(db, 'livestock_farms', f.id), cleanUndefined(f));
+      }
+    } catch (e) {
+      console.error("Sync farms error:", e);
+    }
+
+    // 2. Sync Animals
+    try {
+      const animals: LivestockAnimal[] = JSON.parse(localStorage.getItem(LOCAL_ANIMALS_KEY) || '[]');
+      for (const a of animals) {
+        await setDoc(doc(db, 'livestock_animals', a.id), cleanUndefined(a));
+      }
+    } catch (e) {
+      console.error("Sync animals error:", e);
+    }
+
+    // 3. Sync Batches
+    try {
+      const batches: LivestockBatch[] = JSON.parse(localStorage.getItem(LOCAL_BATCHES_KEY) || '[]');
+      for (const b of batches) {
+        await setDoc(doc(db, 'livestock_batches', b.id), cleanUndefined(b));
+      }
+    } catch (e) {
+      console.error("Sync batches error:", e);
+    }
+
+    // 4. Sync Tasks
+    try {
+      const tasks: LivestockTask[] = JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]');
+      for (const t of tasks) {
+        await setDoc(doc(db, 'livestock_tasks', t.id), cleanUndefined(t));
+      }
+    } catch (e) {
+      console.error("Sync tasks error:", e);
+    }
+  },
+
   // ─────────────────────────────────────────────────────────────────
   // FARMS SERVICE
   // ─────────────────────────────────────────────────────────────────
   async fetchFarms(): Promise<LivestockFarm[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_farms'));
         return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockFarm[];
@@ -101,7 +156,7 @@ export const LivestockService = {
       team: farm.team || []
     };
 
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await setDoc(doc(db, 'livestock_farms', newFarm.id), cleanUndefined(newFarm));
         return newFarm;
@@ -118,7 +173,7 @@ export const LivestockService = {
   },
 
   async updateFarm(farmId: string, updates: Partial<LivestockFarm>): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await updateDoc(doc(db, 'livestock_farms', farmId), cleanUndefined(updates));
       } catch (err) {
@@ -135,10 +190,9 @@ export const LivestockService = {
   },
 
   async deleteFarm(farmId: string): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await deleteDoc(doc(db, 'livestock_farms', farmId));
-        // Delete cascade for related animals, batches, and tasks (on Firestore these would optionally stay or cascade)
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `livestock_farms/${farmId}`);
       }
@@ -162,7 +216,7 @@ export const LivestockService = {
   // ANIMALS SERVICE (Individual Entry Mode)
   // ─────────────────────────────────────────────────────────────────
   async fetchAllAnimals(): Promise<LivestockAnimal[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_animals'));
         return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockAnimal[];
@@ -180,7 +234,7 @@ export const LivestockService = {
   },
 
   async fetchAnimals(farmId: string): Promise<LivestockAnimal[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const q = query(collection(db, 'livestock_animals'), where('farmId', '==', farmId));
         const snap = await getDocs(q);
@@ -211,7 +265,7 @@ export const LivestockService = {
       createdAt: Date.now()
     };
 
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await setDoc(doc(db, 'livestock_animals', newAnimal.id), cleanUndefined(newAnimal));
       } catch (err) {
@@ -230,7 +284,6 @@ export const LivestockService = {
   },
 
   async autoGenerateSchedulesForAnimal(animal: LivestockAnimal) {
-    // Generate system scheduled events automatically based on DOB
     const dob = animal.dob || new Date().toISOString().split('T')[0];
     const tasksToSchedule: Partial<LivestockTask>[] = [];
 
@@ -253,7 +306,7 @@ export const LivestockService = {
       tasksToSchedule.push({
         serviceType: 'Booster Vaccination',
         dueDate: addDays(dob, 330),
-        autoScheduleNext: true // completed booster creates another booster 6 months down the road!
+        autoScheduleNext: true
       });
     } else if (animal.species === 'Goat' || animal.species === 'Sheep') {
       tasksToSchedule.push({
@@ -272,7 +325,6 @@ export const LivestockService = {
         autoScheduleNext: true
       });
     } else {
-      // General checkup
       tasksToSchedule.push({
         serviceType: 'General Checkup',
         dueDate: addDays(dob, 14),
@@ -296,7 +348,7 @@ export const LivestockService = {
   },
 
   async updateAnimal(animalId: string, updates: Partial<LivestockAnimal>): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await updateDoc(doc(db, 'livestock_animals', animalId), cleanUndefined(updates));
       } catch (err) {
@@ -313,7 +365,7 @@ export const LivestockService = {
   },
 
   async deleteAnimal(animalId: string): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await deleteDoc(doc(db, 'livestock_animals', animalId));
       } catch (err) {
@@ -323,7 +375,6 @@ export const LivestockService = {
       const list = await this.fetchAllAnimals();
       localStorage.setItem(LOCAL_ANIMALS_KEY, JSON.stringify(list.filter(a => a.id !== animalId)));
 
-      // Delete tasks associated with animal
       const tasks = await this.fetchAllTasks();
       localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks.filter(t => t.targetId !== animalId)));
     }
@@ -333,7 +384,7 @@ export const LivestockService = {
   // BATCHES SERVICE (Flock / Batch Entry Mode)
   // ─────────────────────────────────────────────────────────────────
   async fetchAllBatches(): Promise<LivestockBatch[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_batches'));
         return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockBatch[];
@@ -351,7 +402,7 @@ export const LivestockService = {
   },
 
   async fetchBatches(farmId: string): Promise<LivestockBatch[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const q = query(collection(db, 'livestock_batches'), where('farmId', '==', farmId));
         const snap = await getDocs(q);
@@ -380,7 +431,7 @@ export const LivestockService = {
       createdAt: Date.now()
     };
 
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await setDoc(doc(db, 'livestock_batches', newBatch.id), cleanUndefined(newBatch));
       } catch (err) {
@@ -392,7 +443,6 @@ export const LivestockService = {
       localStorage.setItem(LOCAL_BATCHES_KEY, JSON.stringify(list));
     }
 
-    // Auto generate schedule for Batch (e.g., standard vaccines for Poultry flocks)
     await this.autoGenerateSchedulesForBatch(newBatch);
 
     return newBatch;
@@ -424,7 +474,6 @@ export const LivestockService = {
         dueDate: addDays(arrDate, 38)
       });
     } else {
-      // General batch care
       tasksToSchedule.push({
         serviceType: 'Batch Acclimatization Inspection',
         dueDate: addDays(arrDate, 3)
@@ -450,7 +499,7 @@ export const LivestockService = {
   },
 
   async updateBatch(batchId: string, updates: Partial<LivestockBatch>): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await updateDoc(doc(db, 'livestock_batches', batchId), cleanUndefined(updates));
       } catch (err) {
@@ -467,7 +516,7 @@ export const LivestockService = {
   },
 
   async deleteBatch(batchId: string): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await deleteDoc(doc(db, 'livestock_batches', batchId));
       } catch (err) {
@@ -477,7 +526,6 @@ export const LivestockService = {
       const list = await this.fetchAllBatches();
       localStorage.setItem(LOCAL_BATCHES_KEY, JSON.stringify(list.filter(b => b.id !== batchId)));
 
-      // Delete tasks associated with batch
       const tasks = await this.fetchAllTasks();
       localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks.filter(t => t.targetId !== batchId)));
     }
@@ -487,7 +535,7 @@ export const LivestockService = {
   // TASKS / REMINDER SERVICE
   // ─────────────────────────────────────────────────────────────────
   async fetchAllTasks(): Promise<LivestockTask[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_tasks'));
         return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockTask[];
@@ -505,7 +553,7 @@ export const LivestockService = {
   },
 
   async fetchTasks(farmId: string): Promise<LivestockTask[]> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         const q = query(collection(db, 'livestock_tasks'), where('farmId', '==', farmId));
         const snap = await getDocs(q);
@@ -540,7 +588,7 @@ export const LivestockService = {
       autoScheduleNext: task.autoScheduleNext
     };
 
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await setDoc(doc(db, 'livestock_tasks', newTask.id), cleanUndefined(newTask));
       } catch (err) {
@@ -555,7 +603,7 @@ export const LivestockService = {
   },
 
   async updateTask(taskId: string, updates: Partial<LivestockTask>): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await updateDoc(doc(db, 'livestock_tasks', taskId), cleanUndefined(updates));
       } catch (err) {
@@ -572,7 +620,7 @@ export const LivestockService = {
   },
 
   async deleteTask(taskId: string): Promise<void> {
-    if (isFirebaseConfigured && db) {
+    if (isCloud()) {
       try {
         await deleteDoc(doc(db, 'livestock_tasks', taskId));
       } catch (err) {
@@ -595,20 +643,12 @@ export const LivestockService = {
       notes: details.notes
     };
 
-    // Retrieve full task details first to verify autoScheduleNext
     let currentTask: LivestockTask | null = null;
-    if (isFirebaseConfigured && db) {
-      // Fetching is simplified on clients
-      const all = await this.fetchAllTasks();
-      currentTask = all.find(t => t.id === taskId) || null;
-    } else {
-      const all = await this.fetchAllTasks();
-      currentTask = all.find(t => t.id === taskId) || null;
-    }
+    const all = await this.fetchAllTasks();
+    currentTask = all.find(t => t.id === taskId) || null;
 
     await this.updateTask(taskId, updatePayload);
 
-    // If autoScheduleNext is configured: Create next booster in exactly 6 months (180 days)
     if (currentTask && currentTask.autoScheduleNext) {
       const nextDueStr = addMonths(today, 6);
       await this.createTask({
@@ -620,7 +660,7 @@ export const LivestockService = {
         dueDate: nextDueStr,
         status: 'Pending',
         createdBy: 'system',
-        autoScheduleNext: true // maintain loop
+        autoScheduleNext: true
       });
     }
   }

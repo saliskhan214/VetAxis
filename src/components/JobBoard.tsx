@@ -541,6 +541,14 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       }
     }
 
+    // Filter out jobs that reached or passed their last date (deadline) for regular browsing
+    if (activeTab !== 'my_postings') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (job.deadline && job.deadline < todayStr) {
+        return false;
+      }
+    }
+
     // Filter by Search term
     const matchesSearch = 
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -849,9 +857,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                           <Check className="w-3.5 h-3.5" />
                           Applied ({appliedForJob.status})
                         </span>
-                      ) : job.status === 'closed' ? (
-                        <button disabled className="bg-gray-100 text-gray-400 border border-gray-200 px-5 py-2.5 rounded-xl text-xs font-bold cursor-not-allowed">
-                          Applications Closed
+                      ) : (job.status === 'closed' || applications.some(app => app.jobId === job.id && app.status === 'Hired')) ? (
+                        <button disabled className="bg-red-50 text-red-700 border border-red-200 px-5 py-2.5 rounded-xl text-xs font-black cursor-not-allowed">
+                          Ad closed
                         </button>
                       ) : (
                         <button

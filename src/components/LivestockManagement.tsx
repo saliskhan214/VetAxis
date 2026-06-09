@@ -113,6 +113,138 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
   const [teamMemberEmail, setTeamMemberEmail] = useState('');
   const [teamMemberRole, setTeamMemberRole] = useState<'Manager' | 'Worker' | 'Veterinarian' | 'Assistant'>('Worker');
 
+  // Sandbox-Safe Custom Confirmation Modal Dialog states
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState<boolean>(false);
+
+  // Manual Offline overrides & synchronize control hooks
+  const [isOfflineModeActive, setIsOfflineModeActive] = useState<boolean>(!navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    LivestockService.setOfflineOverride(isOfflineModeActive);
+  }, [isOfflineModeActive]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOfflineModeActive(false);
+    };
+    const handleOffline = () => {
+      setIsOfflineModeActive(true);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleSyncData = async () => {
+    setIsSyncing(true);
+    try {
+      await LivestockService.syncOfflineDataWithServer();
+      await loadGlobalData();
+      
+      setConfirmDialog({
+        title: "Synchronization Successful",
+        description: "Local agricultural and livestock offline records synchronized safely with the live Cloud database backend!",
+        confirmText: "Excellent",
+        onConfirm: () => setConfirmDialog(null)
+      });
+    } catch (err) {
+      console.error('Failed to sync offline storage:', err);
+      setConfirmDialog({
+        title: "Sync Problem",
+        description: "Verify internet signal level and try again when signal is active.",
+        confirmText: "Ok",
+        onConfirm: () => setConfirmDialog(null)
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Helper date function for automatic scheduling
+  const addDays = (dateStr: string, daysStrNum: number) => {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + daysStrNum);
+    return date.toISOString().split('T')[0];
+  };
+
+  // Time-Saving Bulk Actions for Doctors/clinics
+  const handleBulkDeDewormOrVaccinate = async () => {
+    if (!selectedFarm || animals.length === 0) return;
+    
+    setConfirmDialog({
+      title: "Bulk Health Booster Loop",
+      description: `This will auto-schedule standard vaccination & deworming booster alerts (due in tomorrow's cycle) for all ${animals.length} animals on this farm with a single click.`,
+      confirmText: "Schedule For All",
+      onConfirm: async () => {
+        try {
+          for (const a of animals) {
+            await LivestockService.createTask({
+              farmId: selectedFarm.id,
+              targetId: a.id,
+              targetType: 'individual',
+              targetName: `${a.species} Tag# ${a.tagNumber || a.animalId}`,
+              serviceType: 'Booster Vaccination',
+              dueDate: addDays(new Date().toISOString().split('T')[0], 1),
+              status: 'Pending',
+              notes: 'Automatical bulk scheduler deworming loop booster cycle.',
+              createdBy: 'manual',
+              autoScheduleNext: true
+            });
+          }
+          await loadFarmDetails(selectedFarm.id);
+          
+          setConfirmDialog({
+            title: "Bulk Cycle Scheduled",
+            description: `Successfully scheduled booster vaccination alerts for all ${animals.length} animals on this farm workspace!`,
+            confirmText: "Perfect",
+            onConfirm: () => setConfirmDialog(null)
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
+  };
+
+  const handleBulkMarkAllHealthy = async () => {
+    if (!selectedFarm || animals.length === 0) return;
+
+    setConfirmDialog({
+      title: "Bulk Health Diagnostics Completed",
+      description: `Are you sure you want to mark all ${animals.length} animals on this farm as "Healthy" at once? This overrides individual statuses instantly.`,
+      confirmText: "Mark All Healthy",
+      onConfirm: async () => {
+        try {
+          for (const a of animals) {
+            await LivestockService.updateAnimal(a.id, { healthStatus: 'Healthy' });
+          }
+          await loadFarmDetails(selectedFarm.id);
+          
+          setConfirmDialog({
+            title: "Diagnostics Logged",
+            description: `Successfully declared healthy status for all ${animals.length} registered animals!`,
+            confirmText: "Great",
+            onConfirm: () => setConfirmDialog(null)
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
+  };
+
   // Trigger loading state
   const isClinician = currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant';
 
@@ -514,42 +646,109 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
     }
   };
 
-  const handleDeleteAnimal = async (id: string) => {
-    if (!window.confirm('Delete this livestock record permanently? All related logs will be deleted.')) return;
-    try {
-      await LivestockService.deleteAnimal(id);
-      setAnimals(prev => prev.filter(a => a.id !== id));
-      // Reload tasks
-      await loadFarmDetails(selectedFarm!.id);
-    } catch (err) {
-      console.error('Failed to delete animal:', err);
-    }
-  };
-
-  const handleDeleteBatch = async (id: string) => {
-    if (!window.confirm('Delete this batch/flock permanently? Related logs will be deleted.')) return;
-    try {
-      await LivestockService.deleteBatch(id);
-      setBatches(prev => prev.filter(b => b.id !== id));
-      // Reload tasks
-      await loadFarmDetails(selectedFarm!.id);
-    } catch (err) {
-      console.error('Failed to delete batch:', err);
-    }
-  };
-
-  const handleCascadeDeleteFarm = async (farmId: string) => {
-    if (!window.confirm('WARNING: Are you sure you want to delete this farm entirely? This will permanently wipe out all team, animals, batches, schedules, and historical records. This action cannot be undone!')) return;
-    try {
-      await LivestockService.deleteFarm(farmId);
-      const updatedFarms = farms.filter(f => f.id !== farmId);
-      setFarms(updatedFarms);
-      if (selectedFarm && selectedFarm.id === farmId) {
-        setSelectedFarm(updatedFarms.length > 0 ? updatedFarms[0] : null);
+  const handleDeleteAnimal = (id: string) => {
+    setConfirmDialog({
+      title: "Delete Animal Record",
+      description: "Are you sure you want to delete this animal record permanently? This will remove all related logs and scheduled booster events. This action is irreversible.",
+      confirmText: "Delete Record",
+      onConfirm: async () => {
+        try {
+          await LivestockService.deleteAnimal(id);
+          setAnimals(prev => prev.filter(a => a.id !== id));
+          if (selectedFarm) {
+            await loadFarmDetails(selectedFarm.id);
+          }
+          setConfirmDialog(null);
+        } catch (err) {
+          console.error('Failed to delete animal:', err);
+        }
       }
-    } catch (err) {
-      console.error('Failed to terminate farm entity:', err);
-    }
+    });
+  };
+
+  const handleDeleteBatch = (id: string) => {
+    setConfirmDialog({
+      title: "Delete Batch / Flock",
+      description: "Are you sure you want to delete this batch/flock permanently? Related logs and schedules will be deleted.",
+      confirmText: "Delete Batch",
+      onConfirm: async () => {
+        try {
+          await LivestockService.deleteBatch(id);
+          setBatches(prev => prev.filter(b => b.id !== id));
+          if (selectedFarm) {
+            await loadFarmDetails(selectedFarm.id);
+          }
+          setConfirmDialog(null);
+        } catch (err) {
+          console.error('Failed to delete batch:', err);
+        }
+      }
+    });
+  };
+
+  const handleCascadeDeleteFarm = (farmId: string) => {
+    setConfirmDialog({
+      title: "Terminate Farm Workspace Map",
+      description: "WARNING: Are you sure you want to delete this agricultural workspace entirely? This permanently deletes all registered team members, animals, batches, rosters, and activity logs. This cannot be undone!",
+      confirmText: "CRITICAL: WIPE FARM",
+      onConfirm: async () => {
+        try {
+          await LivestockService.deleteFarm(farmId);
+          const updatedFarms = farms.filter(f => f.id !== farmId);
+          setFarms(updatedFarms);
+          if (selectedFarm && selectedFarm.id === farmId) {
+            setSelectedFarm(updatedFarms.length > 0 ? updatedFarms[0] : null);
+          }
+          setConfirmDialog(null);
+        } catch (err) {
+          console.error('Failed to terminate farm entity:', err);
+        }
+      }
+    });
+  };
+
+  const handleLeaveFarmServices = () => {
+    if (!selectedFarm) return;
+    setConfirmDialog({
+      title: "Resign Healthcare Services",
+      description: `Official Resignation: Are you sure you want to resign and leave all healthcare services for "${selectedFarm.name}"? You will immediately lose administrative access and logging privileges on this farm records system.`,
+      confirmText: "Resign & Disconnect",
+      onConfirm: async () => {
+        try {
+          const updatedTeam = (selectedFarm.team || []).filter(member => member.uid !== currentUser.uid);
+          const updates = {
+            managerUid: undefined,
+            managerName: undefined,
+            managerRole: undefined,
+            managerStatus: 'unassigned' as const,
+            managerDeclinedReason: undefined,
+            team: updatedTeam
+          };
+
+          await LivestockService.updateFarm(selectedFarm.id, updates);
+
+          try {
+            await NotificationService.createNotification({
+              userId: selectedFarm.ownerUid,
+              senderId: currentUser.uid,
+              senderName: currentUser.name,
+              type: 'status_change',
+              targetId: selectedFarm.id,
+              targetType: 'farm',
+              message: `Dr. ${currentUser.name} has resigned as the Certified Healthcare Manager for your farm "${selectedFarm.name}".`
+            });
+          } catch (notifErr) {
+            console.error('Resign notification failed:', notifErr);
+          }
+
+          setConfirmDialog(null);
+          await loadGlobalData();
+          setSelectedFarm(null);
+        } catch (err) {
+          console.error('Resign fail:', err);
+        }
+      }
+    });
   };
 
   const handleAddTeamMember = async (e: React.FormEvent) => {
@@ -696,6 +895,41 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
               <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md tracking-wider border border-emerald-100 font-mono">
                 System Active
               </span>
+
+              {/* OFFLINE CAPABILITY MODE INDICATOR */}
+              <button 
+                type="button"
+                onClick={() => {
+                  const targetState = !isOfflineModeActive;
+                  setIsOfflineModeActive(targetState);
+                  setConfirmDialog({
+                    title: targetState ? "Local Storage Mode Enabled" : "Cloud Connection Mode Enabled",
+                    description: targetState 
+                      ? "You are running in standalone offline simulation cache. Your changes will save instantly to client memory and can be pushed to Firebase when connectivity resumes."
+                      : "Connecting back to live Firestore ledger storage. Press sync to upload offline caches.",
+                    confirmText: "Acknowledge",
+                    onConfirm: () => setConfirmDialog(null)
+                  });
+                }}
+                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md tracking-wider border font-mono transition-all cursor-pointer ${
+                  isOfflineModeActive 
+                    ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse' 
+                    : 'bg-green-100 text-green-800 border-green-300'
+                }`}
+              >
+                {isOfflineModeActive ? '⚠️ OFFLINE LOCAL STORAGE' : '🌐 INFRA CLOUD CONNECTED'}
+              </button>
+
+              {isOfflineModeActive && (
+                <button
+                  type="button"
+                  onClick={handleSyncData}
+                  disabled={isSyncing}
+                  className="cursor-pointer bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-mono text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md border-none flex items-center gap-1 shadow-xs"
+                >
+                  🔄 {isSyncing ? 'Syncing...' : 'Sync Offline Cache'}
+                </button>
+              )}
             </div>
             <h1 className="font-serif text-3xl font-bold text-[#5a5a40] tracking-tight">Livestock Healthcare</h1>
             <p className="text-xs text-[#7a766f]">Manage herds, schedule immunizations, and link with veterinary managers.</p>
@@ -1081,6 +1315,15 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
                           className="cursor-pointer bg-white hover:bg-neutral-50 border border-[#e3dec9] text-gray-500 font-bold text-[10px] px-3 py-2 rounded-lg transition-all"
                         >
                           Revoke Manager Access
+                        </button>
+                      )}
+
+                      {isClinician && selectedFarm.managerUid === currentUser.uid && (
+                        <button
+                          onClick={handleLeaveFarmServices}
+                          className="cursor-pointer bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold text-[10px] px-3.5 py-2.5 rounded-lg transition-all flex items-center gap-1.5"
+                        >
+                          🚪 Leave Farm Services
                         </button>
                       )}
                     </div>
@@ -2074,6 +2317,63 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
           </motion.form>
         </div>
       )}
+
+      {/* Sandbox-Safe Custom Confirmation Modal Overlay */}
+      <AnimatePresence>
+        {confirmDialog && (
+          <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-[550] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white border border-[#e3dec9] rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl mt-0.5">{confirmDialog.isDestructive ? '⚠️' : 'ℹ️'}</span>
+                <div className="space-y-1">
+                  <h3 className="font-serif text-base font-bold text-[#5a5a40]">
+                    {confirmDialog.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed font-sans">
+                    {confirmDialog.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 justify-end">
+                {confirmDialog.confirmText !== 'Excellent' && confirmDialog.confirmText !== 'Perfect' && confirmDialog.confirmText !== 'Great' && confirmDialog.confirmText !== 'Acknowledge' && confirmDialog.confirmText !== 'Ok' && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDialog(null)}
+                    className="cursor-pointer bg-[#faf9f5] hover:bg-[#f5f2e9] text-gray-600 py-2 px-4 rounded-xl text-xs font-bold border border-[#e3dec9] transition-all"
+                  >
+                    {confirmDialog.cancelText || 'Cancel'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setConfirmLoading(true);
+                    try {
+                      await confirmDialog.onConfirm();
+                    } catch (e) {
+                      console.error("Confirmation execution failed:", e);
+                    } finally {
+                      setConfirmLoading(false);
+                    }
+                  }}
+                  disabled={confirmLoading}
+                  className={`cursor-pointer text-white py-2 px-4 rounded-xl text-xs font-bold border-none transition-all ${
+                    confirmDialog.isDestructive ? 'bg-red-600 hover:bg-red-700' : 'bg-[#5a5a40] hover:bg-[#3e3e2b]'
+                  }`}
+                >
+                  {confirmLoading ? 'Processing...' : confirmDialog.confirmText}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

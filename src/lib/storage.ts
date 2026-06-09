@@ -41,11 +41,6 @@ const LOCAL_NOTIFICATIONS_KEY = 'va_notifications';
 
 export function injectPresence(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
-  
-  // If this user already has explicit on/off info set, respect it
-  if (profile.isOnline !== undefined) {
-    return profile;
-  }
 
   // Get active session UID
   let activeUid: string | null = null;
@@ -59,34 +54,26 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
     }
   } catch {}
 
-  // If this profile is the logged-in user, they are online
+  // If this profile is the logged-in user, they are truly online
   if (activeUid && activeUid === profile.uid) {
     profile.isOnline = true;
     profile.lastSeen = Date.now();
     return profile;
   }
 
-  // Otherwise, create stable pseudo-random online status based on uid character sum
-  const charSum = profile.uid.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
-  const isOnline = (charSum % 2 === 0);
-  profile.isOnline = isOnline;
-  
-  if (isOnline) {
-    profile.lastSeen = Date.now();
+  // Real presence calculation (active inside the last 5 minutes)
+  const fiveMinutesMs = 5 * 60 * 1000;
+  if (profile.lastSeen && (Date.now() - profile.lastSeen <= fiveMinutesMs) && profile.isOnline === true) {
+    profile.isOnline = true;
   } else {
-    // Generate an offset that's fixed for this user ID
-    const minutesAgo = (charSum % 55) + 5; // offset between 5 and 60 minutes
-    const hoursAgo = (charSum % 23) + 1; // offset between 1 and 24 hours
-    const daysAgo = (charSum % 5) + 1; // offset between 1 and 5 days
-    
-    let offsetMs = minutesAgo * 60 * 1000;
-    if (charSum % 3 === 1) {
-      offsetMs = hoursAgo * 60 * 60 * 1000;
-    } else if (charSum % 3 === 2) {
-      offsetMs = daysAgo * 24 * 60 * 60 * 1000;
-    }
-    
-    profile.lastSeen = Date.now() - offsetMs;
+    profile.isOnline = false;
+  }
+
+  // If lastSeen is missing, set a stable fallback timestamp
+  if (!profile.lastSeen) {
+    const charSum = profile.uid.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
+    const hoursAgo = (charSum % 12) + 1;
+    profile.lastSeen = Date.now() - (hoursAgo * 60 * 60 * 1000);
   }
 
   return profile;
@@ -1381,6 +1368,12 @@ export const PetAdsService = {
         list = [];
       }
     }
+
+    // Background async auto cleanup expired ads
+    setTimeout(() => {
+      this.autoCleanupAds().catch(e => console.error('Auto cleanup ads error:', e));
+    }, 100);
+
     const validEmails = await getValidUserEmails();
     return list.filter(ad => {
       const email = (ad.ownerEmail || '').toLowerCase().trim();
@@ -1388,7 +1381,59 @@ export const PetAdsService = {
     });
   },
 
+  async autoCleanupAds(): Promise<void> {
+    let list: PetAd[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await getDocs(collection(db, 'pet_ads'));
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PetAd[];
+      } catch (err) {
+        console.error('Failed to fetch ads for cleanup:', err);
+        return;
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_PETS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+
+    const now = Date.now();
+    for (const ad of list) {
+      // Determine if premium
+      const isPremium = ad.isPremium || (ad.ownerRole === 'clinic' || ad.ownerRole === 'doctor');
+      const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+      if (now - ad.createdAt > maxAge) {
+        // Expired! Delete it
+        console.log(`Auto-cleaning expired ad: ${ad.id} (${ad.petType}) - premium: ${isPremium}`);
+        await this.deleteAd(ad.id);
+
+        // Notify the user
+        try {
+          const ownerProfile = await NotificationService.findUserByEmail(ad.ownerEmail);
+          if (ownerProfile) {
+            await NotificationService.createNotification({
+              userId: ownerProfile.uid,
+              senderId: 'system',
+              senderName: 'System Moderator',
+              type: 'status_change',
+              targetId: ad.id,
+              targetType: 'post',
+              message: `Your classified ad listing for "${ad.petType} - ${ad.breed || ''}" has expired and was auto-removed after ${isPremium ? 90 : 30} days.`,
+              read: false,
+              createdAt: Date.now()
+            });
+          }
+        } catch (notifErr) {
+          console.error(`Failed to send ad expiry notification to ${ad.ownerEmail}:`, notifErr);
+        }
+      }
+    }
+  },
+
   async createAd(adData: Partial<PetAd>, owner: UserProfile): Promise<PetAd> {
+    const isOwnerPremium = owner.subscriptionTier === 'Silver' || owner.subscriptionTier === 'Gold' || owner.subscriptionTier === 'Platinum';
     const ad: PetAd = {
       id: 'ad_' + Date.now(),
       adType: adData.adType || 'adoption',
@@ -1403,7 +1448,8 @@ export const PetAdsService = {
       ownerEmail: owner.email,
       ownerName: owner.name,
       ownerRole: owner.role,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      isPremium: isOwnerPremium
     };
 
     if (isFirebaseConfigured && db) {
@@ -1429,8 +1475,8 @@ export const PetAdsService = {
         handleFirestoreError(err, OperationType.DELETE, `pet_ads/${adId}`);
       }
     } else {
-      const ads = await this.fetchAds();
-      const filtered = ads.filter(a => a.id !== adId);
+      const ads = await JSON.parse(localStorage.getItem(LOCAL_PETS_KEY) || '[]');
+      const filtered = ads.filter((a: any) => a.id !== adId);
       localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(filtered));
     }
   }
@@ -1456,6 +1502,12 @@ export const MarketplaceService = {
         list = [];
       }
     }
+
+    // Background async auto cleanup expired products
+    setTimeout(() => {
+      this.autoCleanupProducts().catch(e => console.error('Auto cleanup products error:', e));
+    }, 100);
+
     const validEmails = await getValidUserEmails();
     return list.filter(p => {
       const email = (p.ownerEmail || '').toLowerCase().trim();
@@ -1463,7 +1515,57 @@ export const MarketplaceService = {
     });
   },
 
+  async autoCleanupProducts(): Promise<void> {
+    let list: Product[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await getDocs(collection(db, 'marketplace_products'));
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      } catch (err) {
+        console.error('Failed to fetch products for cleanup:', err);
+        return;
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_ACC_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+
+    const now = Date.now();
+    for (const p of list) {
+      const isPremium = p.isPremium || (p.ownerRole === 'clinic' || p.ownerRole === 'doctor');
+      const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+      if (now - p.createdAt > maxAge) {
+        console.log(`Auto-cleaning expired product: ${p.id} (${p.name}) - premium: ${isPremium}`);
+        await this.deleteProduct(p.id);
+
+        // Notify the user
+        try {
+          const ownerProfile = await NotificationService.findUserByEmail(p.ownerEmail);
+          if (ownerProfile) {
+            await NotificationService.createNotification({
+              userId: ownerProfile.uid,
+              senderId: 'system',
+              senderName: 'System Moderator',
+              type: 'status_change',
+              targetId: p.id,
+              targetType: 'post',
+              message: `Your product listing for "${p.name}" has expired and was auto-removed after ${isPremium ? 90 : 30} days.`,
+              read: false,
+              createdAt: Date.now()
+            });
+          }
+        } catch (notifErr) {
+          console.error(`Failed to send product expiry notification to ${p.ownerEmail}:`, notifErr);
+        }
+      }
+    }
+  },
+
   async createProduct(prodData: Partial<Product>, owner: UserProfile): Promise<Product> {
+    const isOwnerPremium = owner.subscriptionTier === 'Silver' || owner.subscriptionTier === 'Gold' || owner.subscriptionTier === 'Platinum';
     const product: Product = {
       id: 'p_' + Date.now(),
       name: prodData.name || '',
@@ -1475,7 +1577,8 @@ export const MarketplaceService = {
       ownerEmail: owner.email,
       ownerName: owner.name,
       ownerRole: owner.role,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      isPremium: isOwnerPremium
     };
 
     if (isFirebaseConfigured && db) {
@@ -1501,8 +1604,8 @@ export const MarketplaceService = {
         handleFirestoreError(err, OperationType.DELETE, `marketplace_products/${productId}`);
       }
     } else {
-      const products = await this.fetchProducts();
-      const filtered = products.filter(p => p.id !== productId);
+      const products = await JSON.parse(localStorage.getItem(LOCAL_ACC_KEY) || '[]');
+      const filtered = products.filter((p: any) => p.id !== productId);
       localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(filtered));
     }
   }

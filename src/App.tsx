@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, VetNotification } from './types';
 import { getLocalSession, AuthService, NotificationService } from './lib/storage';
-import { testConnection } from './lib/firebase';
+import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 
@@ -18,6 +20,7 @@ import LivestockManagement from './components/LivestockManagement';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(isFirebaseConfigured);
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
@@ -27,6 +30,18 @@ export default function App() {
   const [highlightJobId, setHighlightJobId] = useState<string | null>(null);
   const [highlightApplicationId, setHighlightApplicationId] = useState<string | null>(null);
   const [highlightFarmId, setHighlightFarmId] = useState<string | null>(null);
+
+  // Advanced Global Loading State
+  const [isLoadingSystem, setIsLoadingSystem] = useState<boolean>(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>('');
+
+  const triggerLoading = (message: string = 'Processing...', durationMs: number = 800) => {
+    setLoadingMessage(message);
+    setIsLoadingSystem(true);
+    setTimeout(() => {
+      setIsLoadingSystem(false);
+    }, durationMs);
+  };
 
   // Polling loop for real-time popup notifications
   useEffect(() => {
@@ -139,6 +154,7 @@ export default function App() {
   };
 
   const handleNavigate = (section: string) => {
+    triggerLoading(`Opening ${section.replace('_', ' ').toUpperCase()}...`, 600);
     setActiveSection(section);
     // Clear highlight tags during manual user shifts
     setHighlightPostId(null);
@@ -146,6 +162,45 @@ export default function App() {
     setHighlightApplicationId(null);
     setHighlightFarmId(null);
   };
+
+  // Real-time Auth connection tracker to prevent race conditions on startup
+  useEffect(() => {
+    if (isFirebaseConfigured && auth) {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+          if (firebaseUser) {
+            const stored = getLocalSession();
+            if (stored && stored.uid === firebaseUser.uid) {
+              setCurrentUser(stored);
+            } else {
+              // Fetch fresh user profile from DB to prevent out-of-sync or missing records
+              const userRef = doc(db, 'users', firebaseUser.uid);
+              const userSnap = await getDoc(userRef);
+              if (userSnap.exists()) {
+                const profile = userSnap.data() as UserProfile;
+                setCurrentUser(profile);
+                localStorage.setItem('va_session', JSON.stringify(profile));
+              } else {
+                setCurrentUser(null);
+                localStorage.removeItem('va_session');
+              }
+            }
+          } else {
+            // Sign-out detected or no active Firebase Auth session found
+            setCurrentUser(null);
+            localStorage.removeItem('va_session');
+          }
+        } catch (authErr) {
+          console.error('[VetAxis] Error during auth session restore:', authErr);
+        } finally {
+          setIsAuthInitializing(false);
+        }
+      });
+      return () => unsubscribe();
+    } else {
+      setIsAuthInitializing(false);
+    }
+  }, []);
 
   // Unified Firebase test connection check on initial system boot
   useEffect(() => {
@@ -174,6 +229,29 @@ export default function App() {
     };
   }, [currentUser?.uid]);
 
+  // Real-time online presence heartbeat
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const performHeartbeat = async () => {
+      try {
+        await AuthService.updateProfile(currentUser.uid, {
+          isOnline: true,
+          lastSeen: Date.now()
+        });
+      } catch (err) {
+        console.warn('Presence heartbeat failed:', err);
+      }
+    };
+
+    // Trigger on boot instantly
+    performHeartbeat();
+
+    // Trigger heartbeat clock cycle every 30 seconds to be extremely precise
+    const interval = setInterval(performHeartbeat, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.uid]);
+
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
     setActiveSection('explore');
@@ -187,6 +265,20 @@ export default function App() {
   const handleUpdateUserProfile = (updated: UserProfile) => {
     setCurrentUser(updated);
   };
+
+  if (isAuthInitializing) {
+    return (
+      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="h-16 w-16 bg-[#004d40] rounded-2xl flex items-center justify-center shadow-lg text-[#fdfbf7] font-black text-2xl tracking-widest">
+            VA
+          </div>
+          <h1 className="text-xl font-bold text-stone-800 tracking-tight text-center">VetAxis</h1>
+          <p className="text-stone-500 text-xs font-mono text-center">Securing connection to clinical network...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
@@ -329,6 +421,40 @@ export default function App() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* ADVANCED MODERN SYSTEM LOADING PORTAL */}
+      <AnimatePresence>
+        {isLoadingSystem && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-stone-900/60 backdrop-blur-md z-[99999] flex flex-col items-center justify-center space-y-6"
+          >
+            <div className="relative flex items-center justify-center">
+              {/* Outer Pulsing Radar Ring */}
+              <motion.div
+                animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0.1, 0.6] }}
+                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                className="absolute w-24 h-24 rounded-full border-2 border-amber-500/40"
+              />
+              {/* Inner Rotating Gear / Ring */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                className="w-16 h-16 rounded-full border-4 border-amber-100 border-t-amber-600 border-b-amber-600"
+              />
+              {/* Center Icon */}
+              <span className="absolute text-xl animate-pulse">🩺</span>
+            </div>
+            
+            <div className="space-y-1.5 text-center px-4">
+              <h3 className="font-serif font-black text-amber-50 text-sm uppercase tracking-widest">{loadingMessage}</h3>
+              <p className="text-[10px] text-amber-200/50 font-mono tracking-wider">SECURE DIGITAL LEDGER ENGINE V2</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
