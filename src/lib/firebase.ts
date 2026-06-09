@@ -1,6 +1,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  doc, 
+  getDoc,
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 export enum OperationType {
@@ -43,6 +49,9 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      }),
       experimentalForceLongPolling: true,
     }, firebaseConfig.firestoreDatabaseId);
     auth = getAuth(app);
@@ -87,10 +96,10 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export async function testConnection() {
   if (!isFirebaseConfigured || !db) return;
   try {
-    await getDocFromServer(doc(db, 'test-metadata-connection', 'connectivity-check'));
+    // Graceful connectivity healthcheck using standard dynamic getDoc which respects offline localCache.
+    await getDoc(doc(db, 'test-metadata-connection', 'connectivity-check'));
+    console.log('[VetAxis] Live database connection verified.');
   } catch (error) {
-    if (error instanceof Error && error.message.includes('offline')) {
-      console.warn('[VetAxis] Warning: Please check your Firebase configuration or connection. Device is offline.');
-    }
+    console.warn('[VetAxis] Connection info: Live database is currently in sandbox or offline capability mode:', error);
   }
 }

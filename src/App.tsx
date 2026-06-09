@@ -316,53 +316,63 @@ export default function App() {
       )}
 
       {/* RENDERED FEED ROUTER BOX */}
-      <main className="flex-1 container max-w-7xl mx-auto px-4 py-8">
-        {activeSection === 'explore' && (
-          <ExploreFeed
-            currentUser={currentUser}
-            onUpdateUser={handleUpdateUserProfile}
-            activeSection={activeSection}
-            onNavigate={handleNavigate}
-          />
-        )}
+      <main className="flex-1 container max-w-7xl mx-auto px-4 py-8 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeSection}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+          >
+            {activeSection === 'explore' && (
+              <ExploreFeed
+                currentUser={currentUser}
+                onUpdateUser={handleUpdateUserProfile}
+                activeSection={activeSection}
+                onNavigate={handleNavigate}
+              />
+            )}
 
-        {activeSection === 'community' && (
-          <CommunityFeed 
-            currentUser={currentUser} 
-            highlightPostId={highlightPostId}
-          />
-        )}
+            {activeSection === 'community' && (
+              <CommunityFeed 
+                currentUser={currentUser} 
+                highlightPostId={highlightPostId}
+              />
+            )}
 
-        {activeSection === 'marketplace' && (
-          <Marketplace currentUser={currentUser} />
-        )}
+            {activeSection === 'marketplace' && (
+              <Marketplace currentUser={currentUser} />
+            )}
 
-        {activeSection === 'pet_ads' && (
-          <PetAds currentUser={currentUser} />
-        )}
+            {activeSection === 'pet_ads' && (
+              <PetAds currentUser={currentUser} />
+            )}
 
-        {activeSection === 'jobs' && (
-          <JobBoard 
-            currentUser={currentUser} 
-            highlightJobId={highlightJobId}
-            highlightApplicationId={highlightApplicationId}
-          />
-        )}
+            {activeSection === 'jobs' && (
+              <JobBoard 
+                currentUser={currentUser} 
+                highlightJobId={highlightJobId}
+                highlightApplicationId={highlightApplicationId}
+              />
+            )}
 
-        {activeSection === 'livestock' && (
-          <LivestockManagement 
-            currentUser={currentUser} 
-            highlightFarmId={highlightFarmId}
-          />
-        )}
+            {activeSection === 'livestock' && (
+              <LivestockManagement 
+                currentUser={currentUser} 
+                highlightFarmId={highlightFarmId}
+              />
+            )}
 
-        {activeSection === 'profile' && (
-          <ProfilePage
-            currentUser={currentUser}
-            onUpdateUser={handleUpdateUserProfile}
-            onDeleteSuccess={handleLogout}
-          />
-        )}
+            {activeSection === 'profile' && (
+              <ProfilePage
+                currentUser={currentUser}
+                onUpdateUser={handleUpdateUserProfile}
+                onDeleteSuccess={handleLogout}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* FOOTER METRICS RAIL - Natural Tones Theme */}
