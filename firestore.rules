@@ -32,6 +32,13 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isFarmMember(farmId) {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.ownerUid == request.auth.uid ||
+        get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.managerUid == request.auth.uid
+      );
+    }
+
     // ─────────────────────────────────────────────────────────────────
     // USERS COLLECTION Rules
     // ─────────────────────────────────────────────────────────────────
@@ -412,24 +419,33 @@ service cloud.firestore {
     // LIVESTOCK ANIMALS RULES
     // ─────────────────────────────────────────────────────────────────
     match /livestock_animals/{animalId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn();
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
     }
 
     // ─────────────────────────────────────────────────────────────────
     // LIVESTOCK BATCHES RULES
     // ─────────────────────────────────────────────────────────────────
     match /livestock_batches/{batchId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn();
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
     }
 
     // ─────────────────────────────────────────────────────────────────
     // LIVESTOCK TASKS RULES
     // ─────────────────────────────────────────────────────────────────
     match /livestock_tasks/{taskId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn();
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
     }
 
     // ─────────────────────────────────────────────────────────────────
