@@ -402,8 +402,12 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         phone: phone.trim()
       };
 
-      if (currentUser.role === 'doctor') {
-        payload.expertise = expertise.trim() || 'General Practitioner';
+      if (currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') {
+        payload.expertise = expertise.trim() || (
+          currentUser.role === 'doctor' ? 'General Practitioner' :
+          currentUser.role === 'assistant' ? 'Nurse' :
+          'Livestock Breeder / Pet Owner'
+        );
         payload.address = doctorCity;
         const matchedCity = PAKISTAN_CITIES.find(c => c.name === doctorCity) || PAKISTAN_CITIES[0];
         payload.location = {
@@ -482,7 +486,12 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
             </h3>
             
             <span className="inline-block px-3.5 py-1 rounded-xl text-[9px] uppercase font-black tracking-widest bg-[#f4f1e9] text-[#5a5a40] border border-[#e3dec9]">
-              {currentUser.subscriptionTier ? `${currentUser.subscriptionTier} ` : ''} {currentUser.role === 'doctor' ? 'Practitioner' : currentUser.role === 'clinic' ? 'Hospital Centre' : 'Assistant Nurse'}
+              {currentUser.subscriptionTier ? `${currentUser.subscriptionTier} ` : ''} {
+                currentUser.role === 'doctor' ? 'Practitioner' :
+                currentUser.role === 'clinic' ? 'Hospital Centre' :
+                currentUser.role === 'assistant' ? 'Assistant Nurse' :
+                'General User (Farmer / Pet Owner)'
+              }
             </span>
 
             <div className="text-xs font-mono font-bold text-[#a49f92] truncate max-w-full">{currentUser.email}</div>
@@ -706,22 +715,32 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                   </div>
                 </div>
 
-                {/* CONDITIONAL: Specialty Doctor */}
-                {currentUser.role === 'doctor' && (
+                {/* CONDITIONAL: Specialty Doctor, Assistant or General User */}
+                {(currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') && (
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">Board Specialization competencies</span>
+                      <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">
+                        {currentUser.role === 'doctor' ? 'Board Specialization competencies' :
+                         currentUser.role === 'assistant' ? 'Technical & Nursing competencies' :
+                         'Animal Focus & Farm/Pet Interest'}
+                      </span>
                       <input
                         type="text"
                         className="form-control text-xs"
-                        placeholder="e.g. Feline Care, Small Animal Orthopedic and Surgery"
+                        placeholder={
+                          currentUser.role === 'doctor' ? 'e.g. Feline Care, Small Animal Orthopedic and Surgery' :
+                          currentUser.role === 'assistant' ? 'e.g. Dressing surgery support, animal vaccinations' :
+                          'e.g. Dairy Buffalo breeding, pet owner focus, pedigree cats'
+                        }
                         value={expertise}
                         onChange={(e) => setExpertise(e.target.value)}
                         disabled={loading}
                       />
                     </div>
                     <div className="space-y-1">
-                      <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">Practice City / Town</span>
+                      <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">
+                        {currentUser.role === 'user' ? 'Location City / district' : 'Practice City / Town'}
+                      </span>
                       <select
                         className="form-control text-xs bg-white cursor-pointer"
                         value={doctorCity}
@@ -957,15 +976,27 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                   </div>
                 </div>
 
-                {currentUser.role === 'doctor' && (
+                {(currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') && (
                   <div className="grid grid-cols-1 gap-4.5">
                     <div className="bg-white p-3.5 rounded-xl border border-[#e3dec9]/60">
-                      <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">Board Specialization Competencies</span>
-                      <span className="text-xs font-extrabold text-[#373735]">{currentUser.expertise || 'General Practitioner'}</span>
+                      <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">
+                        {currentUser.role === 'doctor' ? 'Board Specialization Competencies' :
+                         currentUser.role === 'assistant' ? 'Nursing & Clinical Competencies' :
+                         'Animal Focus & Breeder Interests'}
+                      </span>
+                      <span className="text-xs font-extrabold text-[#373735]">
+                        {currentUser.expertise || (
+                          currentUser.role === 'doctor' ? 'General Practitioner' :
+                          currentUser.role === 'assistant' ? 'Nurse' :
+                          'Livestock Breeder / Pet Owner'
+                        )}
+                      </span>
                     </div>
 
                     <div className="bg-white p-3.5 rounded-xl border border-[#e3dec9]/60">
-                      <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">Practice City / Town</span>
+                      <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">
+                        {currentUser.role === 'user' ? 'Location City / District' : 'Practice City / Town'}
+                      </span>
                       <span className="text-xs font-extrabold text-[#373735]">{currentUser.address || 'Islamabad'}</span>
                     </div>
                   </div>

@@ -76,8 +76,12 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
     setLoading(true);
     try {
       const extra: any = {};
-      if (selectedRole === 'doctor') {
-        extra.expertise = expertise.trim() || 'General Practitioner';
+      if (selectedRole === 'doctor' || selectedRole === 'assistant' || selectedRole === 'user') {
+        extra.expertise = expertise.trim() || (
+          selectedRole === 'doctor' ? 'General Practitioner' :
+          selectedRole === 'assistant' ? 'Clinic Assistant' :
+          'Livestock Breeder / Pet Owner'
+        );
         const matchedCity = PAKISTAN_CITIES.find(c => c.name === doctorCity) || PAKISTAN_CITIES[0];
         extra.location = {
           lat: matchedCity.lat,
@@ -258,7 +262,9 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: 'doctor', icon: '🩺', title: 'Clinical Doctor', desc: 'Licensed practitioner portfolio' },
-                    { id: 'clinic', icon: '🏥', title: 'Clinic Facility', desc: 'Hospital register & profiles' }
+                    { id: 'clinic', icon: '🏥', title: 'Clinic Facility', desc: 'Hospital register & profiles' },
+                    { id: 'user', icon: '👨‍🌾', title: 'General User', desc: 'Farmer, breeder, or pet owner' },
+                    { id: 'assistant', icon: '🧑‍⚕️', title: 'Vet Assistant', desc: 'Clinical assistant / technician' }
                   ].map((roleOpt) => {
                     const isSelected = selectedRole === roleOpt.id;
                     return (
@@ -268,15 +274,15 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                         whileHover={{ y: -2 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={() => setSelectedRole(roleOpt.id as UserRole)}
-                        className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                        className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
                           isSelected
                             ? 'border-[#5a5a40] border-b-[4px] border-b-[#3e3e2b] bg-[#fcf9f2] font-bold shadow-[0_4px_12px_rgba(90,90,64,0.08)]'
                             : 'border-[#e3dec9] border-b-[2px] bg-white hover:bg-[#fcf9f2]/50'
                         }`}
                       >
-                        <span className="text-2xl mb-1 filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]">{roleOpt.icon}</span>
-                        <span className="text-xs font-black text-[#373735] mb-0.5">{roleOpt.title}</span>
-                        <span className="text-[9px] text-[#a49f92] font-bold tracking-tight leading-none px-1">{roleOpt.desc}</span>
+                        <span className="text-xl mb-1 filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]">{roleOpt.icon}</span>
+                        <span className="text-2xs font-extrabold text-[#373735] mb-0.5">{roleOpt.title}</span>
+                        <span className="text-[8px] text-[#a49f92] font-bold tracking-tight leading-none px-1 line-clamp-1">{roleOpt.desc}</span>
                       </motion.button>
                     );
                   })}
@@ -285,7 +291,7 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
 
               {/* CONDITIONAL SUBFORMS */}
               <AnimatePresence mode="wait">
-                {(selectedRole === 'doctor') && (
+                {(selectedRole === 'doctor' || selectedRole === 'assistant') && (
                   <motion.div
                     key="pro-form"
                     initial={{ opacity: 0, y: 15 }}
@@ -294,11 +300,16 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                     className="p-4 bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] rounded-2xl space-y-4"
                   >
                     <div>
-                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Professional Specialization</label>
+                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">
+                        {selectedRole === 'doctor' ? 'Professional Specialization' : 'Assistant / Technician Expertise'}
+                      </label>
                       <input
                         type="text"
                         className="form-control bg-white"
-                        placeholder="e.g., Equine Practitioner, Orthopedic Surgery, Pet Vaccinator"
+                        placeholder={selectedRole === 'doctor' 
+                          ? "e.g., Equine Practitioner, Orthopedic Surgery, Pet Vaccinator"
+                          : "e.g., Dressing wound, post-op helper, vaccinator helper"
+                        }
                         value={expertise}
                         onChange={(e) => setExpertise(e.target.value)}
                         disabled={loading}
@@ -319,6 +330,44 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                         ))}
                       </select>
                       <span className="text-[9px] text-[#a49f92] font-semibold mt-1 block">Your clinic-independent practice city. This can be updated in your profile any time.</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {selectedRole === 'user' && (
+                  <motion.div
+                    key="user-form"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    className="p-4 bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] rounded-2xl space-y-4"
+                  >
+                    <div>
+                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Primary Animal Focus / Interest</label>
+                      <input
+                        type="text"
+                        className="form-control bg-white"
+                        placeholder="e.g. Cows & Cattle, Goat Farm, Pet Breeder, Dog Companion"
+                        value={expertise}
+                        onChange={(e) => setExpertise(e.target.value)}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Your Location City / District *</label>
+                      <select
+                        className="form-control bg-white cursor-pointer"
+                        value={doctorCity}
+                        onChange={(e) => setDoctorCity(e.target.value)}
+                        disabled={loading}
+                      >
+                        {PAKISTAN_CITIES.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            🇵🇰 {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[9px] text-[#a49f92] font-semibold mt-1 block">Helps veterinarians and clinical centers find your breeder farm or pet clinic request.</span>
                     </div>
                   </motion.div>
                 )}
