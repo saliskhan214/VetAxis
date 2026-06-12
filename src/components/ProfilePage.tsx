@@ -3,6 +3,7 @@ import { UserProfile } from '../types';
 import { AuthService, PromotionalAdsService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, User, MapPin, Mail, Sparkles, AlertTriangle, Trash2, Camera, RefreshCw, Megaphone, ChevronRight } from 'lucide-react';
+import { LegalModal } from './LegalAndAbout';
 
 interface ProfileProps {
   currentUser: UserProfile;
@@ -57,6 +58,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [legalModalOpen, setLegalModalOpen] = useState<boolean>(false);
+  const [legalModalType, setLegalModalType] = useState<'terms' | 'about'>('terms');
 
   // Billboard Promotional campaign states
   const [adTitle, setAdTitle] = useState<string>('');
@@ -1489,6 +1492,39 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
           )}
         </AnimatePresence>
 
+        {/* PROFESSIONAL COMPONENT FOOTER CREDENTIALS */}
+        <footer className="pt-8 pb-4 border-t border-[#e3dec9] mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-stone-500 text-xs w-full">
+          <div className="flex items-center gap-2 font-serif font-black text-[#5a5a40]">
+            <span>🐾 VetAxis Pakistan</span>
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+          </div>
+          <div className="flex items-center gap-6">
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalType('terms');
+                setLegalModalOpen(true);
+              }}
+              className="font-extrabold hover:text-[#5a5a40] hover:underline bg-transparent border-none cursor-pointer transition-colors"
+            >
+              Terms and conditions
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalType('about');
+                setLegalModalOpen(true);
+              }}
+              className="font-extrabold hover:text-[#5a5a40] hover:underline bg-transparent border-none cursor-pointer transition-colors"
+            >
+              About Us
+            </button>
+          </div>
+          <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+            Last Updated: June 2026
+          </div>
+        </footer>
+
       </div>
 
       {/* DETAILED INTERACTIVE BILLING CHECKOUT DRAWER OVERLAY */}
@@ -1658,6 +1694,16 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               </form>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {legalModalOpen && (
+          <LegalModal
+            isOpen={legalModalOpen}
+            type={legalModalType}
+            onClose={() => setLegalModalOpen(false)}
+          />
         )}
       </AnimatePresence>
 

@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark } from 'lucide-react';
+import { LegalModal } from './LegalAndAbout';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: any) => void;
@@ -25,6 +26,9 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
   const [facilities, setFacilities] = useState<string>('');
   const [address, setAddress] = useState<string>('');
   const [doctorCity, setDoctorCity] = useState<string>('Islamabad');
+  const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
+  const [legalModalOpen, setLegalModalOpen] = useState<boolean>(false);
+  const [legalModalType, setLegalModalType] = useState<'terms' | 'about'>('terms');
 
   const PAKISTAN_CITIES = [
     { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },
@@ -407,10 +411,40 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                 )}
               </AnimatePresence>
 
+              {/* Terms and conditions Check */}
+              <div className="flex items-center gap-2.5 bg-[#fcf9f2] p-3 rounded-xl border border-[#e3dec9] text-left animate-fadeIn mt-4">
+                <input
+                  id="signup-terms-check"
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="w-4 h-4 text-[#5a5a40] focus:ring-[#5a5a40] border-[#cdc6ad] rounded cursor-pointer"
+                  disabled={loading}
+                />
+                <label htmlFor="signup-terms-check" className="text-xs font-semibold text-[#5a5a40] cursor-pointer select-none">
+                  I accept the{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLegalModalType('terms');
+                      setLegalModalOpen(true);
+                    }}
+                    className="text-[#a0522d] hover:text-[#5a5a40] underline font-extrabold cursor-pointer inline-block bg-transparent p-0 border-none outline-none"
+                    id="link-terms-and-conditions"
+                  >
+                    terms and conditions
+                  </button>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
-                className="btn-tactile-3d-primary w-full py-4 text-base tracking-wide flex items-center justify-center gap-2 mt-4"
+                disabled={loading || !acceptedTerms}
+                className={`btn-tactile-3d-primary w-full py-4 text-base tracking-wide flex items-center justify-center gap-2 mt-4 ${
+                  (!acceptedTerms && !loading) ? 'opacity-60 cursor-not-allowed border-b-[2px]' : ''
+                }`}
+                id="btn-complete-registration"
               >
                 {loading ? 'Creating VetAxis profile…' : 'Complete Registration & Enter →'}
               </button>
@@ -456,6 +490,17 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
           )}
         </motion.div>
       </div>
+
+
+    <AnimatePresence>
+      {legalModalOpen && (
+        <LegalModal
+          isOpen={legalModalOpen}
+          type={legalModalType}
+          onClose={() => setLegalModalOpen(false)}
+        />
+      )}
+    </AnimatePresence>
 
     </div>
   );
