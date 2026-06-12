@@ -70,6 +70,7 @@ service cloud.firestore {
         (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
         (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum']) &&
         (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number) &&
+        (!('promoAdsUsed' in incoming()) || incoming().promoAdsUsed is number) &&
         (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
         incoming().name is string && incoming().name.size() <= 80 &&
         (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
@@ -429,6 +430,32 @@ service cloud.firestore {
     match /livestock_tasks/{taskId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isSignedIn();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PROMOTIONAL ADS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /promotional_ads/{adId} {
+      allow read: if true;
+
+      allow create: if isSignedIn() && (
+        incoming().ownerUid == request.auth.uid &&
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().ownerRole in ['doctor', 'clinic'] &&
+        incoming().sponsorName is string && incoming().sponsorName.size() <= 100 &&
+        incoming().title is string && incoming().title.size() <= 155 &&
+        incoming().description is string && incoming().description.size() <= 1000 &&
+        incoming().ctaText is string && incoming().ctaText.size() <= 100 &&
+        incoming().ctaUrl is string && incoming().ctaUrl.size() <= 550 &&
+        incoming().pricePaid is number && incoming().pricePaid in [0, 1000, 1500] &&
+        incoming().durationDays is number && incoming().durationDays in [3, 7] &&
+        incoming().expiresAt is number &&
+        incoming().createdAt is number
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerUid == request.auth.uid
+      );
     }
   }
 }

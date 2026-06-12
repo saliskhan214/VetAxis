@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, VetNotification } from './types';
-import { getLocalSession, AuthService, NotificationService } from './lib/storage';
+import { getLocalSession, AuthService, NotificationService, injectTemporaryPlatinum } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -17,6 +17,7 @@ import { PetAds } from './components/PetAds';
 import { ProfilePage } from './components/ProfilePage';
 import { JobBoard } from './components/JobBoard';
 import LivestockManagement from './components/LivestockManagement';
+import { SubscriptionPortal } from './components/SubscriptionPortal';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -178,8 +179,9 @@ export default function App() {
               const userSnap = await getDoc(userRef);
               if (userSnap.exists()) {
                 const profile = userSnap.data() as UserProfile;
-                setCurrentUser(profile);
-                localStorage.setItem('va_session', JSON.stringify(profile));
+                const finalized = injectTemporaryPlatinum(profile);
+                setCurrentUser(finalized);
+                localStorage.setItem('va_session', JSON.stringify(finalized));
               } else {
                 setCurrentUser(null);
                 localStorage.removeItem('va_session');
@@ -207,9 +209,13 @@ export default function App() {
     testConnection();
   }, []);
 
+
+
   // Sync and validate that the stored session user profile still exists in Firestore or Fallback DB
+  // Also runs a real-time periodic clock to guarantee user downgrades when subscription duration runs out
   useEffect(() => {
     let active = true;
+
     const validateSession = async () => {
       if (currentUser) {
         try {
@@ -217,17 +223,46 @@ export default function App() {
           if (active && !isValid) {
             console.warn("Stored session user profile no longer exists in DB. Logging out.");
             handleLogout();
+            return;
+          }
+
+          // Real-time automatic monthly subscription expiration check
+          if (currentUser.subscriptionTier && currentUser.subscriptionExpiresAt) {
+            if (Date.now() > currentUser.subscriptionExpiresAt) {
+              console.warn("User premium tier subscription has expired. Auto-downgrading privileges.");
+              const updated = await AuthService.updateProfile(currentUser.uid, {
+                subscriptionTier: null as any,
+                subscriptionExpiresAt: null as any,
+                isVerified: false
+              });
+              if (active) {
+                setCurrentUser(updated);
+                alert(`⚠️ Your VetAxis Premium ${currentUser.subscriptionTier} plan subscription has expired (validity exceeded its monthly cycle). Premium privileges have been removed. Please go to Settings > Subscription Portal to renew.`);
+              }
+            }
           }
         } catch (e) {
           console.error("Error validating stored session:", e);
         }
       }
     };
+
     validateSession();
+
+    // Setup real-time poll clock checking every 2 seconds to instantly process expiration!
+    const pollId = setInterval(() => {
+      if (currentUser?.subscriptionTier && currentUser?.subscriptionExpiresAt) {
+        if (Date.now() > currentUser.subscriptionExpiresAt) {
+          validateSession();
+        }
+      }
+    }, 2000);
+
     return () => {
       active = false;
+      clearInterval(pollId);
     };
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, currentUser?.subscriptionExpiresAt, currentUser?.subscriptionTier]);
 
   // Real-time online presence heartbeat
   useEffect(() => {
@@ -371,21 +406,20 @@ export default function App() {
                 onDeleteSuccess={handleLogout}
               />
             )}
+
+            {activeSection === 'subscription' && (
+              <SubscriptionPortal
+                currentUser={currentUser}
+                onUpdateUser={handleUpdateUserProfile}
+                onNavigateToSection={handleNavigate}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
 
       {/* FOOTER METRICS RAIL - Natural Tones Theme */}
-      <footer className="py-6 mt-8 border-t border-[#e6e2da] bg-[#f5f2ed] text-center text-xs text-[#7a766f] w-full">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="font-semibold text-left">
-            🌱 © 2026 VetAxis PK · <span className="font-normal text-[#a8a49c]">Certified Veterinary Clinical Network of Pakistan</span>
-          </div>
-          <div className="flex items-center gap-3 text-[10px] font-mono font-bold tracking-wider uppercase text-[#5a5a40] bg-[#ece8df] px-3 py-1.5 rounded-full border border-[#e6e2da]">
-            <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
-            Cloud Firestore Synced
-          </div>
-        </div>
+      <footer className="py-4 mt-8 bg-[#fdfbf7] w-full">
       </footer>
 
       {/* Floating Popup Toast Alerts System */}

@@ -61,6 +61,7 @@ export interface UserProfile {
   isVerified?: boolean; // legacy
   subscriptionTier?: 'Silver' | 'Gold' | 'Platinum';
   subscriptionExpiresAt?: number;
+  promoAdsUsed?: number;
   emailVerified?: boolean;
   avgRating?: number;
   totalReviews?: number;
@@ -85,6 +86,7 @@ export interface PetAd {
   ownerRole: UserRole;
   createdAt: number;
   isPremium?: boolean;
+  ownerSubscriptionTier?: 'Silver' | 'Gold' | 'Platinum';
 }
 
 export interface Product {
@@ -100,6 +102,7 @@ export interface Product {
   ownerRole: UserRole;
   createdAt: number;
   isPremium?: boolean;
+  ownerSubscriptionTier?: 'Silver' | 'Gold' | 'Platinum';
 }
 
 export interface CommunityPost {
@@ -280,4 +283,25 @@ export interface LivestockTask {
   createdAt: number;
   autoScheduleNext?: boolean; // if true, completion schedules next booster in 6 months
 }
+
+export interface PromotionalAd {
+  id: string;
+  sponsorName: string;
+  title: string;
+  description: string;
+  couponCode?: string;
+  ctaText: string;
+  ctaUrl: string;
+  bgGradient: string;
+  badge: string;
+  icon?: string;
+  ownerEmail: string;
+  ownerUid: string;
+  ownerRole: 'doctor' | 'clinic';
+  pricePaid: number;
+  durationDays: number;
+  expiresAt: number; // millisecond timestamp
+  createdAt: number; // millisecond timestamp
+}
+
 

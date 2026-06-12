@@ -49,6 +49,7 @@ export function Navbar({
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },
     { id: 'jobs', label: 'Job Board', icon: '💼' },
+    { id: 'subscription', label: 'Subscription Portal', icon: '💳' },
   ];
 
   return (
@@ -280,24 +281,31 @@ export function Navbar({
                 <div className="p-4 flex flex-col gap-2">
                   <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Systems Panel</p>
                   
-                  {navItems.map(item => {
-                    const isActive = activeSection === item.id;
-                    return (
-                      <motion.button
-                        key={item.id}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleMobileNav(item.id)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold transition-all border border-transparent text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[4px] border-b-[#3e3e2b]'
-                            : 'bg-transparent text-[#5a5a40] hover:bg-[#fcf9f2] hover:border-[#e3dec9]'
-                        }`}
-                      >
-                        <span className="text-lg">{item.icon}</span>
-                        <span>{item.label}</span>
-                      </motion.button>
-                    );
-                  })}
+                  {navItems
+                    .filter(item => {
+                      if (item.id === 'subscription') {
+                        return user.role === 'clinic' || user.role === 'doctor';
+                      }
+                      return true;
+                    })
+                    .map(item => {
+                      const isActive = activeSection === item.id;
+                      return (
+                        <motion.button
+                          key={item.id}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleMobileNav(item.id)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold transition-all border border-transparent text-left cursor-pointer ${
+                            isActive
+                              ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[4px] border-b-[#3e3e2b]'
+                              : 'bg-transparent text-[#5a5a40] hover:bg-[#fcf9f2] hover:border-[#e3dec9]'
+                          }`}
+                        >
+                          <span className="text-lg">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </motion.button>
+                      );
+                    })}
                 </div>
               </div>
 

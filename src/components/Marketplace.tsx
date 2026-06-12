@@ -1,8 +1,8 @@
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import { UserProfile, Product } from '../types';
-import { MarketplaceService } from '../lib/storage';
-import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
+import { MarketplaceService, PromotionalAdsService } from '../lib/storage';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
+import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface MarketplaceProps {
   currentUser: UserProfile;
@@ -13,6 +13,102 @@ export function Marketplace({ currentUser }: MarketplaceProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
+
+  // Sliding banner & promotion states for Marketplace Section
+  const [currentSlideIdx, setCurrentSlideIdx] = useState<number>(0);
+  const [promoPaused, setPromoPaused] = useState<boolean>(false);
+  const [dbAds, setDbAds] = useState<any[]>([]);
+
+  // 3D Tilt orientation & Gloss Reflection for Billboard Card inside Marketplace
+  const billboardRef = useRef<HTMLDivElement>(null);
+  const [bHovered, setBHovered] = useState<boolean>(false);
+  const bx = useMotionValue(0.5);
+  const by = useMotionValue(0.5);
+
+  const brotateX = useTransform(by, [0, 1], [6, -6]);
+  const brotateY = useTransform(bx, [0, 1], [-6, 6]);
+
+  const bspringX = useSpring(brotateX, { stiffness: 150, damping: 22 });
+  const bspringY = useSpring(brotateY, { stiffness: 150, damping: 22 });
+
+  const bsheenX = useTransform(bx, [0, 1], ['130%', '-30%']);
+  const bsheenY = useTransform(by, [0, 1], ['130%', '-30%']);
+
+  const handleBillboardMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!billboardRef.current) return;
+    const rect = billboardRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    bx.set(mouseX / width);
+    by.set(mouseY / height);
+    setBHovered(true);
+    setPromoPaused(true);
+  };
+
+  const handleBillboardMouseLeave = () => {
+    bx.set(0.5);
+    by.set(0.5);
+    setBHovered(false);
+    setPromoPaused(false);
+  };
+
+  const BANNER_SLIDES_MARKETPLACE = [
+    {
+      id: 'welcome_marketplace',
+      type: 'welcome',
+      sponsorName: '',
+      badge: 'Veterinary Directory',
+      icon: '🛡️',
+      bgGradient: "from-[#3c3c2b] via-[#52523b] to-[#6d6d4f]",
+      borderColors: "border-[#52523b] border-b-[#303022]",
+      title: "Self-Serve Medical Marketplace & Pharmacy",
+      description: "Direct connection with official clinicians to order diagnostic kits, vitamins, and clinical dressings securely.",
+      couponCode: '',
+      ctaText: '',
+      ctaUrl: ''
+    }
+  ];
+
+  const activeSlides = [...BANNER_SLIDES_MARKETPLACE, ...dbAds];
+
+  const fetchCampaigns = async () => {
+    try {
+      const ads = await PromotionalAdsService.fetchActiveAds();
+      const mapped = ads.map(ad => ({
+        id: ad.id,
+        type: 'promo',
+        sponsorName: ad.sponsorName,
+        title: ad.title,
+        description: ad.description,
+        couponCode: ad.couponCode || '',
+        ctaText: ad.ctaText,
+        ctaUrl: ad.ctaUrl,
+        bgGradient: ad.bgGradient || "from-[#574c3c] via-[#433b2f] to-[#574c3c]",
+        borderColors: "border-[#433b2f] border-b-[#2a241c]",
+        badge: ad.badge || "Sponsored",
+        icon: ad.icon || "📢",
+        ownerUid: ad.ownerUid,
+        expiresAt: ad.expiresAt,
+        createdAt: ad.createdAt,
+        pricePaid: ad.pricePaid,
+        durationDays: ad.durationDays
+      }));
+      setDbAds(mapped);
+    } catch (err) {
+      console.error("Failed fetching dynamic promotion ads in Marketplace", err);
+    }
+  };
+
+  useEffect(() => {
+    if (promoPaused) return;
+    const timer = setInterval(() => {
+      setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [promoPaused, activeSlides.length]);
 
   // Form compose state (only allowed for doctor, clinic)
   const isAuthorizedSeller = currentUser.role === 'doctor' || currentUser.role === 'clinic';
@@ -42,6 +138,7 @@ export function Marketplace({ currentUser }: MarketplaceProps) {
 
   useEffect(() => {
     loadProducts();
+    fetchCampaigns();
     // Pre-fill phone if available for convenience
     if (currentUser.phone) {
       setProdWhatsapp(currentUser.phone);
@@ -150,37 +247,196 @@ export function Marketplace({ currentUser }: MarketplaceProps) {
   return (
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4 text-left">
       
-      {/* MARKETPLACE HERO BANNER */}
-      <div className="relative bg-gradient-to-br from-[#3e3e2b] via-[#5a5a40] to-[#737351] text-white p-8 md:p-10 rounded-3xl overflow-hidden border border-[#5a5a40] border-b-[8px] border-b-[#323223] shadow-xl animate-fadeIn">
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-15" />
-        <div className="absolute top-1/2 right-12 -translate-y-1/2 opacity-20 pointer-events-none hidden md:block">
-          <ShoppingBag className="w-48 h-48" />
-        </div>
-        
-        <div className="relative z-10 space-y-2.5">
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 rounded-xl text-xs font-bold font-mono tracking-wider uppercase border border-white/20 backdrop-blur-md">
-            🛒 Medical Marketplace
-          </span>
-          <h2 className="text-3.5xl md:text-4.5xl font-serif font-black tracking-tight drop-shadow-sm">
-            Veterinary Pharmacy & Accessories
-          </h2>
-          <p className="text-neutral-200 text-sm md:text-base font-semibold max-w-xl">
-            Acquire certified animal nutrition products, vitamins, and clinical dressings listed by official vets.
-          </p>
-          
-          <div className="pt-2 animate-scaleUp">
-            {isAuthorizedSeller ? (
-              <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-emerald-500/15 border border-emerald-400/30 rounded-2xl text-[11px] font-black uppercase text-emerald-300 shadow-inner">
-                <CheckCircle2 className="w-4.5 h-4.5" />
-                <span>Seller Mode Activated (Can Publish Below)</span>
+      {/* 3D INTERACTIVE HERO & SPONSOR BILLBOARD */}
+      <div 
+        ref={billboardRef}
+        onMouseMove={handleBillboardMouseMove}
+        onMouseLeave={handleBillboardMouseLeave}
+        className="mb-8 relative w-full h-[360px] sm:h-[280px] md:h-[230px] lg:h-[210px] overflow-hidden rounded-3xl shrink-0 shadow-[0_15px_40px_rgba(90,90,64,0.18)] hover:shadow-[0_25px_50px_rgba(90,90,64,0.3)] transition-shadow duration-500 border border-[#cdc6ad]"
+        style={{ perspective: 1200 }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlideIdx}
+            initial={{ rotateY: 90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            exit={{ rotateY: -90, opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+            style={{ 
+              transformStyle: "preserve-3d", 
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              rotateX: bspringX,
+              rotateY: bspringY,
+            }}
+            className={`absolute inset-0 text-white p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br ${activeSlides[currentSlideIdx].bgGradient} ${activeSlides[currentSlideIdx].borderColors} border border-b-[8px] transition-all duration-300`}
+          >
+            {/* Holographic grid wallpaper */}
+            <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.2px,transparent_1.2px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
+
+            {/* Premium 3D Metallic Gloss Glow Layer */}
+            <motion.div
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.18) 100%)',
+                x: bsheenX,
+                y: bsheenY,
+                pointerEvents: 'none',
+              }}
+              className="absolute inset-0 z-20 mix-blend-overlay pointer-events-none"
+            />
+
+            {activeSlides[currentSlideIdx].type === 'welcome' ? (
+              // WELCOME BANNER SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
+              <div className="w-full relative" style={{ transformStyle: "preserve-3d" }}>
+                <div 
+                  className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none hidden lg:block"
+                  style={{ transform: "translateZ(50px)" }}
+                >
+                  <ShoppingBag className="w-32 h-32 animate-pulse" />
+                </div>
+                
+                <div className="relative z-10 space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    🛒 Medical Marketplace
+                  </span>
+                  <h2 
+                    className="text-2.5xl md:text-3xl font-serif font-black tracking-tight leading-tight"
+                    style={{ transform: "translateZ(45px)" }}
+                  >
+                    Veterinary Pharmacy & Accessories
+                  </h2>
+                  <p 
+                    className="text-neutral-200 text-xs md:text-sm font-semibold leading-relaxed"
+                    style={{ transform: "translateZ(25px)" }}
+                  >
+                    Acquire certified animal nutrition products, vitamins, and clinical dressings listed by official vets.
+                  </p>
+                  
+                  <div className="pt-1.5" style={{ transform: "translateZ(20px)" }}>
+                    {isAuthorizedSeller ? (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-[9px] font-black uppercase text-emerald-300">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Seller Mode Active (Publish Below)</span>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-xl text-[9px] font-bold text-neutral-300">
+                        <span>ℹ️ Browsing (Only clinic/doctor can publish products)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-white/10 rounded-2xl text-[11px] font-bold text-neutral-300">
-                <span>ℹ️ Browsing Mode (Only doctors or clinics can sell products)</span>
+              // SPONSORED CAMPAIGN SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
+              <div className="w-full relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6" style={{ transformStyle: "preserve-3d" }}>
+                <div className="space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    📌 {activeSlides[currentSlideIdx].badge} • Sponsored Campaign
+                  </span>
+                  <h2 
+                    className="text-xl md:text-3.5xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
+                    style={{ transform: "translateZ(45px)" }}
+                  >
+                    <span className="text-2xl md:text-3.5xl shrink-0 select-none">{activeSlides[currentSlideIdx].icon}</span>
+                    <span>{activeSlides[currentSlideIdx].title}</span>
+                  </h2>
+                  <p 
+                    className="text-neutral-200 text-xs md:text-xs font-semibold leading-relaxed line-clamp-3"
+                    style={{ transform: "translateZ(20px)" }}
+                  >
+                    {activeSlides[currentSlideIdx].description}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
+                      {activeSlides[currentSlideIdx].sponsorName}
+                    </span>
+                    {activeSlides[currentSlideIdx].couponCode && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(activeSlides[currentSlideIdx].couponCode || '');
+                          alert(`📋 Copied coupon code "${activeSlides[currentSlideIdx].couponCode}" to clipboard!`);
+                        }}
+                        className="inline-flex items-center gap-2 px-2.5 py-1 bg-dashed border border-white/30 hover:border-white/50 bg-white/10 rounded-xl text-[9px] font-black tracking-wider text-amber-300 shadow-inner cursor-pointer transition-all"
+                        title="Click to copy coupon code"
+                      >
+                        <span>Code: {activeSlides[currentSlideIdx].couponCode}</span>
+                        <span className="text-white/60 font-normal text-[8px] pl-1">Copy 📋</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* CTA Link out (WITH COGNITIVE HEIGHT HIGHLIGHT) */}
+                <div className="shrink-0 flex flex-col gap-2 min-w-[180px] md:min-w-[200px]" style={{ transform: "translateZ(35px)" }}>
+                  <a
+                    href={activeSlides[currentSlideIdx].ctaUrl.startsWith('http') ? activeSlides[currentSlideIdx].ctaUrl : `https://${activeSlides[currentSlideIdx].ctaUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer decoration-none shadow-md"
+                  >
+                    <span>{activeSlides[currentSlideIdx].ctaText}</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               </div>
             )}
-          </div>
-        </div>
+
+            {/* Carousel Navigation Toolbar */}
+            <div 
+              className="absolute bottom-4 right-6 flex items-center gap-3 bg-black/25 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-20 select-none"
+              style={{ transform: "translateZ(40px)" }}
+            >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIdx((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
+                }}
+                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center animate-none"
+                title="Previous Slide"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              
+              <div className="flex gap-1.5">
+                {activeSlides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentSlideIdx(idx);
+                    }}
+                    className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all border-none ${
+                      idx === currentSlideIdx ? 'bg-amber-400 scale-120' : 'bg-white/40 hover:bg-white/60'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+                }}
+                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center animate-none"
+                title="Next Slide"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* TOAST SYSTEM */}
@@ -381,17 +637,48 @@ export function Marketplace({ currentUser }: MarketplaceProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((p) => {
             const isOwner = p.ownerEmail === currentUser.email;
+            const tier = p.ownerSubscriptionTier || (p.isPremium ? 'Silver' : undefined);
+
+            let cardStyle = "bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] overflow-hidden flex flex-col justify-between hover:shadow-xl hover:border-b-[4px] hover:border-[#5a5a40]";
+            let headerGradient = "h-44 bg-stone-50 relative border-b border-[#e3dec9] flex items-center justify-center overflow-hidden";
+            let ribbonBadge = null;
+
+            if (tier === 'Platinum') {
+              cardStyle = "bg-gradient-to-br from-neutral-900 to-zinc-950 text-white rounded-3xl border-2 border-indigo-500/50 border-b-[6px] border-b-black overflow-hidden flex flex-col justify-between shadow-lg hover:shadow-indigo-950/40";
+              headerGradient = "h-44 bg-zinc-900 relative border-b border-indigo-900/50 flex items-center justify-center overflow-hidden";
+              ribbonBadge = (
+                <span className="absolute top-3 right-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-500 text-white text-[8px] uppercase font-black tracking-widest rounded-xl px-2.5 py-1.5 shadow-sm border border-indigo-300/35">
+                  🏆 PLATINUM SELLER
+                </span>
+              );
+            } else if (tier === 'Gold') {
+              cardStyle = "bg-[#fffbeb] rounded-3xl border-2 border-amber-400 border-b-[6px] border-b-amber-600 overflow-hidden flex flex-col justify-between shadow-md hover:shadow-amber-100/40";
+              headerGradient = "h-44 bg-amber-50/50 relative border-b border-amber-200 flex items-center justify-center overflow-hidden";
+              ribbonBadge = (
+                <span className="absolute top-3 right-3 bg-amber-600 text-white text-[8px] uppercase font-black tracking-widest rounded-xl px-2.5 py-1.5 shadow-sm border border-amber-300/40 animate-pulse">
+                  👑 GOLD SELLER
+                </span>
+              );
+            } else if (tier === 'Silver') {
+              cardStyle = "bg-slate-50/60 rounded-3xl border-2 border-slate-300 border-b-[6px] border-b-slate-400 overflow-hidden flex flex-col justify-between hover:shadow-md";
+              headerGradient = "h-44 bg-slate-100/50 relative border-b border-slate-200 flex items-center justify-center overflow-hidden";
+              ribbonBadge = (
+                <span className="absolute top-3 right-3 bg-slate-500 text-white text-[8px] uppercase font-black tracking-widest rounded-xl px-2.5 py-1.5 shadow-sm">
+                  ✦ SILVER SELLER
+                </span>
+              );
+            }
 
             return (
               <motion.div
                 key={p.id}
                 layout
                 whileHover={{ y: -5 }}
-                className="bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] overflow-hidden flex flex-col justify-between hover:shadow-xl hover:border-b-[4px] hover:border-[#5a5a40]"
+                className={cardStyle}
               >
                 <div>
                   {/* Thumbnail Banner */}
-                  <div className="h-44 bg-stone-50 relative border-b border-[#e3dec9] flex items-center justify-center overflow-hidden">
+                  <div className={headerGradient}>
                     {p.image ? (
                       <img src={p.image} className="w-full h-full object-cover" alt={p.name} />
                     ) : (
@@ -406,33 +693,41 @@ export function Marketplace({ currentUser }: MarketplaceProps) {
                         ⭐ My product
                       </span>
                     )}
+
+                    {ribbonBadge}
                   </div>
 
                   <div className="p-5 space-y-3">
                     <div>
-                      <h4 className="font-black text-base text-[#373735] leading-snug truncate">
+                      <h4 className={`font-black text-base leading-snug truncate ${tier === 'Platinum' ? 'text-zinc-100' : 'text-[#373735]'}`}>
                         {p.name}
                       </h4>
-                      <div className="text-lg font-serif font-black text-[#5a5a40] mt-1.5">
+                      <div className={`text-lg font-serif font-black mt-1.5 ${tier === 'Platinum' ? 'text-teal-400' : 'text-[#5a5a40]'}`}>
                         PKR {Number(p.price).toLocaleString()}
                       </div>
                     </div>
 
                     <div className="flex gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] uppercase tracking-widest font-black bg-stone-100 border border-stone-200 text-[#5a5a40] font-mono shadow-inner">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] uppercase tracking-widest font-black border font-mono shadow-inner ${
+                        tier === 'Platinum' ? 'bg-zinc-800 border-zinc-700 text-zinc-300' : 'bg-stone-100 border-stone-200 text-[#5a5a40]'
+                      }`}>
                         <Package className="w-3 h-3" />
                         <span>Stock: {p.quantity} left</span>
                       </span>
                     </div>
 
-                    <p className="text-xs text-[#7a766f] font-semibold leading-relaxed line-clamp-3">
+                    <p className={`text-xs font-semibold leading-relaxed line-clamp-3 ${tier === 'Platinum' ? 'text-zinc-300' : 'text-[#7a766f]'}`}>
                       {p.description}
                     </p>
 
-                    <div className="text-[10px] text-[#a49f92] font-semibold flex items-center gap-1 bg-[#fcf9f2] p-2.5 rounded-xl border border-[#e3dec9]">
+                    <div className={`text-[10px] font-semibold flex items-center gap-1 p-2.5 rounded-xl border ${
+                      tier === 'Platinum'
+                        ? 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                        : 'bg-[#fcf9f2] border-[#e3dec9] text-[#a49f92]'
+                    }`}>
                       <span className="font-extrabold uppercase text-[9px] text-[#5a5a40]">Seller:</span>
-                      <strong className="text-black font-bold">{p.ownerName}</strong>
-                      <span className="inline-flex px-1.5 py-0.5 rounded-lg bg-white/80 uppercase tracking-widest text-[8px] font-black border border-stone-200">
+                      <strong className={`font-bold ${tier === 'Platinum' ? 'text-white' : 'text-black'}`}>{p.ownerName}</strong>
+                      <span className="inline-flex px-1.5 py-0.5 rounded-lg bg-white/10 uppercase tracking-widest text-[8px] font-black border border-stone-200/20">
                         {p.ownerRole}
                       </span>
                     </div>

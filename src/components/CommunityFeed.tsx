@@ -433,6 +433,112 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         </div>
       </div>
 
+      {/* ACTIVE BOOSTED EMERGENCY AD ALERTS */}
+      {posts.filter(p => p.isBoosted).length > 0 && (
+        <div className="bg-gradient-to-br from-red-50 via-rose-50 to-amber-50 border-2 border-red-500 rounded-3xl p-6 shadow-[0_15px_30px_rgba(239,68,68,0.15)] flex flex-col gap-4 text-left relative overflow-hidden">
+          <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-red-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg relative">
+                <span className="absolute inset-0 rounded-2xl bg-red-600 animate-ping opacity-25"></span>
+                <span className="text-lg">📢</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="bg-red-600 text-white font-mono text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest leading-none">
+                    PRIORITY EMERGENCY AD
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-bold">
+                    Active Broadcaster Signal
+                  </span>
+                </div>
+                <h3 className="font-serif font-black text-red-950 text-lg leading-tight">
+                  Active Emergency Lost Pet Ads
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 z-10">
+            {posts.filter(p => p.isBoosted).map((post) => (
+              <div 
+                key={post.id}
+                className="bg-white border border-red-100 hover:border-red-300 rounded-3xl p-5 space-y-4 shadow-xs transition-all hover:shadow-md relative overflow-hidden flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                      📍 Last Seen: {post.boostDetails?.lastSeenLoc.address || 'Local Region'}
+                    </span>
+                    <span className="text-[9px] text-[#7a766f] font-mono">
+                      {new Date(post.ts).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-serif font-bold text-[#3c3c2b] text-base leading-tight hover:text-red-700 transition-colors">
+                      {post.title || "Emergency Lost Pet Alert"}
+                    </h4>
+                    <p className="text-xs text-[#52523b] font-medium leading-relaxed mt-1.5 whitespace-pre-wrap">
+                      {post.text || post.description}
+                    </p>
+                  </div>
+
+                  {/* Pictures Preview */}
+                  {post.images && post.images.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {post.images.map((imgSrc: string, imgIdx: number) => (
+                        <div key={imgIdx} className="relative aspect-video rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group shadow-inner">
+                          <img 
+                            src={imgSrc} 
+                            alt={`Emergency Preview ${imgIdx + 1}`} 
+                            className="w-full h-full object-cover select-none"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notification System Signal Status */}
+                  <div className="bg-red-50/70 rounded-xl p-2.5 border border-red-100 text-[10px] space-y-1">
+                    <div className="flex items-center gap-1.5 text-red-800 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                      <span>Broadcaster Dispatch System</span>
+                    </div>
+                    <p className="text-zinc-650 font-semibold">
+                      🔔 Sent high-priority sound alarm and push alerts to <strong className="font-sans font-extrabold text-red-700">{post.boostDetails?.notifiedCount || 12} matching users & veterinarians</strong> inside the {post.boostDetails?.radiusKm || 5}km secure perimeter.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-zinc-100 mt-2">
+                  <div className="flex items-center gap-1.5 text-[9px] text-red-700 font-black tracking-widest uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping"></span>
+                    <span>Radar {post.boostDetails?.radiusKm || 5}km Shield</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById(`post-${post.id}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('ring-red-600', 'ring-4', 'scale-[1.02]');
+                        setTimeout(() => {
+                          el.classList.remove('ring-red-600', 'ring-4', 'scale-[1.02]');
+                        }, 4000);
+                      }
+                    }}
+                    className="cursor-pointer bg-[#5a5a40] hover:bg-[#3e3e2b] text-white text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-md border-none shadow-xs transition-transform hover:scale-103 whitespace-nowrap"
+                  >
+                    Locate Alert 🔎
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* TOAST PANEL */}
       <AnimatePresence>
         {toast && (

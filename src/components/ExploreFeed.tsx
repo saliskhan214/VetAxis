@@ -1,7 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview } from '../types';
-import { ExploreService, LocationService } from '../lib/storage';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect, FormEvent, useRef } from 'react';
+import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
+import { ExploreService, LocationService, PromotionalAdsService } from '../lib/storage';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 
@@ -12,9 +12,24 @@ interface ExploreFeedProps {
   onNavigate?: (section: string) => void;
 }
 
-const SPONSOR_PROMOS = [
+const BANNER_SLIDES = [
+  {
+    id: 'welcome',
+    type: 'welcome',
+    sponsorName: '',
+    badge: 'Clinical Network',
+    icon: '🧭',
+    bgGradient: "from-[#3e3e2b] via-[#5a5a40] to-[#7c7c5a]",
+    borderColors: "border-[#5a5a40] border-b-[#323223]",
+    title: "Pakistan Medical Directory",
+    description: "Instantly connect with highly-qualified vet doctors, dynamic clinical centers, and on-call home vaccinators near you.",
+    couponCode: '',
+    ctaText: '',
+    ctaUrl: ''
+  },
   {
     id: 'promo_hills',
+    type: 'promo',
     sponsorName: "Hill's Science Diet",
     title: "Support Joint & Mobility Health",
     description: "Veterinarian recommended diet formula engineered with EPA. Protect cartilage and improve active daily movement.",
@@ -22,23 +37,27 @@ const SPONSOR_PROMOS = [
     ctaText: "Claim 15% Vet Voucher",
     ctaUrl: "https://www.hillspet.com",
     bgGradient: "from-[#201d14] via-[#3a3928] to-[#201d14]",
+    borderColors: "border-[#3a3928] border-b-[#181710]",
     badge: "Official Sponsor",
     icon: "🐕"
   },
   {
     id: 'promo_zoetis',
+    type: 'promo',
     sponsorName: "Zoetis Animal Health",
     title: "Advanced Vet Diagnostics & Vaccines",
     description: "Anti-itching Cytopoint therapies to professional canine vaccines. Helping veterinarians protect cats and dog patients.",
     couponCode: "ZOECARE",
     ctaText: "Clinical Resource Hub",
     ctaUrl: "https://www.zoetis.com",
-    bgGradient: "from-stone-850 via-stone-800 to-stone-900",
+    bgGradient: "from-[#2d3238] via-[#3d444d] to-[#2d3238]",
+    borderColors: "border-[#3d444d] border-b-[#1e2226]",
     badge: "Accredited Partner",
     icon: "💉"
   },
   {
     id: 'promo_purina',
+    type: 'promo',
     sponsorName: "Purina Veterinary Diets",
     title: "Specialist Digestive Probiotic Formulas",
     description: "Customized clinical probiotics & food formulas designed to soothe and resolve animal gastrointestinal discomfort.",
@@ -46,9 +65,24 @@ const SPONSOR_PROMOS = [
     ctaText: "Request Clinical Pack",
     ctaUrl: "https://www.purina.com",
     bgGradient: "from-[#281a0e] via-[#432d18] to-[#281a0e]",
+    borderColors: "border-[#432d18] border-b-[#1e140a]",
     badge: "Premium Sponsor",
     icon: "🐈"
   }
+];
+
+const PAKISTAN_CITIES = [
+  { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },
+  { name: 'Lahore', lat: 31.5204, lng: 74.3587 },
+  { name: 'Karachi', lat: 24.8607, lng: 67.0011 },
+  { name: 'Peshawar', lat: 34.0151, lng: 71.5249 },
+  { name: 'Quetta', lat: 30.1798, lng: 66.9750 },
+  { name: 'Rawalpindi', lat: 33.5651, lng: 73.0169 },
+  { name: 'Faisalabad', lat: 31.4504, lng: 73.1350 },
+  { name: 'Multan', lat: 30.1575, lng: 71.5249 },
+  { name: 'Sialkot', lat: 32.4945, lng: 74.5229 },
+  { name: 'Gujranwala', lat: 32.1877, lng: 74.1945 },
+  { name: 'Hyderabad', lat: 25.3960, lng: 68.3578 },
 ];
 
 export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNavigate }: ExploreFeedProps) {
@@ -58,6 +92,79 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
+  const [gpsPopupVisible, setGpsPopupVisible] = useState<boolean>(false);
+  const [gpsPopupMessage, setGpsPopupMessage] = useState<string>('');
+
+  // Nearest sorting & geographic filter popup states
+  const [doctorLocationModalOpen, setDoctorLocationModalOpen] = useState<boolean>(false);
+  const [popCityInput, setPopCityInput] = useState<string>('');
+  const [cityFilterActive, setCityFilterActive] = useState<string>('');
+
+  const handleSortChange = (newVal: SORT_TYPES) => {
+    if (newVal === SORT_TYPES.NEAREST) {
+      setPopCityInput('');
+      setDoctorLocationModalOpen(true);
+      return;
+    }
+    setSortBy(newVal);
+  };
+
+  const handleCitySearchSubmit = (cityName: string) => {
+    const term = cityName.trim();
+    if (!term) return;
+
+    // Resolve coordinates
+    const matched = PAKISTAN_CITIES.find(c => c.name.toLowerCase() === term.toLowerCase());
+    const coords = matched ? { lat: matched.lat, lng: matched.lng } : { lat: 33.6844, lng: 73.0479 };
+
+    const updatedUser = {
+      ...currentUser,
+      location: {
+        lat: coords.lat,
+        lng: coords.lng,
+        address: term
+      }
+    };
+
+    onUpdateUser(updatedUser);
+    localStorage.setItem('va_session', JSON.stringify(updatedUser));
+
+    setCityFilterActive(term);
+    setSortBy(SORT_TYPES.NEAREST);
+    setDoctorLocationModalOpen(false);
+  };
+
+  const handleUseCurrentGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const updatedUser = {
+          ...currentUser,
+          location: {
+            lat: latitude,
+            lng: longitude,
+            address: 'My GPS Location'
+          }
+        };
+        onUpdateUser(updatedUser);
+        localStorage.setItem('va_session', JSON.stringify(updatedUser));
+
+        setCityFilterActive('');
+        setSortBy(SORT_TYPES.NEAREST);
+        setLocLoading(false);
+        setDoctorLocationModalOpen(false);
+      },
+      (err) => {
+        setLocLoading(false);
+        alert('Access denied/unavailable for GPS coordinate tracking on this device. Please use the fallback City search search fields instead.');
+      }
+    );
+  };
   
   // Geolocation states
   const [locLoading, setLocLoading] = useState<boolean>(false);
@@ -72,20 +179,88 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  // Sliding sponsor promotion states
-  const [showPromos, setShowPromos] = useState<boolean>(() => {
-    return localStorage.getItem('va_hide_promos') !== 'true';
-  });
-  const [currentPromoIdx, setCurrentPromoIdx] = useState<number>(0);
+  // Sliding banner & promotion states (10 seconds per slide)
+  const [currentSlideIdx, setCurrentSlideIdx] = useState<number>(0);
   const [promoPaused, setPromoPaused] = useState<boolean>(false);
+  const [dbAds, setDbAds] = useState<any[]>([]);
+
+  const fetchCampaigns = async () => {
+    try {
+      const ads = await PromotionalAdsService.fetchActiveAds();
+      const mapped = ads.map(ad => ({
+        id: ad.id,
+        type: 'promo',
+        sponsorName: ad.sponsorName,
+        title: ad.title,
+        description: ad.description,
+        couponCode: ad.couponCode || '',
+        ctaText: ad.ctaText,
+        ctaUrl: ad.ctaUrl,
+        bgGradient: ad.bgGradient || "from-[#574c3c] via-[#433b2f] to-[#574c3c]",
+        borderColors: "border-[#433b2f] border-b-[#2a241c]",
+        badge: ad.badge || "Sponsored",
+        icon: ad.icon || "📢",
+        ownerUid: ad.ownerUid,
+        expiresAt: ad.expiresAt,
+        createdAt: ad.createdAt,
+        pricePaid: ad.pricePaid,
+        durationDays: ad.durationDays
+      }));
+      setDbAds(mapped);
+    } catch (err) {
+      console.error("Failed fetching dynamic promotion ads", err);
+    }
+  };
 
   useEffect(() => {
-    if (!showPromos || promoPaused) return;
+    fetchCampaigns();
+  }, []);
+
+  const activeSlides = [...BANNER_SLIDES, ...dbAds];
+
+  // 3D Tilt orientation & Gloss Reflection for Billboard Card
+  const billboardRef = useRef<HTMLDivElement>(null);
+  const [bHovered, setBHovered] = useState<boolean>(false);
+  const bx = useMotionValue(0.5);
+  const by = useMotionValue(0.5);
+
+  const brotateX = useTransform(by, [0, 1], [6, -6]);
+  const brotateY = useTransform(bx, [0, 1], [-6, 6]);
+
+  const bspringX = useSpring(brotateX, { stiffness: 150, damping: 22 });
+  const bspringY = useSpring(brotateY, { stiffness: 150, damping: 22 });
+
+  const bsheenX = useTransform(bx, [0, 1], ['130%', '-30%']);
+  const bsheenY = useTransform(by, [0, 1], ['130%', '-30%']);
+
+  const handleBillboardMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!billboardRef.current) return;
+    const rect = billboardRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    bx.set(mouseX / width);
+    by.set(mouseY / height);
+    setBHovered(true);
+    setPromoPaused(true);
+  };
+
+  const handleBillboardMouseLeave = () => {
+    bx.set(0.5);
+    by.set(0.5);
+    setBHovered(false);
+    setPromoPaused(false);
+  };
+
+  useEffect(() => {
+    if (promoPaused) return;
     const timer = setInterval(() => {
-      setCurrentPromoIdx((prev) => (prev + 1) % SPONSOR_PROMOS.length);
-    }, 6000);
+      setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+    }, 10000);
     return () => clearInterval(timer);
-  }, [showPromos, promoPaused]);
+  }, [promoPaused, activeSlides.length]);
 
   // Load specialists on mount or tab change
   const loadData = async () => {
@@ -165,6 +340,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
           // Save locally first
           onUpdateUser(freshUser);
           localStorage.setItem('va_session', JSON.stringify(freshUser));
+          setSortBy(SORT_TYPES.NEAREST);
           
           // Update in user collections too
           const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
@@ -263,12 +439,25 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const filteredProfessionals = ExploreService.sortUsers(
     professionals.filter((p) => {
       const search = searchTerm.toLowerCase();
-      return (
+      const matchesSearch = (
         p.name.toLowerCase().includes(search) ||
         (p.expertise || '').toLowerCase().includes(search) ||
         (p.facilities || '').toLowerCase().includes(search) ||
         (p.address || '').toLowerCase().includes(search)
       );
+      if (!matchesSearch) return false;
+
+      // Filter by city if selected
+      if (cityFilterActive) {
+        const cityLower = cityFilterActive.toLowerCase().trim();
+        const matchesCity = (
+          (p.address || '').toLowerCase().includes(cityLower) ||
+          (p.location?.address || '').toLowerCase().includes(cityLower)
+        );
+        if (!matchesCity) return false;
+      }
+
+      return true;
     }),
     sortBy,
     currentUser.location || null
@@ -282,144 +471,196 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   return (
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4">
       
-      {/* DIRECTORY HERO BANNER */}
-      <div className="relative bg-gradient-to-br from-[#3e3e2b] via-[#5a5a40] to-[#7c7c5a] text-white p-8 md:p-12 rounded-3xl overflow-hidden border border-[#5a5a40] border-b-[8px] border-b-[#323223] shadow-xl animate-fadeIn">
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-15" />
-        <div className="absolute right-12 top-12 opacity-10 pointer-events-none hidden lg:block">
-          <Compass className="w-48 h-48 animate-spin" style={{ animationDuration: '40s' }} />
-        </div>
-        
-        <div className="relative z-10 space-y-3 max-w-2xl">
-          <span className="inline-flex px-3.5 py-1.5 bg-white/10 rounded-xl text-xs font-bold tracking-widest font-mono border border-white/20 uppercase">
-            🩺 Pakistan Medical Directory
-          </span>
-          <h2 className="text-3.5xl md:text-5xl font-serif font-black tracking-tight leading-tight">
-            Hello, {currentUser.name.split(' ')[0]} 👋
-          </h2>
-          <p className="text-neutral-200 text-sm md:text-base font-semibold leading-relaxed">
-            Instantly connect with highly-qualified vet doctors, dynamic clinical centers, and on-call home vaccinators near you.
-          </p>
-          {currentUser.location && (
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-md rounded-2xl text-xs font-bold border border-white/25 shadow-inner"
-            >
-              <MapPin className="w-4.5 h-4.5 text-amber-400" />
-              <span>Active GPS Base: {currentUser.location.address}</span>
-            </motion.div>
-          )}
-        </div>
-      </div>
-
-      {/* SLIDING PROMOTIONAL ADS CAROUSEL (NON-ANNOYING, SPONSORE-BACKED AND PAUSABLE) */}
-      <AnimatePresence mode="wait">
-        {showPromos && (
+      {/* 3D INTERACTIVE HERO & SPONSOR BILLBOARD */}
+      <div 
+        ref={billboardRef}
+        onMouseMove={handleBillboardMouseMove}
+        onMouseLeave={handleBillboardMouseLeave}
+        className="relative w-full h-[360px] sm:h-[280px] md:h-[230px] lg:h-[210px] overflow-hidden rounded-3xl shrink-0 shadow-[0_15px_40px_rgba(90,90,64,0.18)] hover:shadow-[0_25px_50px_rgba(90,90,64,0.3)] transition-shadow duration-500 border border-[#cdc6ad]"
+        style={{ perspective: 1200 }}
+      >
+        <AnimatePresence mode="wait">
           <motion.div
-            key={SPONSOR_PROMOS[currentPromoIdx].id}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.4 }}
-            onMouseEnter={() => setPromoPaused(true)}
-            onMouseLeave={() => setPromoPaused(false)}
-            className={`relative rounded-3xl overflow-hidden p-6 md:p-8 text-white shadow-lg border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-r ${SPONSOR_PROMOS[currentPromoIdx].bgGradient}`}
+            key={currentSlideIdx}
+            initial={{ rotateY: 90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            exit={{ rotateY: -90, opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+            style={{ 
+              transformStyle: "preserve-3d", 
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              rotateX: bspringX,
+              rotateY: bspringY,
+            }}
+            className={`absolute inset-0 text-white p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br ${activeSlides[currentSlideIdx].bgGradient} ${activeSlides[currentSlideIdx].borderColors} border border-b-[8px] transition-all duration-300`}
           >
-            {/* Sponsor Label */}
-            <div className="absolute top-3 left-4 bg-white/15 backdrop-blur-xs px-2.5 py-1 rounded-full text-[8.5px] uppercase font-black tracking-widest border border-white/10 flex items-center gap-1 select-none">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-              <span>📌 Sponsored Campaign</span>
-            </div>
+            {/* Holographic grid wallpaper */}
+            <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.2px,transparent_1.2px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
 
-            {/* Dismiss button */}
-            <button
-              onClick={() => {
-                localStorage.setItem('va_hide_promos', 'true');
-                setShowPromos(false);
+            {/* Premium 3D Metallic Gloss Glow Layer */}
+            <motion.div
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.18) 100%)',
+                x: bsheenX,
+                y: bsheenY,
+                pointerEvents: 'none',
               }}
-              className="absolute top-3 right-4 text-white/50 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer z-10"
-              title="Dismiss Ads Permanently"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              className="absolute inset-0 z-20 mix-blend-overlay pointer-events-none"
+            />
 
-            {/* Main content body */}
-            <div className="flex items-center gap-5 w-full md:max-w-2xl text-left mt-3.5 md:mt-0 select-none">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-white/10 text-3xl flex items-center justify-center shrink-0 border border-white/10 shadow-inner">
-                {SPONSOR_PROMOS[currentPromoIdx].icon}
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
-                  {SPONSOR_PROMOS[currentPromoIdx].sponsorName} • {SPONSOR_PROMOS[currentPromoIdx].badge}
-                </span>
-                <h3 className="font-serif font-black text-sm md:text-md text-white leading-tight">
-                  {SPONSOR_PROMOS[currentPromoIdx].title}
-                </h3>
-                <p className="text-[11px] text-white/80 font-semibold leading-relaxed max-w-xl">
-                  {SPONSOR_PROMOS[currentPromoIdx].description}
-                </p>
-              </div>
-            </div>
-
-            {/* Interactions */}
-            <div className="flex items-center justify-between md:justify-end gap-3.5 w-full md:w-auto mt-2 md:mt-0 pt-3.5 md:pt-0 border-t border-white/10 md:border-t-0 shrink-0 z-10">
-              
-              {/* Promo Coupon Card */}
-              {SPONSOR_PROMOS[currentPromoIdx].couponCode && (
+            {activeSlides[currentSlideIdx].type === 'welcome' ? (
+              // WELCOME BANNER SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
+              <div className="w-full relative" style={{ transformStyle: "preserve-3d" }}>
                 <div 
-                  onClick={() => {
-                    navigator.clipboard.writeText(SPONSOR_PROMOS[currentPromoIdx].couponCode || '');
-                    alert(`📋 Copied coupon code "${SPONSOR_PROMOS[currentPromoIdx].couponCode}" to your clipboard!`);
-                  }}
-                  className="bg-dashed border border-white/20 hover:border-white/40 cursor-pointer bg-white/5 hover:bg-white/10 rounded-xl px-3 py-1.5 text-center select-none"
-                  title="Click to copy coupon code"
+                  className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none hidden lg:block"
+                  style={{ transform: "translateZ(50px)" }}
                 >
-                  <span className="block text-[8px] uppercase tracking-widest text-white/60 font-black">Copy Code</span>
-                  <span className="font-mono text-[10px] font-black tracking-wider text-amber-300">
-                    {SPONSOR_PROMOS[currentPromoIdx].couponCode}
-                  </span>
+                  <Compass className="w-32 h-32 animate-spin" style={{ animationDuration: '40s' }} />
                 </div>
-              )}
+                
+                <div className="relative z-10 space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    🩺 Pakistan Medical Directory
+                  </span>
+                  <h2 
+                    className="text-2.5xl md:text-4xl font-serif font-black tracking-tight leading-tight"
+                    style={{ transform: "translateZ(45px)" }}
+                  >
+                    Hello, {currentUser.name.split(' ')[0]} 👋
+                  </h2>
+                  <p 
+                    className="text-neutral-200 text-xs md:text-sm font-semibold leading-relaxed"
+                    style={{ transform: "translateZ(25px)" }}
+                  >
+                    Instantly connect with highly-qualified vet doctors, dynamic clinical centers, and on-call home vaccinators near you.
+                  </p>
+                  {currentUser.location && (
+                    <motion.div 
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="inline-flex items-center gap-2 px-3.5 py-1 bg-white/15 backdrop-blur-md rounded-xl text-[10px] font-bold border border-white/25 shadow-inner mt-1"
+                      style={{ transform: "translateZ(20px)" }}
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Active GPS Base: {currentUser.location.address}</span>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // SPONSORED CAMPAIGN SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
+              <div className="w-full relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6" style={{ transformStyle: "preserve-3d" }}>
+                <div className="space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    📌 {activeSlides[currentSlideIdx].badge} • Sponsored Campaign
+                  </span>
+                  <h2 
+                    className="text-xl md:text-3xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
+                    style={{ transform: "translateZ(45px)" }}
+                  >
+                    <span className="text-2xl md:text-3.5xl shrink-0 select-none">{activeSlides[currentSlideIdx].icon}</span>
+                    <span>{activeSlides[currentSlideIdx].title}</span>
+                  </h2>
+                  <p 
+                    className="text-neutral-200 text-xs md:text-xs font-semibold leading-relaxed line-clamp-3"
+                    style={{ transform: "translateZ(20px)" }}
+                  >
+                    {activeSlides[currentSlideIdx].description}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
+                      {activeSlides[currentSlideIdx].sponsorName}
+                    </span>
+                    {activeSlides[currentSlideIdx].couponCode && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(activeSlides[currentSlideIdx].couponCode || '');
+                          alert(`📋 Copied coupon code "${activeSlides[currentSlideIdx].couponCode}" to clipboard!`);
+                        }}
+                        className="inline-flex items-center gap-2 px-2.5 py-1 bg-dashed border border-white/30 hover:border-white/50 bg-white/10 rounded-xl text-[9px] font-black tracking-wider text-amber-300 shadow-inner cursor-pointer transition-all"
+                        title="Click to copy coupon code"
+                      >
+                        <span>Code: {activeSlides[currentSlideIdx].couponCode}</span>
+                        <span className="text-white/60 font-normal text-[8px] pl-1">Copy 📋</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-              {/* Action Link out */}
-              <a
-                href={SPONSOR_PROMOS[currentPromoIdx].ctaUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-white hover:bg-stone-100 text-stone-900 border-b-2 border-b-stone-300 px-4.5 py-2.5 rounded-xl text-[10px] font-black tracking-wider uppercase transition-transform active:scale-95 flex items-center gap-1 w-fit cursor-pointer decoration-none shadow-sm"
+                {/* CTA Link out (WITH COGNITIVE HEIGHT HIGHLIGHT) */}
+                <div className="shrink-0 flex flex-col gap-2 min-w-[180px] md:min-w-[200px]" style={{ transform: "translateZ(35px)" }}>
+                  <a
+                    href={activeSlides[currentSlideIdx].ctaUrl.startsWith('http') ? activeSlides[currentSlideIdx].ctaUrl : `https://${activeSlides[currentSlideIdx].ctaUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer decoration-none shadow-md"
+                  >
+                    <span>{activeSlides[currentSlideIdx].ctaText}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Carousel Navigation Toolbar */}
+            <div 
+              className="absolute bottom-4 right-6 flex items-center gap-3 bg-black/25 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-20 select-none"
+              style={{ transform: "translateZ(40px)" }}
+            >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIdx((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
+                }}
+                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
+                title="Previous Slide"
               >
-                <span>{SPONSOR_PROMOS[currentPromoIdx].ctaText}</span>
-              </a>
-
-              {/* Carousel controls */}
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentPromoIdx((prev) => (prev - 1 + SPONSOR_PROMOS.length) % SPONSOR_PROMOS.length);
-                  }}
-                  className="p-1.5 border border-white/10 hover:border-white/30 hover:bg-white/5 text-white/70 hover:text-white rounded-xl transition-all cursor-pointer"
-                  title="Previous Sponsor"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentPromoIdx((prev) => (prev + 1) % SPONSOR_PROMOS.length);
-                  }}
-                  className="p-1.5 border border-white/10 hover:border-white/30 hover:bg-white/5 text-white/70 hover:text-white rounded-xl transition-all cursor-pointer"
-                  title="Next Sponsor"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              
+              <div className="flex gap-1.5">
+                {activeSlides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentSlideIdx(idx);
+                    }}
+                    className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all border-none ${
+                      idx === currentSlideIdx ? 'bg-amber-400 scale-120' : 'bg-white/40 hover:bg-white/60'
+                    }`}
+                  />
+                ))}
               </div>
 
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+                }}
+                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
+                title="Next Slide"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
+
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
 
       {/* FILTER & OPTION CONTROLS BAR */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl shadow-sm text-left">
@@ -457,28 +698,31 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             })}
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={handleLocateMe}
-            disabled={locLoading}
-            className={`btn-tactile-3d-secondary py-2.5 px-4.5 text-xs inline-flex items-center gap-2 ${
-              currentUser.location ? 'bg-[#5a5a40] text-white border-[#4a4a34]' : ''
-            }`}
-          >
-            {locLoading ? (
-              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <span className="w-2.5 h-2.5 bg-current rounded-full" />
-            )}
-            <span>{currentUser.location ? '📍 Distance Sort Active' : 'Enable My GPS'}</span>
-          </motion.button>
+          {activeTab === 'clinic' && (
+            <>
+              <motion.button
+                id="va-gps-btn"
+                whileTap={{ scale: 0.95 }}
+                onClick={handleLocateMe}
+                disabled={locLoading}
+                className={`btn-tactile-3d-secondary py-2.5 px-4.5 text-xs inline-flex items-center gap-2 ${
+                  currentUser.location ? 'bg-[#5a5a40] text-white border-[#4a4a34]' : ''
+                }`}
+              >
+                {locLoading ? (
+                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span className="w-2.5 h-2.5 bg-current rounded-full" />
+                )}
+                <span>{currentUser.location ? '📍 Distance Sort Active' : 'Enable My GPS'}</span>
+              </motion.button>
 
-
-
-          {gpsError && (
-            <span className="text-[10px] text-red-600 bg-red-150 py-1.5 px-3 rounded-xl border border-red-200 font-bold">
-              ⚠️ {gpsError}
-            </span>
+              {gpsError && (
+                <span className="text-[10px] text-red-600 bg-red-150 py-1.5 px-3 rounded-xl border border-red-200 font-bold">
+                  ⚠️ {gpsError}
+                </span>
+              )}
+            </>
           )}
         </div>
 
@@ -499,7 +743,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             <span className="text-xs text-[#a49f92] font-black uppercase tracking-wider pl-1 select-none">Sort:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SORT_TYPES)}
+              onChange={(e) => handleSortChange(e.target.value as SORT_TYPES)}
               className="text-xs bg-white border border-[#e3dec9] p-2 px-3 rounded-xl cursor-pointer font-bold text-[#373735] focus:outline-none"
             >
               <option value={SORT_TYPES.HIGHEST}>⭐ Highest Rated</option>
@@ -511,6 +755,8 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         </div>
 
       </div>
+
+
 
       {/* SPECIALIST GRID LIST */}
       {loading ? (
@@ -532,7 +778,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             
             // Calculate distance if GPS latlng is present
             let distance: number | null = null;
-            if (currentUser.location && prof.location?.lat) {
+            if (currentUser.location && prof.location?.lat && prof.location?.lng) {
               distance = LocationService.haversine(
                 currentUser.location.lat,
                 currentUser.location.lng,
@@ -665,12 +911,12 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                     </>
                   )}
 
-                  {selectedProfile.location && (
+                  {selectedProfile.location && selectedProfile.role !== 'doctor' && (
                     <a
                       href={`https://www.google.com/maps?q=${selectedProfile.location.lat},${selectedProfile.location.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn-tactile-3d-secondary py-2 px-5 text-xs"
+                      className="btn-tactile-3d-secondary py-2 px-5 text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-150 border-emerald-300"
                     >
                       🗺️ Show on Map
                     </a>
@@ -852,6 +1098,116 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
 
                 </div>
 
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating GPS activation warning toast */}
+      <AnimatePresence>
+        {gpsPopupVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: 'spring', duration: 0.5 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 pointer-events-auto"
+          >
+            <div className="bg-[#fcf9f2] border-2 border-amber-900 rounded-2xl p-4.5 shadow-[0_12px_36px_rgba(0,0,0,0.15)] border-b-[5px] border-b-amber-950 flex items-start gap-3.5">
+              <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center text-lg border border-amber-300 shrink-0 select-none">
+                📍
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-[11px] font-black text-amber-950 uppercase tracking-wider">GPS Coordinates Required</h4>
+                <p className="text-[11px] text-amber-900 leading-normal font-semibold">
+                  Please turn on your location first. Taking you to the GPS connection setup button.
+                </p>
+                <div className="pt-1 flex items-center gap-1.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[9px] text-amber-800 font-bold uppercase font-mono tracking-widest animate-pulse">Context shifting...</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Search by City / Current Location custom prompt modal */}
+      <AnimatePresence>
+        {doctorLocationModalOpen && (
+          <div className="fixed inset-0 bg-neutral-900/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-[#fcf9f2] w-full max-w-md rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] shadow-[0_24px_48px_rgba(30,30,20,0.22)] p-6 z-50 relative text-left overflow-hidden space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📍</span>
+                  <h3 className="font-serif font-black text-lg text-[#373735] tracking-tight">Nearest Proximity Search</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDoctorLocationModalOpen(false)}
+                  className="w-7 h-7 flex items-center justify-center rounded-xl border border-[#e3dec9] bg-white hover:bg-neutral-50 text-neutral-500 font-black transition-all text-xs cursor-pointer focus:outline-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-2xl text-[#6b471c] text-2xs font-semibold leading-relaxed space-y-1">
+                  <p className="font-extrabold uppercase tracking-wide text-amber-800 flex items-center gap-1.5">
+                    🔎 Nearest Location Search
+                  </p>
+                  <p>You can search clinicians and clinics within a specific city/town to find and sort the nearest ones to that area.</p>
+                </div>
+
+                <div className="space-y-2.5">
+                  <label className="text-2xs uppercase font-extrabold text-[#5a5a40] tracking-wider block">Search by City / Town name</label>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleCitySearchSubmit(popCityInput);
+                    }}
+                    className="flex gap-2"
+                  >
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        className="form-control bg-white text-xs py-2.5 w-full pr-8"
+                        placeholder="e.g. Peshawar, Lahore, Islamabad, Karachi"
+                        value={popCityInput}
+                        onChange={(e) => setPopCityInput(e.target.value)}
+                        required
+                      />
+                      {popCityInput && (
+                        <button
+                          type="button"
+                          onClick={() => setPopCityInput('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 font-bold text-2xs cursor-pointer focus:outline-none"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn-tactile-3d-secondary bg-[#5a5a40] text-white border-[#444430] hover:bg-[#4d4d37] px-4 text-xs font-black cursor-pointer"
+                    >
+                      Search
+                    </button>
+                  </form>
+                  <p className="text-[10px] text-stone-500 font-semibold italic">
+                    Type any municipal town or city to narrow down directory listings.
+                  </p>
+                </div>
               </div>
 
             </motion.div>

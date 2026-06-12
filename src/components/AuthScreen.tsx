@@ -24,6 +24,21 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
   const [expertise, setExpertise] = useState<string>('');
   const [facilities, setFacilities] = useState<string>('');
   const [address, setAddress] = useState<string>('');
+  const [doctorCity, setDoctorCity] = useState<string>('Islamabad');
+
+  const PAKISTAN_CITIES = [
+    { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },
+    { name: 'Lahore', lat: 31.5204, lng: 74.3587 },
+    { name: 'Karachi', lat: 24.8607, lng: 67.0011 },
+    { name: 'Peshawar', lat: 34.0151, lng: 71.5249 },
+    { name: 'Quetta', lat: 30.1798, lng: 66.9750 },
+    { name: 'Rawalpindi', lat: 33.5651, lng: 73.0169 },
+    { name: 'Faisalabad', lat: 31.4504, lng: 73.1350 },
+    { name: 'Multan', lat: 30.1575, lng: 71.5249 },
+    { name: 'Sialkot', lat: 32.4945, lng: 74.5229 },
+    { name: 'Gujranwala', lat: 32.1877, lng: 74.1945 },
+    { name: 'Hyderabad', lat: 25.3960, lng: 68.3578 },
+  ];
 
   const handleGoogleAuth = async () => {
     setError(null);
@@ -63,6 +78,13 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
       const extra: any = {};
       if (selectedRole === 'doctor') {
         extra.expertise = expertise.trim() || 'General Practitioner';
+        const matchedCity = PAKISTAN_CITIES.find(c => c.name === doctorCity) || PAKISTAN_CITIES[0];
+        extra.location = {
+          lat: matchedCity.lat,
+          lng: matchedCity.lng,
+          address: matchedCity.name
+        };
+        extra.address = doctorCity;
       }
       if (selectedRole === 'clinic') {
         extra.facilities = facilities.trim() || 'General Diagnostics & OPD';
@@ -269,17 +291,35 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -15 }}
-                    className="p-4 bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] rounded-2xl"
+                    className="p-4 bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] rounded-2xl space-y-4"
                   >
-                    <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Professional Specialization</label>
-                    <input
-                      type="text"
-                      className="form-control bg-white"
-                      placeholder="e.g., Equine Practitioner, Orthopedic Surgery, Pet Vaccinator"
-                      value={expertise}
-                      onChange={(e) => setExpertise(e.target.value)}
-                      disabled={loading}
-                    />
+                    <div>
+                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Professional Specialization</label>
+                      <input
+                        type="text"
+                        className="form-control bg-white"
+                        placeholder="e.g., Equine Practitioner, Orthopedic Surgery, Pet Vaccinator"
+                        value={expertise}
+                        onChange={(e) => setExpertise(e.target.value)}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Select Practice City / Town *</label>
+                      <select
+                        className="form-control bg-white cursor-pointer"
+                        value={doctorCity}
+                        onChange={(e) => setDoctorCity(e.target.value)}
+                        disabled={loading}
+                      >
+                        {PAKISTAN_CITIES.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            🇵🇰 {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[9px] text-[#a49f92] font-semibold mt-1 block">Your clinic-independent practice city. This can be updated in your profile any time.</span>
+                    </div>
                   </motion.div>
                 )}
 

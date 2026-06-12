@@ -25,6 +25,7 @@
           }
         },
         "isVerified": { "type": "boolean" },
+        "promoAdsUsed": { "type": "number", "description": "Number of promotional ads created using subscription limits" },
         "subscriptionTier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
         "subscriptionExpiresAt": { "type": "number" },
         "avgRating": { "type": "number" },
@@ -252,6 +253,31 @@
         "createdAt": { "type": "number" }
       },
       "required": ["farmId", "targetId", "targetType", "targetName", "serviceType", "dueDate", "status", "createdBy", "createdAt"]
+    },
+    "PromotionalAd": {
+      "title": "PromotionalAd",
+      "description": "A paid campaign advertisement by a doctor or clinic",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sponsorName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "couponCode": { "type": "string" },
+        "ctaText": { "type": "string" },
+        "ctaUrl": { "type": "string" },
+        "bgGradient": { "type": "string" },
+        "badge": { "type": "string" },
+        "icon": { "type": "string" },
+        "ownerEmail": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "ownerRole": { "type": "string", "enum": ["doctor", "clinic"] },
+        "pricePaid": { "type": "number", "enum": [0, 1000, 1500] },
+        "durationDays": { "type": "number", "enum": [3, 7] },
+        "expiresAt": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["sponsorName", "title", "description", "ctaText", "ctaUrl", "ownerUid", "ownerEmail", "ownerRole", "pricePaid", "durationDays", "expiresAt", "createdAt"]
     }
   },
   "firestore": {
@@ -302,6 +328,10 @@
     "/livestock_tasks/{taskId}": {
       "schema": "LivestockTask",
       "description": "Hub of medical treatments, breeding tasks, and preventative vaccination events"
+    },
+    "/promotional_ads/{adId}": {
+      "schema": "PromotionalAd",
+      "description": "Paid advertising campaigns created by veterinarians and clinics"
     }
   }
 }

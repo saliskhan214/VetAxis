@@ -25,7 +25,7 @@ import {
 } from 'firebase/auth';
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification } from '../types';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd } from '../types';
 
 // ─────────────────────────────────────────────────────────────────
 // MOCK FALLBACK DATABASE ACTIONS (LocalStorage)
@@ -95,9 +95,24 @@ function saveLocalUsers(list: UserProfile[]) {
 
 export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile | null {
   if (user && user.email && user.email.toLowerCase().trim() === 'saliskhan214@gmail.com') {
-    user.subscriptionTier = 'Gold';
-    user.subscriptionExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    if (!user.subscriptionTier) {
+      user.subscriptionTier = 'Gold';
+    }
     user.isVerified = true;
+
+    // Use a single stable localStorage key for Salis's subscription expiration
+    let expiresStr = localStorage.getItem('va_salis_sub_expires');
+    let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
+    
+    if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs) {
+      expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      localStorage.setItem('va_salis_sub_expires', expiresMs.toString());
+    }
+    
+    // Always enforce this stable expiration for Salis's temporary platinum/gold tier
+    if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now()) {
+      user.subscriptionExpiresAt = expiresMs;
+    }
   }
   return user;
 }
@@ -651,7 +666,8 @@ export const AuthService = {
       profilePic: pendingInfo.profilePic,
       createdAt: Date.now(),
       isVerified: false,
-      emailVerified: pendingInfo.emailVerified
+      emailVerified: pendingInfo.emailVerified,
+      location: extra.location || null
     };
 
     if (isFirebaseConfigured && db) {
@@ -919,12 +935,12 @@ export const ExploreService = {
         });
       case SORT_TYPES.NEAREST: {
         return listCopy.sort((a, b) => {
-          const tierDiff = getTierOrder(b) - getTierOrder(a);
-          if (tierDiff !== 0) return tierDiff;
-          if (!userLoc) return (b.avgRating || 0) - (a.avgRating || 0);
-          const distA = a.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, a.location.lat, a.location.lng) : 99999;
-          const distB = b.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, b.location.lat, b.location.lng) : 99999;
-          return distA - distB;
+          if (userLoc) {
+            const distA = a.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, a.location.lat, a.location.lng) : 99999;
+            const distB = b.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, b.location.lat, b.location.lng) : 99999;
+            if (distA !== distB) return distA - distB;
+          }
+          return (b.avgRating || 0) - (a.avgRating || 0);
         });
       }
       case SORT_TYPES.RECOMMENDED: {
@@ -1449,7 +1465,8 @@ export const PetAdsService = {
       ownerName: owner.name,
       ownerRole: owner.role,
       createdAt: Date.now(),
-      isPremium: isOwnerPremium
+      isPremium: isOwnerPremium,
+      ownerSubscriptionTier: owner.subscriptionTier
     };
 
     if (isFirebaseConfigured && db) {
@@ -1578,7 +1595,8 @@ export const MarketplaceService = {
       ownerName: owner.name,
       ownerRole: owner.role,
       createdAt: Date.now(),
-      isPremium: isOwnerPremium
+      isPremium: isOwnerPremium,
+      ownerSubscriptionTier: owner.subscriptionTier
     };
 
     if (isFirebaseConfigured && db) {
@@ -1942,3 +1960,97 @@ export const NotificationService = {
     }
   }
 };
+
+export const PromotionalAdsService = {
+  async fetchActiveAds(): Promise<PromotionalAd[]> {
+    const now = Date.now();
+    if (isFirebaseConfigured && db) {
+      try {
+        const adsCol = collection(db, 'promotional_ads');
+        const snap = await getDocs(adsCol);
+        const list: PromotionalAd[] = [];
+        for (const d of snap.docs) {
+          const data = d.data() as PromotionalAd;
+          if (data && data.expiresAt > now) {
+            list.push({ ...data, id: d.id });
+          } else {
+            // Clean up expired ads asynchronously
+            deleteDoc(doc(db, 'promotional_ads', d.id)).catch(err => {
+              console.warn('Failed self-cleaning of expired ad', d.id, err);
+            });
+          }
+        }
+        return list;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'promotional_ads');
+        return [];
+      }
+    } else {
+      let list: PromotionalAd[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
+      } catch {
+        list = [];
+      }
+      const activeAds = list.filter(ad => ad.expiresAt > now);
+      if (activeAds.length !== list.length) {
+        localStorage.setItem('va_promotional_ads', JSON.stringify(activeAds));
+      }
+      return activeAds;
+    }
+  },
+
+  async createAd(adData: Omit<PromotionalAd, 'id' | 'createdAt' | 'expiresAt' | 'durationDays' | 'pricePaid'>, durationDays: 3 | 7, pricePaid: number): Promise<PromotionalAd> {
+    const createdAt = Date.now();
+    const expiresAt = createdAt + durationDays * 24 * 60 * 60 * 1000;
+    const cleanAd: PromotionalAd = {
+      ...adData,
+      id: 'ad_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      durationDays,
+      pricePaid,
+      expiresAt,
+      createdAt
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'promotional_ads', cleanAd.id), cleanUndefined(cleanAd));
+        return cleanAd;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `promotional_ads/${cleanAd.id}`);
+        throw err;
+      }
+    } else {
+      let list: PromotionalAd[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
+      } catch {
+        list = [];
+      }
+      list.push(cleanAd);
+      localStorage.setItem('va_promotional_ads', JSON.stringify(list));
+      return cleanAd;
+    }
+  },
+
+  async deleteAd(adId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'promotional_ads', adId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `promotional_ads/${adId}`);
+        throw err;
+      }
+    } else {
+      let list: PromotionalAd[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
+      } catch {
+        list = [];
+      }
+      const filtered = list.filter(ad => ad.id !== adId);
+      localStorage.setItem('va_promotional_ads', JSON.stringify(filtered));
+    }
+  }
+};
+

@@ -1,6 +1,6 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { UserProfile, PetAd } from '../types';
-import { PetAdsService } from '../lib/storage';
+import { PetAdsService, CommunityService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle } from 'lucide-react';
 
@@ -33,6 +33,7 @@ export function PetAds({ currentUser }: PetAdsProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [boostedPosts, setBoostedPosts] = useState<any[]>([]);
 
   const loadAds = async () => {
     setLoading(true);
@@ -46,8 +47,19 @@ export function PetAds({ currentUser }: PetAdsProps) {
     }
   };
 
+  const loadBoostedEmergencyPosts = async () => {
+    try {
+      const posts = await CommunityService.fetchPosts();
+      const boosted = posts.filter((p: any) => p.isBoosted);
+      setBoostedPosts(boosted);
+    } catch (err) {
+      console.error('Failed to load boosted emergency posts in PetAds section', err);
+    }
+  };
+
   useEffect(() => {
     loadAds();
+    loadBoostedEmergencyPosts();
     if (currentUser.phone) {
       setWhatsapp(currentUser.phone);
     }
@@ -531,6 +543,100 @@ export function PetAds({ currentUser }: PetAdsProps) {
 
       </div>
 
+      {/* ACTIVE EMERGENCIES - LOST PET RADAR BEACON ALERTS */}
+      {boostedPosts.length > 0 && (
+        <div className="bg-gradient-to-br from-red-50 via-rose-50 to-amber-50 border-2 border-red-500 rounded-3xl p-6 shadow-[0_15px_30px_rgba(239,68,68,0.12)] flex flex-col gap-4 text-left relative overflow-hidden">
+          <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-red-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg relative">
+                <span className="absolute inset-0 rounded-2xl bg-red-600 animate-ping opacity-25"></span>
+                <span className="text-lg">📢</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="bg-red-600 text-white font-mono text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest leading-none">
+                    PRIORITY EMERGENCY AD
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-bold">
+                    Active Broadcaster Signal
+                  </span>
+                </div>
+                <h3 className="font-serif font-black text-red-950 text-lg leading-tight">
+                  Active Emergency Lost Pet Radar Alerts
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 z-10">
+            {boostedPosts.map((post) => (
+              <div 
+                key={post.id}
+                className="bg-white border border-red-100 hover:border-red-300 rounded-3xl p-5 space-y-4 shadow-xs transition-all hover:shadow-md relative overflow-hidden flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                      📍 Last Seen: {post.boostDetails?.lastSeenLoc.address || 'Local Region'}
+                    </span>
+                    <span className="text-[9px] text-[#7a766f] font-mono">
+                      {new Date(post.ts).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-serif font-bold text-[#3c3c2b] text-base leading-tight hover:text-red-700 transition-colors">
+                      {post.title || "Emergency Lost Pet Alert"}
+                    </h4>
+                    <p className="text-xs text-[#52523b] font-medium leading-relaxed mt-1.5 whitespace-pre-wrap">
+                      {post.text || post.description}
+                    </p>
+                  </div>
+
+                  {/* Pictures Preview */}
+                  {post.images && post.images.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {post.images.map((imgSrc: string, imgIdx: number) => (
+                        <div key={imgIdx} className="relative aspect-video rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group shadow-inner">
+                          <img 
+                            src={imgSrc} 
+                            alt={`Emergency Preview ${imgIdx + 1}`} 
+                            className="w-full h-full object-cover select-none"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notification System Signal Status */}
+                  <div className="bg-red-50/70 rounded-xl p-2.5 border border-red-100 text-[10px] space-y-1">
+                    <div className="flex items-center gap-1.5 text-red-800 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                      <span>Broadcaster Dispatch System</span>
+                    </div>
+                    <p className="text-zinc-650 font-semibold">
+                      🔔 Sent high-priority sound alarm and push alerts to <strong className="font-sans font-extrabold text-red-700">{post.boostDetails?.notifiedCount || 12} matching users & veterinarians</strong> inside the {post.boostDetails?.radiusKm || 5}km secure perimeter.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-zinc-100 mt-2">
+                  <div className="flex items-center gap-1.5 text-[9px] text-red-700 font-black tracking-widest uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping"></span>
+                    <span>Radar {post.boostDetails?.radiusKm || 5}km Shield</span>
+                  </div>
+                  <span className="text-[9px] font-mono bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-black">
+                    Please Check Community Feed 💬
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* AD CLASSIFIED GRID CARDS */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -548,16 +654,47 @@ export function PetAds({ currentUser }: PetAdsProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
           {filteredAds.map((ad) => {
             const isOwner = ad.ownerEmail === currentUser.email;
+            const tier = ad.ownerSubscriptionTier || (ad.isPremium ? 'Silver' : undefined);
+
+            let cardStyle = "bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] overflow-hidden flex flex-col justify-between hover:shadow-xl hover:border-b-[4px] hover:border-[#5a5a40]";
+            let headerGradient = "h-48 bg-stone-100 relative overflow-hidden flex items-center justify-center border-b border-[#e3dec9]";
+            let sponsorBadge = null;
+
+            if (tier === 'Platinum') {
+              cardStyle = "bg-gradient-to-br from-neutral-900 to-zinc-950 text-white rounded-3xl border-2 border-indigo-500/50 border-b-[6px] border-b-black overflow-hidden flex flex-col justify-between shadow-lg hover:shadow-indigo-950/40";
+              headerGradient = "h-48 bg-zinc-900 relative overflow-hidden flex items-center justify-center border-b border-indigo-900/50";
+              sponsorBadge = (
+                <span className="absolute top-3 right-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-500 text-white text-[8px] uppercase font-black tracking-widest rounded-xl px-2.5 py-1.5 shadow-sm border border-indigo-400/20">
+                  🏆 PLATINUM AD
+                </span>
+              );
+            } else if (tier === 'Gold') {
+              cardStyle = "bg-[#fffbeb] rounded-3xl border-2 border-amber-400 border-b-[6px] border-b-amber-600 overflow-hidden flex flex-col justify-between shadow-md hover:shadow-amber-100/40";
+              headerGradient = "h-48 bg-amber-50/50 relative overflow-hidden flex items-center justify-center border-b border-amber-200";
+              sponsorBadge = (
+                <span className="absolute top-3 right-3 bg-amber-600 text-white text-[8px] uppercase font-black tracking-widest rounded-xl px-2.5 py-1.5 shadow-sm border border-amber-400/20 animate-pulse">
+                  👑 GOLD AD
+                </span>
+              );
+            } else if (tier === 'Silver') {
+              cardStyle = "bg-slate-50/60 rounded-3xl border-2 border-slate-350 border-b-[6px] border-b-slate-400 overflow-hidden flex flex-col justify-between hover:shadow-md";
+              headerGradient = "h-48 bg-slate-100/50 relative overflow-hidden flex items-center justify-center border-b border-slate-200";
+              sponsorBadge = (
+                <span className="absolute top-3 right-3 bg-slate-500 text-white text-[8px] uppercase font-black tracking-widest rounded-xl px-2.5 py-1.5 shadow-sm">
+                  ✦ SILVER AD
+                </span>
+              );
+            }
 
             return (
               <motion.div
                 key={ad.id}
                 layout
                 whileHover={{ y: -5 }}
-                className="bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] overflow-hidden flex flex-col justify-between hover:shadow-xl hover:border-b-[4px] hover:border-[#5a5a40]"
+                className={cardStyle}
               >
                 <div>
-                  <div className="h-48 bg-stone-100 relative overflow-hidden flex items-center justify-center border-b border-[#e3dec9]">
+                  <div className={headerGradient}>
                     {ad.image ? (
                       <img src={ad.image} className="w-full h-full object-cover" alt={ad.petType} />
                     ) : (
@@ -579,16 +716,18 @@ export function PetAds({ currentUser }: PetAdsProps) {
                         My listing
                       </span>
                     )}
+
+                    {sponsorBadge}
                   </div>
 
                   <div className="p-5 space-y-3">
                     <div>
-                      <h4 className="font-black text-base text-[#373735] leading-snug truncate">
+                      <h4 className={`font-black text-base leading-snug truncate ${tier === 'Platinum' ? 'text-zinc-100' : 'text-[#373735]'}`}>
                         {ad.petType} {ad.breed && `· ${ad.breed}`}
                       </h4>
-                      <div className="text-lg font-serif font-black text-[#5a5a40] mt-1.5 gap-1 inline-flex items-center">
+                      <div className={`text-lg font-serif font-black mt-1.5 gap-1 inline-flex items-center ${tier === 'Platinum' ? 'text-teal-400' : 'text-[#5a5a40]'}`}>
                         {ad.adType === 'adoption' ? (
-                          <span className="text-emerald-700 italic">Free Family Adoption</span>
+                          <span className={`italic ${tier === 'Platinum' ? 'text-emerald-400' : 'text-emerald-700'}`}>Free Family Adoption</span>
                         ) : (
                           `PKR ${Number(ad.price).toLocaleString()}`
                         )}
@@ -597,25 +736,33 @@ export function PetAds({ currentUser }: PetAdsProps) {
 
                     <div className="flex flex-wrap gap-2.5">
                       {ad.age !== null && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-stone-100 border border-stone-200 text-[9px] font-black uppercase text-[#373735]">
-                          <Calendar className="w-3 h-3 text-[#5a5a40]" />
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase text-zinc-700 border ${
+                          tier === 'Platinum' ? 'bg-zinc-800 border-zinc-700 text-zinc-300' : 'bg-stone-100 border-stone-200'
+                        }`}>
+                          <Calendar className={`w-3 h-3 ${tier === 'Platinum' ? 'text-zinc-400' : 'text-[#5a5a40]'}`} />
                           <span>{ad.age < 12 ? `${ad.age} mos` : `${Math.floor(ad.age / 12)} yrs`}</span>
                         </span>
                       )}
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#fcf9f2] border border-[#e3dec9] text-[9px] font-black uppercase text-[#5a5a40]">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase border ${
+                        tier === 'Platinum' ? 'bg-zinc-800 border-zinc-700 text-zinc-300' : 'bg-[#fcf9f2] border-[#e3dec9] text-[#5a5a40]'
+                      }`}>
                         <MapPin className="w-3 h-3 text-amber-500" />
                         <span>{ad.location}</span>
                       </span>
                     </div>
 
-                    <p className="text-xs text-[#7a766f] font-semibold leading-relaxed line-clamp-3">
+                    <p className={`text-xs font-semibold leading-relaxed line-clamp-3 ${tier === 'Platinum' ? 'text-zinc-300' : 'text-[#7a766f]'}`}>
                       {ad.description}
                     </p>
 
-                    <div className="text-[10px] text-[#a49f92] font-semibold flex items-center gap-1 bg-[#fcf9f2] p-2.5 rounded-xl border border-[#e3dec9]">
+                    <div className={`text-[10px] font-semibold flex items-center gap-1 p-2.5 rounded-xl border ${
+                      tier === 'Platinum'
+                        ? 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                        : 'bg-[#fcf9f2] border-[#e3dec9] text-[#a49f92]'
+                    }`}>
                       <span className="font-extrabold uppercase text-[9px] text-[#5a5a40]">Contact:</span>
-                      <strong className="text-black font-bold">{ad.ownerName}</strong>
-                      <span className="inline-flex px-1.5 py-0.5 rounded-lg bg-white/80 uppercase tracking-widest text-[8px] font-black border border-stone-200">
+                      <strong className={`font-bold ${tier === 'Platinum' ? 'text-white' : 'text-black'}`}>{ad.ownerName}</strong>
+                      <span className="inline-flex px-1.5 py-0.5 rounded-lg bg-white/15 uppercase tracking-widest text-[8px] font-black border border-stone-200/20">
                         {ad.ownerRole}
                       </span>
                     </div>

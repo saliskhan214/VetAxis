@@ -123,7 +123,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
   };
 
   return (
-    <div className="perspective-1000 w-full" style={{ perspective: '1100px' }}>
+    <div className="perspective-1000 w-full h-full flex flex-col" style={{ perspective: '1100px' }}>
       <motion.div
         ref={cardRef}
         onMouseMove={handleMouseMove}
@@ -301,6 +301,49 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Proximity indicator text */}
+            {distance !== null && (
+              <div className={`mt-3.5 p-2 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${
+                tier === 'Platinum'
+                  ? 'bg-teal-950/40 border-teal-500/30 text-teal-300'
+                  : 'bg-emerald-50/50 border-emerald-100 text-[#1b7c31]'
+              }`}>
+                <span>📍</span>
+                <span>This service is <span className="font-extrabold underline">{distance < 1 ? `${Math.round(distance * 1000)} meters` : `${distance.toFixed(1)} km`}</span> far away from you.</span>
+              </div>
+            )}
+
+            {/* Location button for exact location on Google Maps */}
+            {profile.role !== 'doctor' && (
+              <div className="mt-3.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (profile.location?.lat && profile.location?.lng) {
+                      // Open saved location precisely on Google Maps
+                      window.open(`https://www.google.com/maps?q=${profile.location.lat},${profile.location.lng}`, '_blank');
+                    } else {
+                      const query = encodeURIComponent(`${profile.name} ${profile.address || ''}`);
+                      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                    }
+                  }}
+                  className={`w-full py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border transition-all hover:shadow-md active:translate-y-[1px] cursor-pointer ${
+                    tier === 'Platinum'
+                      ? 'bg-neutral-800 text-teal-300 border-teal-500/30 hover:bg-neutral-750 hover:border-teal-400'
+                      : tier === 'Gold'
+                      ? 'bg-amber-950 text-white border-amber-950 hover:bg-amber-900'
+                      : tier === 'Silver'
+                      ? 'bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-150'
+                      : 'bg-[#edf6ef] hover:bg-[#e2f0e4] text-[#2ebd4d] border-[#2ebd4d]/20'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5 shrink-0" />
+                  <span>📍 ( See Location )</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Platinum / Gold privilege of direct WhatsApp Lead connection in card */}

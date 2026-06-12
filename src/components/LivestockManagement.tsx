@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import {
   Plus,
   Trash2,
@@ -15,7 +15,9 @@ import {
   X,
   Shield,
   Activity,
+  TrendingUp,
   ChevronRight,
+  ChevronLeft,
   Info,
   MapPin,
   Lock,
@@ -25,7 +27,7 @@ import {
 
 import { LivestockService, addDays, addMonths } from '../lib/livestockService';
 import { NotificationService } from '../lib/storage';
-import { ExploreService } from '../lib/storage';
+import { ExploreService, PromotionalAdsService } from '../lib/storage';
 import {
   UserProfile,
   LivestockFarm,
@@ -35,6 +37,8 @@ import {
   FarmType,
   MixedFarmOptions
 } from '../types';
+
+import FarmAnalyticsDashboard from './FarmAnalyticsDashboard';
 
 interface LivestockManagementProps {
   currentUser: UserProfile;
@@ -51,7 +55,7 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
   const [allProfessionals, setAllProfessionals] = useState<UserProfile[]>([]);
 
   // UI state navigation within Livestock tab
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'animals' | 'batches' | 'tasks' | 'team'>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'analytics' | 'animals' | 'batches' | 'tasks' | 'team'>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
 
   // Search clinicians & assign states
@@ -248,8 +252,105 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
   // Trigger loading state
   const isClinician = currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant';
 
+  // Sliding banner & promotion states for Livestock Section
+  const [currentSlideIdx, setCurrentSlideIdx] = useState<number>(0);
+  const [promoPaused, setPromoPaused] = useState<boolean>(false);
+  const [dbAds, setDbAds] = useState<any[]>([]);
+
+  // 3D Tilt orientation & Gloss Reflection for Billboard Card inside Livestock
+  const billboardRef = useRef<HTMLDivElement>(null);
+  const [bHovered, setBHovered] = useState<boolean>(false);
+  const bx = useMotionValue(0.5);
+  const by = useMotionValue(0.5);
+
+  const brotateX = useTransform(by, [0, 1], [6, -6]);
+  const brotateY = useTransform(bx, [0, 1], [-6, 6]);
+
+  const bspringX = useSpring(brotateX, { stiffness: 150, damping: 22 });
+  const bspringY = useSpring(brotateY, { stiffness: 150, damping: 22 });
+
+  const bsheenX = useTransform(bx, [0, 1], ['130%', '-30%']);
+  const bsheenY = useTransform(by, [0, 1], ['130%', '-30%']);
+
+  const handleBillboardMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!billboardRef.current) return;
+    const rect = billboardRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    bx.set(mouseX / width);
+    by.set(mouseY / height);
+    setBHovered(true);
+    setPromoPaused(true);
+  };
+
+  const handleBillboardMouseLeave = () => {
+    bx.set(0.5);
+    by.set(0.5);
+    setBHovered(false);
+    setPromoPaused(false);
+  };
+
+  const BANNER_SLIDES_LIVESTOCK = [
+    {
+      id: 'welcome_production',
+      type: 'welcome',
+      sponsorName: '',
+      badge: 'Livestock Network',
+      icon: '🐄',
+      bgGradient: "from-[#3c3c2b] via-[#52523b] to-[#6d6d4f]",
+      borderColors: "border-[#52523b] border-b-[#303022]",
+      title: "Self-Serve Livestock Production Hub",
+      description: "Direct link with qualified local veterinarians, track herd schedule rosters, and ensure automated vaccine notifications.",
+      couponCode: '',
+      ctaText: '',
+      ctaUrl: ''
+    }
+  ];
+
+  const activeSlides = [...BANNER_SLIDES_LIVESTOCK, ...dbAds];
+
+  const fetchCampaigns = async () => {
+    try {
+      const ads = await PromotionalAdsService.fetchActiveAds();
+      const mapped = ads.map(ad => ({
+        id: ad.id,
+        type: 'promo',
+        sponsorName: ad.sponsorName,
+        title: ad.title,
+        description: ad.description,
+        couponCode: ad.couponCode || '',
+        ctaText: ad.ctaText,
+        ctaUrl: ad.ctaUrl,
+        bgGradient: ad.bgGradient || "from-[#574c3c] via-[#433b2f] to-[#574c3c]",
+        borderColors: "border-[#433b2f] border-b-[#2a241c]",
+        badge: ad.badge || "Sponsored",
+        icon: ad.icon || "📢",
+        ownerUid: ad.ownerUid,
+        expiresAt: ad.expiresAt,
+        createdAt: ad.createdAt,
+        pricePaid: ad.pricePaid,
+        durationDays: ad.durationDays
+      }));
+      setDbAds(mapped);
+    } catch (err) {
+      console.error("Failed fetching dynamic promotion ads in Livestock", err);
+    }
+  };
+
+  useEffect(() => {
+    if (promoPaused) return;
+    const timer = setInterval(() => {
+      setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [promoPaused, activeSlides.length]);
+
   useEffect(() => {
     loadGlobalData();
+    fetchCampaigns();
   }, [currentUser]);
 
   // Redirect to a highlighted farm on demand
@@ -892,33 +993,25 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md tracking-wider border border-emerald-100 font-mono">
-                System Active
-              </span>
-
               {/* OFFLINE CAPABILITY MODE INDICATOR */}
-              <button 
-                type="button"
-                onClick={() => {
-                  const targetState = !isOfflineModeActive;
-                  setIsOfflineModeActive(targetState);
-                  setConfirmDialog({
-                    title: targetState ? "Local Storage Mode Enabled" : "Cloud Connection Mode Enabled",
-                    description: targetState 
-                      ? "You are running in standalone offline simulation cache. Your changes will save instantly to client memory and can be pushed to Firebase when connectivity resumes."
-                      : "Connecting back to live Firestore ledger storage. Press sync to upload offline caches.",
-                    confirmText: "Acknowledge",
-                    onConfirm: () => setConfirmDialog(null)
-                  });
-                }}
-                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md tracking-wider border font-mono transition-all cursor-pointer ${
-                  isOfflineModeActive 
-                    ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse' 
-                    : 'bg-green-100 text-green-800 border-green-300'
-                }`}
-              >
-                {isOfflineModeActive ? '⚠️ OFFLINE LOCAL STORAGE' : '🌐 INFRA CLOUD CONNECTED'}
-              </button>
+              {isOfflineModeActive && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const targetState = !isOfflineModeActive;
+                    setIsOfflineModeActive(targetState);
+                    setConfirmDialog({
+                      title: "Cloud Connection Mode Enabled",
+                      description: "Connecting back to live Firestore ledger storage. Press sync to upload offline caches.",
+                      confirmText: "Acknowledge",
+                      onConfirm: () => setConfirmDialog(null)
+                    });
+                  }}
+                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md tracking-wider border font-mono transition-all cursor-pointer bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                >
+                  ⚠️ OFFLINE LOCAL STORAGE
+                </button>
+              )}
 
               {isOfflineModeActive && (
                 <button
@@ -969,6 +1062,185 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
             </motion.button>
           )}
         </div>
+      </div>
+
+      {/* 3D INTERACTIVE HERO & SPONSOR BILLBOARD */}
+      <div 
+        ref={billboardRef}
+        onMouseMove={handleBillboardMouseMove}
+        onMouseLeave={handleBillboardMouseLeave}
+        className="mb-8 relative w-full h-[360px] sm:h-[280px] md:h-[230px] lg:h-[210px] overflow-hidden rounded-3xl shrink-0 shadow-[0_15px_40px_rgba(90,90,64,0.18)] hover:shadow-[0_25px_50px_rgba(90,90,64,0.3)] transition-shadow duration-500 border border-[#cdc6ad]"
+        style={{ perspective: 1200 }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlideIdx}
+            initial={{ rotateY: 90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            exit={{ rotateY: -90, opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+            style={{ 
+              transformStyle: "preserve-3d", 
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              rotateX: bspringX,
+              rotateY: bspringY,
+            }}
+            className={`absolute inset-0 text-white p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br ${activeSlides[currentSlideIdx].bgGradient} ${activeSlides[currentSlideIdx].borderColors} border border-b-[8px] transition-all duration-300`}
+          >
+            {/* Holographic grid wallpaper */}
+            <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.2px,transparent_1.2px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
+
+            {/* Premium 3D Metallic Gloss Glow Layer */}
+            <motion.div
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.18) 100%)',
+                x: bsheenX,
+                y: bsheenY,
+                pointerEvents: 'none',
+              }}
+              className="absolute inset-0 z-20 mix-blend-overlay pointer-events-none"
+            />
+
+            {activeSlides[currentSlideIdx].type === 'welcome' ? (
+              // WELCOME BANNER SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
+              <div className="w-full relative" style={{ transformStyle: "preserve-3d" }}>
+                <div 
+                  className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none hidden lg:block"
+                  style={{ transform: "translateZ(50px)" }}
+                >
+                  <span className="text-6xl animate-pulse inline-block">🐄</span>
+                </div>
+                
+                <div className="relative z-10 space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    🥩 Livestock & Production Network
+                  </span>
+                  <h2 
+                    className="text-2.5xl md:text-3xl font-serif font-black tracking-tight leading-tight"
+                    style={{ transform: "translateZ(45px)" }}
+                  >
+                    Hello, {currentUser.name.split(' ')[0]} 👋
+                  </h2>
+                  <p 
+                    className="text-neutral-200 text-xs md:text-sm font-semibold leading-relaxed"
+                    style={{ transform: "translateZ(25px)" }}
+                  >
+                    Manage herd identification, schedule veterinary immunizations, link with professionals and track daily farm production records.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // SPONSORED CAMPAIGN SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
+              <div className="w-full relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6" style={{ transformStyle: "preserve-3d" }}>
+                <div className="space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    📌 {activeSlides[currentSlideIdx].badge} • Sponsored Campaign
+                  </span>
+                  <h2 
+                    className="text-xl md:text-3xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
+                    style={{ transform: "translateZ(45px)" }}
+                  >
+                    <span className="text-2xl md:text-3.5xl shrink-0 select-none">{activeSlides[currentSlideIdx].icon}</span>
+                    <span>{activeSlides[currentSlideIdx].title}</span>
+                  </h2>
+                  <p 
+                    className="text-neutral-200 text-xs md:text-xs font-semibold leading-relaxed line-clamp-3"
+                    style={{ transform: "translateZ(20px)" }}
+                  >
+                    {activeSlides[currentSlideIdx].description}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
+                      {activeSlides[currentSlideIdx].sponsorName}
+                    </span>
+                    {activeSlides[currentSlideIdx].couponCode && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(activeSlides[currentSlideIdx].couponCode || '');
+                          alert(`📋 Copied coupon code "${activeSlides[currentSlideIdx].couponCode}" to clipboard!`);
+                        }}
+                        className="inline-flex items-center gap-2 px-2.5 py-1 bg-dashed border border-white/30 hover:border-white/50 bg-white/10 rounded-xl text-[9px] font-black tracking-wider text-amber-300 shadow-inner cursor-pointer transition-all"
+                        title="Click to copy coupon code"
+                      >
+                        <span>Code: {activeSlides[currentSlideIdx].couponCode}</span>
+                        <span className="text-white/60 font-normal text-[8px] pl-1">Copy 📋</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* CTA Link out (WITH COGNITIVE HEIGHT HIGHLIGHT) */}
+                <div className="shrink-0 flex flex-col gap-2 min-w-[180px] md:min-w-[200px]" style={{ transform: "translateZ(35px)" }}>
+                  <a
+                    href={activeSlides[currentSlideIdx].ctaUrl.startsWith('http') ? activeSlides[currentSlideIdx].ctaUrl : `https://${activeSlides[currentSlideIdx].ctaUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer decoration-none shadow-md"
+                  >
+                    <span>{activeSlides[currentSlideIdx].ctaText}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Carousel Navigation Toolbar */}
+            <div 
+              className="absolute bottom-4 right-6 flex items-center gap-3 bg-black/25 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-20 select-none"
+              style={{ transform: "translateZ(40px)" }}
+            >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIdx((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
+                }}
+                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
+                title="Previous Slide"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              
+              <div className="flex gap-1.5">
+                {activeSlides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentSlideIdx(idx);
+                    }}
+                    className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all border-none ${
+                      idx === currentSlideIdx ? 'bg-amber-400 scale-120' : 'bg-white/40 hover:bg-white/60'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+                }}
+                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
+                title="Next Slide"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Livestock Overview Content */}
@@ -1027,6 +1299,19 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
                       {overdueAlertsCount + soonAlertsCount}
                     </span>
                   )}
+                </button>
+
+                <button
+                  onClick={() => setActiveSubTab('analytics')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold tracking-tight text-left transition-all border-none cursor-pointer ${
+                    activeSubTab === 'analytics'
+                      ? 'bg-[#5a5a40] text-white'
+                      : 'bg-transparent text-[#7a766f] hover:bg-[#fbfaf6] hover:text-[#5a5a40]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" /> Farm Insights Chart 📊
+                  </span>
                 </button>
 
                 <button
@@ -1332,6 +1617,25 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
               </div>
             )}
 
+            {/* Farm insights and herd analytics Recharts dashboard */}
+            {activeSubTab === 'analytics' && (
+              <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 shadow-xs space-y-6">
+                <div>
+                  <h3 className="font-serif font-black text-xl text-[#5a5a40] flex items-center gap-2">
+                    📊 Farm Insights & Herd Analytics
+                  </h3>
+                  <p className="text-xs text-zinc-550 leading-relaxed mt-1">
+                    Visual diagnostic monitoring parameters, herd compositions, vaccine coverage targets, and biosafety estimations computed directly from logged metrics.
+                  </p>
+                </div>
+                <FarmAnalyticsDashboard 
+                  animals={animals} 
+                  batches={batches} 
+                  tasks={tasks} 
+                />
+              </div>
+            )}
+
             {/* Animals Individual Tab (Herds Identification) */}
             {activeSubTab === 'animals' && (
               <div className="space-y-6">
@@ -1491,59 +1795,61 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
                   </div>
                 ) : (
                   <div className="bg-white border border-[#e3dec9] rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-[#fcfbf9] border-b border-[#e3dec9]">
-                          <th className="p-4 font-bold text-[#5a5a40]">ID & Breed</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Species</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Gender & DOB</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Weight</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Status</th>
-                          {canModifyAnimals && <th className="p-4 font-bold text-[#5a5a40] text-right">Delete</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f4f2ea]">
-                        {animals.map(a => (
-                          <tr key={a.id} className="hover:bg-[#fcfbf9]/50 transition-all">
-                            <td className="p-4 font-bold">
-                              <div>{a.animalId}</div>
-                              {a.tagNumber && <span className="font-mono text-[9px] text-[#7a766f]">Tag: {a.tagNumber}</span>}
-                              {a.breed && <span className="text-[10px] text-gray-400 block">{a.breed}</span>}
-                            </td>
-                            <td className="p-4">
-                              <span className="font-semibold text-gray-700">{a.species}</span>
-                            </td>
-                            <td className="p-4">
-                              <div>{a.gender}</div>
-                              <div className="text-[10px] text-gray-400 font-mono italic">DOB: {a.dob || 'Unknown'}</div>
-                            </td>
-                            <td className="p-4 font-semibold text-gray-600">
-                              {a.weight ? `${a.weight} kg` : '-'}
-                            </td>
-                            <td className="p-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                a.healthStatus === 'Healthy' ? 'bg-emerald-100 text-emerald-800' :
-                                a.healthStatus === 'Sick' ? 'bg-red-100 text-red-800' :
-                                a.healthStatus === 'Under Treatment' ? 'bg-amber-100 text-amber-900' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {a.healthStatus}
-                              </span>
-                            </td>
-                            {canModifyAnimals && (
-                              <td className="p-4 text-right">
-                                <button
-                                  onClick={() => handleDeleteAnimal(a.id)}
-                                  className="cursor-pointer text-red-600 hover:text-red-800 bg-transparent border-none p-1"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            )}
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full min-w-[700px] text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#fcfbf9] border-b border-[#e3dec9]">
+                            <th className="p-4 font-bold text-[#5a5a40]">ID & Breed</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Species</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Gender & DOB</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Weight</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Status</th>
+                            {canModifyAnimals && <th className="p-4 font-bold text-[#5a5a40] text-right">Delete</th>}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-[#f4f2ea]">
+                          {animals.map(a => (
+                            <tr key={a.id} className="hover:bg-[#fcfbf9]/50 transition-all">
+                              <td className="p-4 font-bold">
+                                <div>{a.animalId}</div>
+                                {a.tagNumber && <span className="font-mono text-[9px] text-[#7a766f]">Tag: {a.tagNumber}</span>}
+                                {a.breed && <span className="text-[10px] text-gray-400 block">{a.breed}</span>}
+                              </td>
+                              <td className="p-4">
+                                <span className="font-semibold text-gray-700">{a.species}</span>
+                              </td>
+                              <td className="p-4">
+                                <div>{a.gender}</div>
+                                <div className="text-[10px] text-gray-400 font-mono italic">DOB: {a.dob || 'Unknown'}</div>
+                              </td>
+                              <td className="p-4 font-semibold text-gray-600">
+                                {a.weight ? `${a.weight} kg` : '-'}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                  a.healthStatus === 'Healthy' ? 'bg-emerald-100 text-emerald-800' :
+                                  a.healthStatus === 'Sick' ? 'bg-red-100 text-red-800' :
+                                  a.healthStatus === 'Under Treatment' ? 'bg-amber-100 text-amber-900' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {a.healthStatus}
+                                </span>
+                              </td>
+                              {canModifyAnimals && (
+                                <td className="p-4 text-right">
+                                  <button
+                                    onClick={() => handleDeleteAnimal(a.id)}
+                                    className="cursor-pointer text-red-600 hover:text-red-800 bg-transparent border-none p-1"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1642,13 +1948,13 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
                        <div className="flex items-end justify-end pt-5 col-span-1 md:col-span-3">
                          <button
                            type="submit"
-                           className="cursor-pointer bg-[#5a5a40] hover:bg-[#3e3e2b] text-white text-xs font-bold py-2.5 px-6 rounded-xl border-none shadow-sm"
-                         >
-                           Acclimate Flock & Generate Vaccine Alerts
-                         </button>
-                       </div>
-                     </motion.form>
-                  )}
+                            className="cursor-pointer bg-[#5a5a40] hover:bg-[#3e3e2b] text-white text-xs font-bold py-2.5 px-6 rounded-xl border-none shadow-sm"
+                          >
+                            Acclimate Flock & Generate Vaccine Alerts
+                          </button>
+                        </div>
+                      </motion.form>
+                   )}
                 </AnimatePresence>
 
                 {/* Batches Table list */}
@@ -1658,55 +1964,57 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
                   </div>
                 ) : (
                   <div className="bg-white border border-[#e3dec9] rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-[#fcfbf9] border-b border-[#e3dec9]">
-                          <th className="p-4 font-bold text-[#5a5a40]">Batch & Variety</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Quantity</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Arrival Date</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Category</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">State</th>
-                          {canModifyAnimals && <th className="p-4 font-bold text-[#5a5a40] text-right">Delete</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f4f2ea]">
-                        {batches.map(b => (
-                          <tr key={b.id} className="hover:bg-[#fcfbf9]/50 transition-all">
-                            <td className="p-4 font-bold">
-                              <div>{b.batchName}</div>
-                              {b.breed && <span className="text-[10px] text-gray-400 block">{b.breed}</span>}
-                            </td>
-                            <td className="p-4 font-extrabold text-[#5a5a40] font-sans">
-                              {b.quantity} birds / head
-                            </td>
-                            <td className="p-4 text-gray-600 font-mono">
-                              {b.arrivalDate || '-'}
-                            </td>
-                            <td className="p-4 font-semibold text-gray-600">
-                              {b.species}
-                            </td>
-                            <td className="p-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                b.status === 'Active' ? 'bg-emerald-100 text-emerald-800 animate-pulse' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
-                                {b.status}
-                              </span>
-                            </td>
-                            {canModifyAnimals && (
-                              <td className="p-4 text-right">
-                                <button
-                                  onClick={() => handleDeleteBatch(b.id)}
-                                  className="cursor-pointer text-red-600 hover:text-red-800 bg-transparent border-none p-1"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            )}
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full min-w-[700px] text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#fcfbf9] border-b border-[#e3dec9]">
+                            <th className="p-4 font-bold text-[#5a5a40]">Batch & Variety</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Quantity</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Arrival Date</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Category</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">State</th>
+                            {canModifyAnimals && <th className="p-4 font-bold text-[#5a5a40] text-right">Delete</th>}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-[#f4f2ea]">
+                          {batches.map(b => (
+                            <tr key={b.id} className="hover:bg-[#fcfbf9]/50 transition-all">
+                              <td className="p-4 font-bold">
+                                <div>{b.batchName}</div>
+                                {b.breed && <span className="text-[10px] text-gray-400 block">{b.breed}</span>}
+                              </td>
+                              <td className="p-4 font-extrabold text-[#5a5a40] font-sans">
+                                {b.quantity} birds / head
+                              </td>
+                              <td className="p-4 text-gray-600 font-mono">
+                                {b.arrivalDate || '-'}
+                              </td>
+                              <td className="p-4 font-semibold text-gray-600">
+                                {b.species}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                  b.status === 'Active' ? 'bg-emerald-100 text-emerald-800 animate-pulse' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {b.status}
+                                </span>
+                              </td>
+                              {canModifyAnimals && (
+                                <td className="p-4 text-right">
+                                  <button
+                                    onClick={() => handleDeleteBatch(b.id)}
+                                    className="cursor-pointer text-red-600 hover:text-red-800 bg-transparent border-none p-1"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1834,67 +2142,69 @@ export default function LivestockManagement({ currentUser, highlightFarmId }: Li
                   </div>
                 ) : (
                   <div className="bg-white border border-[#e3dec9] rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-[#fcfbf9] border-b border-[#e3dec9]">
-                          <th className="p-4 font-bold text-[#5a5a40]">Service & Target</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Due Date</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Verification</th>
-                          <th className="p-4 font-bold text-[#5a5a40]">Protocol History</th>
-                          {canPerformClinicalTasks && <th className="p-4 font-bold text-[#5a5a40] text-center">clinical action</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f4f2ea]">
-                        {tasks.sort((a,b) => a.dueDate.localeCompare(b.dueDate)).map(t => (
-                          <tr key={t.id} className="hover:bg-[#fcfbf9]/50 transition-all">
-                            <td className="p-4">
-                              <span className="font-bold block text-sm">{t.serviceType}</span>
-                              <span className="text-gray-400 text-[10px] block mt-0.5">Target: {t.targetName}</span>
-                            </td>
-                            <td className="p-4 font-mono font-bold text-[#5a5a40]">
-                              {t.dueDate}
-                            </td>
-                            <td className="p-4">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                t.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900 animate-pulse'
-                              }`}>
-                                {t.status}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              {t.status === 'Completed' ? (
-                                <div className="space-y-0.5 text-[10px]">
-                                  <p className="text-gray-700">Verified on: <strong className="font-mono">{t.completedDate}</strong></p>
-                                  {t.completedByName && <p className="text-gray-500">By: {t.completedByName}</p>}
-                                  {t.vaccineUsed && <p className="text-blue-700 font-bold bg-blue-50/50 px-1 py-0.5 inline-block rounded-md">Vax: {t.vaccineUsed}</p>}
-                                  {t.notes && <p className="text-gray-500 italic mt-1 font-sans">"{t.notes}"</p>}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic">Pre-scheduled {t.createdBy}</span>
-                              )}
-                            </td>
-                            {canPerformClinicalTasks && (
-                              <td className="p-4 text-center">
-                                {t.status === 'Pending' ? (
-                                  <button
-                                    onClick={() => {
-                                      setTaskCompletionModal(t);
-                                      setCompletionVaccine('');
-                                      setCompletionNotes('');
-                                    }}
-                                    className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold tracking-widest uppercase py-2 px-3 rounded-lg border-none flex items-center justify-center gap-1 mx-auto"
-                                  >
-                                    <Check className="w-3.5 h-3.5" /> Complete
-                                  </button>
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full min-w-[700px] text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#fcfbf9] border-b border-[#e3dec9]">
+                            <th className="p-4 font-bold text-[#5a5a40]">Service & Target</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Due Date</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Verification</th>
+                            <th className="p-4 font-bold text-[#5a5a40]">Protocol History</th>
+                            {canPerformClinicalTasks && <th className="p-4 font-bold text-[#5a5a40] text-center">clinical action</th>}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#f4f2ea]">
+                          {tasks.sort((a,b) => a.dueDate.localeCompare(b.dueDate)).map(t => (
+                            <tr key={t.id} className="hover:bg-[#fcfbf9]/50 transition-all">
+                              <td className="p-4">
+                                <span className="font-bold block text-sm">{t.serviceType}</span>
+                                <span className="text-gray-400 text-[10px] block mt-0.5">Target: {t.targetName}</span>
+                              </td>
+                              <td className="p-4 font-mono font-bold text-[#5a5a40]">
+                                {t.dueDate}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                  t.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900 animate-pulse'
+                                }`}>
+                                  {t.status}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                {t.status === 'Completed' ? (
+                                  <div className="space-y-0.5 text-[10px]">
+                                    <p className="text-gray-700">Verified on: <strong className="font-mono">{t.completedDate}</strong></p>
+                                    {t.completedByName && <p className="text-gray-500">By: {t.completedByName}</p>}
+                                    {t.vaccineUsed && <p className="text-blue-700 font-bold bg-blue-50/50 px-1 py-0.5 inline-block rounded-md">Vax: {t.vaccineUsed}</p>}
+                                    {t.notes && <p className="text-gray-500 italic mt-1 font-sans">"{t.notes}"</p>}
+                                  </div>
                                 ) : (
-                                  <span className="text-emerald-600 font-black">✓ verified</span>
+                                  <span className="text-gray-400 italic">Pre-scheduled {t.createdBy}</span>
                                 )}
                               </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              {canPerformClinicalTasks && (
+                                <td className="p-4 text-center">
+                                  {t.status === 'Pending' ? (
+                                    <button
+                                      onClick={() => {
+                                        setTaskCompletionModal(t);
+                                        setCompletionVaccine('');
+                                        setCompletionNotes('');
+                                      }}
+                                      className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold tracking-widest uppercase py-2 px-3 rounded-lg border-none flex items-center justify-center gap-1 mx-auto"
+                                    >
+                                      <Check className="w-3.5 h-3.5" /> Complete
+                                    </button>
+                                  ) : (
+                                    <span className="text-emerald-600 font-black">✓ verified</span>
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
