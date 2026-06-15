@@ -111,6 +111,16 @@ export function PetAds({ currentUser }: PetAdsProps) {
       return;
     }
 
+    // Subscription Limit check for posting classified ads (Unlimited for premium, max 3 for unsubscribed)
+    const isPremium = !!currentUser.subscriptionTier;
+    if (!isPremium) {
+      const myAdsCount = ads.filter(a => a.ownerEmail === currentUser.email).length;
+      if (myAdsCount >= 3) {
+        setFormError('⚠️ Placement Limit: Unsubscribed accounts are restricted to 3 active classified pet ads. Please upgrade to Silver, Gold, or Platinum inside the Practitioner Billing Centre to unlock unlimited submissions!');
+        return;
+      }
+    }
+
     setSubmitLoading(true);
 
     try {

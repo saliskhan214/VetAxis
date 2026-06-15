@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
   deleteDoc,
   updateDoc,
@@ -10,14 +11,29 @@ import {
 } from 'firebase/firestore';
 
 import { db, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { LivestockFarm, LivestockAnimal, LivestockBatch, LivestockTask } from '../types';
+import { LivestockFarm, LivestockAnimal, LivestockBatch, LivestockTask, IndividualAnimalRecord, HerdLevelMasterRecord } from '../types';
 
 const LOCAL_FARMS_KEY = 'va_farms';
 const LOCAL_ANIMALS_KEY = 'va_animals';
 const LOCAL_BATCHES_KEY = 'va_batches';
 const LOCAL_TASKS_KEY = 'va_tasks';
+const LOCAL_INDIVIDUAL_RECORDS_KEY = 'va_individual_records';
+const LOCAL_HERD_RECORDS_KEY = 'va_herd_records';
 
 let offlineOverride = false;
+
+function mergeCachedItems<T extends { id: any }>(key: string, newItems: T[]) {
+  try {
+    const existingStr = localStorage.getItem(key);
+    let existing: T[] = [];
+    try { existing = existingStr ? JSON.parse(existingStr) : []; } catch {}
+    const newIds = new Set(newItems.map(item => item.id));
+    const merged = [...newItems, ...existing.filter(e => !newIds.has(e.id))];
+    localStorage.setItem(key, JSON.stringify(merged));
+  } catch (e) {
+    console.error("Failed to merge local storage caching for " + key, e);
+  }
+}
 
 function isCloud() {
   return isFirebaseConfigured && db && !offlineOverride;
@@ -115,6 +131,35 @@ export const LivestockService = {
     } catch (e) {
       console.error("Sync tasks error:", e);
     }
+
+    // 5. Sync Comprehensive Individual Animal Records
+    try {
+      const records: IndividualAnimalRecord[] = JSON.parse(localStorage.getItem(LOCAL_INDIVIDUAL_RECORDS_KEY) || '[]');
+      for (const r of records) {
+        await setDoc(doc(db, 'livestock_individual_records', r.id), cleanUndefined(r));
+      }
+    } catch (e) {
+      console.error("Sync individual records error:", e);
+    }
+
+    // 6. Sync Comprehensive Herd Master Records
+    try {
+      const records: HerdLevelMasterRecord[] = JSON.parse(localStorage.getItem(LOCAL_HERD_RECORDS_KEY) || '[]');
+      for (const r of records) {
+        await setDoc(doc(db, 'livestock_herd_records', r.id), cleanUndefined(r));
+      }
+    } catch (e) {
+      console.error("Sync herd records error:", e);
+    }
+
+    try {
+      localStorage.setItem('vetaxis_last_sync_timestamp', new Date().toISOString());
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('vetaxis-sync-complete'));
+      }
+    } catch (e) {
+      console.error("Error setting sync timestamp", e);
+    }
   },
 
   // ─────────────────────────────────────────────────────────────────
@@ -124,9 +169,16 @@ export const LivestockService = {
     if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_farms'));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockFarm[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockFarm[];
+        mergeCachedItems(LOCAL_FARMS_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_farms');
+        console.warn("Offline fallback triggered for fetchFarms. Using local storage cache:", err);
+        try {
+          return JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+        } catch {
+          return [];
+        }
       }
     } else {
       try {
@@ -135,7 +187,27 @@ export const LivestockService = {
         return [];
       }
     }
-    return [];
+  },
+
+  async fetchFarmById(farmId: string): Promise<LivestockFarm | null> {
+    if (isCloud()) {
+      try {
+        const snap = await getDoc(doc(db, 'livestock_farms', farmId));
+        if (snap.exists()) {
+          const item = { id: snap.id, ...snap.data() } as LivestockFarm;
+          mergeCachedItems(LOCAL_FARMS_KEY, [item]);
+          return item;
+        }
+        return null;
+      } catch (err) {
+        console.warn(`Offline fallback triggered for fetchFarmById(${farmId}). Using local storage cache:`, err);
+        const list = await this.fetchFarms();
+        return list.find(f => f.id === farmId) || null;
+      }
+    } else {
+      const list = await this.fetchFarms();
+      return list.find(f => f.id === farmId) || null;
+    }
   },
 
   async createFarm(farm: Partial<LivestockFarm>): Promise<LivestockFarm> {
@@ -156,6 +228,12 @@ export const LivestockService = {
       team: farm.team || []
     };
 
+    const initialMemberUids = [newFarm.ownerUid, ...(newFarm.team || []).map(m => m.uid)];
+    if (newFarm.managerUid) {
+      initialMemberUids.push(newFarm.managerUid);
+    }
+    newFarm.memberUids = Array.from(new Set(initialMemberUids.filter(Boolean)));
+
     if (isCloud()) {
       try {
         await setDoc(doc(db, 'livestock_farms', newFarm.id), cleanUndefined(newFarm));
@@ -175,7 +253,27 @@ export const LivestockService = {
   async updateFarm(farmId: string, updates: Partial<LivestockFarm>): Promise<void> {
     if (isCloud()) {
       try {
-        await updateDoc(doc(db, 'livestock_farms', farmId), cleanUndefined(updates));
+        let finalUpdates = { ...updates };
+        if (updates.team || updates.managerUid || updates.ownerUid) {
+          try {
+            const snap = await getDoc(doc(db, 'livestock_farms', farmId));
+            if (snap.exists()) {
+              const existingFarm = snap.data() as LivestockFarm;
+              const owner = updates.ownerUid || existingFarm.ownerUid || '';
+              const t = updates.team || existingFarm.team || [];
+              const mgr = 'managerUid' in updates ? updates.managerUid : existingFarm.managerUid;
+
+              const finalMemberUids = [owner, ...t.map(m => m.uid)];
+              if (mgr) {
+                finalMemberUids.push(mgr);
+              }
+              finalUpdates.memberUids = Array.from(new Set(finalMemberUids.filter(Boolean)));
+            }
+          } catch (e) {
+            console.error("Failed to dynamically compute memberUids on update:", e);
+          }
+        }
+        await updateDoc(doc(db, 'livestock_farms', farmId), cleanUndefined(finalUpdates));
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `livestock_farms/${farmId}`);
       }
@@ -219,9 +317,16 @@ export const LivestockService = {
     if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_animals'));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockAnimal[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockAnimal[];
+        mergeCachedItems(LOCAL_ANIMALS_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_animals');
+        console.warn("Offline fallback triggered for fetchAllAnimals. Using local storage cache:", err);
+        try {
+          return JSON.parse(localStorage.getItem(LOCAL_ANIMALS_KEY) || '[]');
+        } catch {
+          return [];
+        }
       }
     } else {
       try {
@@ -230,7 +335,6 @@ export const LivestockService = {
         return [];
       }
     }
-    return [];
   },
 
   async fetchAnimals(farmId: string): Promise<LivestockAnimal[]> {
@@ -238,15 +342,18 @@ export const LivestockService = {
       try {
         const q = query(collection(db, 'livestock_animals'), where('farmId', '==', farmId));
         const snap = await getDocs(q);
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockAnimal[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockAnimal[];
+        mergeCachedItems(LOCAL_ANIMALS_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_animals');
+        console.warn(`Offline fallback triggered for fetchAnimals(${farmId}). Using local storage cache:`, err);
+        const all = await this.fetchAllAnimals();
+        return all.filter(a => a.farmId === farmId);
       }
     } else {
       const all = await this.fetchAllAnimals();
       return all.filter(a => a.farmId === farmId);
     }
-    return [];
   },
 
   async createAnimal(animal: Partial<LivestockAnimal>): Promise<LivestockAnimal> {
@@ -387,9 +494,16 @@ export const LivestockService = {
     if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_batches'));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockBatch[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockBatch[];
+        mergeCachedItems(LOCAL_BATCHES_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_batches');
+        console.warn("Offline fallback triggered for fetchAllBatches. Using local storage cache:", err);
+        try {
+          return JSON.parse(localStorage.getItem(LOCAL_BATCHES_KEY) || '[]');
+        } catch {
+          return [];
+        }
       }
     } else {
       try {
@@ -398,7 +512,6 @@ export const LivestockService = {
         return [];
       }
     }
-    return [];
   },
 
   async fetchBatches(farmId: string): Promise<LivestockBatch[]> {
@@ -406,15 +519,18 @@ export const LivestockService = {
       try {
         const q = query(collection(db, 'livestock_batches'), where('farmId', '==', farmId));
         const snap = await getDocs(q);
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockBatch[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockBatch[];
+        mergeCachedItems(LOCAL_BATCHES_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_batches');
+        console.warn(`Offline fallback triggered for fetchBatches(${farmId}). Using local storage cache:`, err);
+        const all = await this.fetchAllBatches();
+        return all.filter(b => b.farmId === farmId);
       }
     } else {
       const all = await this.fetchAllBatches();
       return all.filter(b => b.farmId === farmId);
     }
-    return [];
   },
 
   async createBatch(batch: Partial<LivestockBatch>): Promise<LivestockBatch> {
@@ -538,9 +654,16 @@ export const LivestockService = {
     if (isCloud()) {
       try {
         const snap = await getDocs(collection(db, 'livestock_tasks'));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockTask[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockTask[];
+        mergeCachedItems(LOCAL_TASKS_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_tasks');
+        console.warn("Offline fallback triggered for fetchAllTasks. Using local storage cache:", err);
+        try {
+          return JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]');
+        } catch {
+          return [];
+        }
       }
     } else {
       try {
@@ -549,7 +672,6 @@ export const LivestockService = {
         return [];
       }
     }
-    return [];
   },
 
   async fetchTasks(farmId: string): Promise<LivestockTask[]> {
@@ -557,15 +679,18 @@ export const LivestockService = {
       try {
         const q = query(collection(db, 'livestock_tasks'), where('farmId', '==', farmId));
         const snap = await getDocs(q);
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockTask[];
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockTask[];
+        mergeCachedItems(LOCAL_TASKS_KEY, list);
+        return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'livestock_tasks');
+        console.warn(`Offline fallback triggered for fetchTasks(${farmId}). Using local storage cache:`, err);
+        const all = await this.fetchAllTasks();
+        return all.filter(t => t.farmId === farmId);
       }
     } else {
       const all = await this.fetchAllTasks();
       return all.filter(t => t.farmId === farmId);
     }
-    return [];
   },
 
   async createTask(task: Partial<LivestockTask>): Promise<LivestockTask> {
@@ -663,5 +788,396 @@ export const LivestockService = {
         autoScheduleNext: true
       });
     }
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // COMPREHENSIVE INDIVIDUAL ANIMAL RECORDS SERVICE
+  // ─────────────────────────────────────────────────────────────────
+  async fetchIndividualRecordById(id: string): Promise<IndividualAnimalRecord | null> {
+    if (isCloud()) {
+      try {
+        const snap = await getDoc(doc(db, 'livestock_individual_records', id));
+        if (snap.exists()) {
+          const item = { id: snap.id, ...snap.data() } as IndividualAnimalRecord;
+          mergeCachedItems(LOCAL_INDIVIDUAL_RECORDS_KEY, [item]);
+          return item;
+        }
+        return null;
+      } catch (err) {
+        console.warn(`Offline fallback triggered for fetchIndividualRecordById(${id}). Using local storage cache:`, err);
+        const all = await this.fetchAllIndividualRecords();
+        return all.find(r => r.id === id) || null;
+      }
+    } else {
+      const all = await this.fetchAllIndividualRecords();
+      return all.find(r => r.id === id) || null;
+    }
+  },
+
+  async fetchAllIndividualRecords(): Promise<IndividualAnimalRecord[]> {
+    if (isCloud()) {
+      try {
+        const snap = await getDocs(collection(db, 'livestock_individual_records'));
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as IndividualAnimalRecord[];
+        mergeCachedItems(LOCAL_INDIVIDUAL_RECORDS_KEY, list);
+        return list;
+      } catch (err) {
+        console.warn("Offline fallback triggered for fetchAllIndividualRecords. Using local storage cache:", err);
+        try {
+          return JSON.parse(localStorage.getItem(LOCAL_INDIVIDUAL_RECORDS_KEY) || '[]');
+        } catch {
+          return [];
+        }
+      }
+    } else {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_INDIVIDUAL_RECORDS_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+  },
+
+  async fetchIndividualRecords(farmId: string): Promise<IndividualAnimalRecord[]> {
+    if (isCloud()) {
+      try {
+        const q = query(collection(db, 'livestock_individual_records'), where('farmId', '==', farmId));
+        const snap = await getDocs(q);
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as IndividualAnimalRecord[];
+        mergeCachedItems(LOCAL_INDIVIDUAL_RECORDS_KEY, list);
+        return list;
+      } catch (err) {
+        console.warn(`Offline fallback triggered for fetchIndividualRecords(${farmId}). Using local storage cache:`, err);
+        const all = await this.fetchAllIndividualRecords();
+        return all.filter(r => r.farmId === farmId);
+      }
+    } else {
+      const all = await this.fetchAllIndividualRecords();
+      return all.filter(r => r.farmId === farmId);
+    }
+  },
+
+  async createIndividualRecord(record: Partial<IndividualAnimalRecord>): Promise<IndividualAnimalRecord> {
+    const newRecord: IndividualAnimalRecord = {
+      id: 'indrec_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      farmId: record.farmId || '',
+      createdAt: Date.now(),
+      
+      animalId: record.animalId || '',
+      earTagNumber: record.earTagNumber || '',
+      name: record.name || '',
+      species: record.species || 'Cattle',
+      breed: record.breed || '',
+      sex: record.sex || '',
+      colorMarkings: record.colorMarkings || '',
+      dob: record.dob || '',
+      age: record.age || '',
+      source: record.source || '',
+      purchaseDate: record.purchaseDate || '',
+      purchasePrice: record.purchasePrice || null,
+      
+      sireId: record.sireId || '',
+      damId: record.damId || '',
+      breedOfSire: record.breedOfSire || '',
+      breedOfDam: record.breedOfDam || '',
+      generation: record.generation || '',
+      
+      bodyWeight: record.bodyWeight || null,
+      bcs: record.bcs || '',
+      heightAtWithers: record.heightAtWithers || '',
+      heartGirth: record.heartGirth || '',
+      hornStatus: record.hornStatus || '',
+      identificationMarks: record.identificationMarks || '',
+      
+      pubertyDate: record.pubertyDate || '',
+      estrusDates: record.estrusDates || '',
+      serviceDate: record.serviceDate || '',
+      aiOrNatural: record.aiOrNatural || '',
+      bullOrBuckUsed: record.bullOrBuckUsed || '',
+      pregnancyDiagDate: record.pregnancyDiagDate || '',
+      expectedParturition: record.expectedParturition || '',
+      actualParturition: record.actualParturition || '',
+      typeOfBirth: record.typeOfBirth || '',
+      calvingDifficulty: record.calvingDifficulty || '',
+      placentaExpulsionTime: record.placentaExpulsionTime || '',
+      
+      breedingSoundnessDate: record.breedingSoundnessDate || '',
+      semenEvaluation: record.semenEvaluation || '',
+      breedingSeason: record.breedingSeason || '',
+      femalesServedCount: record.femalesServedCount || null,
+      
+      offspringId: record.offspringId || '',
+      offspringBirthDate: record.offspringBirthDate || '',
+      offspringSex: record.offspringSex || '',
+      offspringBirthWeight: record.offspringBirthWeight || null,
+      offspringWeaningWeight: record.offspringWeaningWeight || null,
+      offspringRemarks: record.offspringRemarks || '',
+      
+      healthRecords: record.healthRecords || [],
+      vaccinationRecords: record.vaccinationRecords || [],
+      dewormingRecords: record.dewormingRecords || [],
+      parasiteRecords: record.parasiteRecords || [],
+      
+      feedingGroup: record.feedingGroup || '',
+      dailyConcentrate: record.dailyConcentrate || '',
+      greenFodder: record.greenFodder || '',
+      dryFodder: record.dryFodder || '',
+      mineralMixture: record.mineralMixture || '',
+      waterIntake: record.waterIntake || '',
+      
+      morningMilk: record.morningMilk || null,
+      eveningMilk: record.eveningMilk || null,
+      totalMilk: record.totalMilk || null,
+      bodyWeightMeat: record.bodyWeightMeat || null,
+      adg: record.adg || null,
+      
+      servicesPerConception: record.servicesPerConception || null,
+      ageAtFirstService: record.ageAtFirstService || '',
+      ageAtFirstParturition: record.ageAtFirstParturition || '',
+      calvingInterval: record.calvingInterval || '',
+      daysOpen: record.daysOpen || '',
+      
+      labRecords: record.labRecords || [],
+      surgicalRecords: record.surgicalRecords || [],
+      
+      mortalityDate: record.mortalityDate || '',
+      mortalityReason: record.mortalityReason || '',
+      necropsyDetails: record.necropsyDetails || '',
+      disposalMethod: record.disposalMethod || '',
+      
+      finPurchase: record.finPurchase || null,
+      finFeed: record.finFeed || null,
+      finMedicine: record.finMedicine || null,
+      finLabor: record.finLabor || null,
+      finMilkIncome: record.finMilkIncome || null,
+      finSaleIncome: record.finSaleIncome || null,
+      
+      notes: record.notes || '',
+      dailyMonitoring: record.dailyMonitoring || []
+    };
+
+    if (isCloud()) {
+      try {
+        await setDoc(doc(db, 'livestock_individual_records', newRecord.id), cleanUndefined(newRecord));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `livestock_individual_records/${newRecord.id}`);
+      }
+    } else {
+      const list = await this.fetchAllIndividualRecords();
+      list.push(newRecord);
+      localStorage.setItem(LOCAL_INDIVIDUAL_RECORDS_KEY, JSON.stringify(list));
+    }
+    return newRecord;
+  },
+
+  async updateIndividualRecord(id: string, updates: Partial<IndividualAnimalRecord>): Promise<void> {
+    if (isCloud()) {
+      try {
+        await updateDoc(doc(db, 'livestock_individual_records', id), cleanUndefined(updates));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `livestock_individual_records/${id}`);
+      }
+    } else {
+      const list = await this.fetchAllIndividualRecords();
+      const idx = list.findIndex(r => r.id === id);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem(LOCAL_INDIVIDUAL_RECORDS_KEY, JSON.stringify(list));
+      }
+    }
+  },
+
+  async deleteIndividualRecord(id: string): Promise<void> {
+    if (isCloud()) {
+      try {
+        await deleteDoc(doc(db, 'livestock_individual_records', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `livestock_individual_records/${id}`);
+      }
+    } else {
+      const list = await this.fetchAllIndividualRecords();
+      localStorage.setItem(LOCAL_INDIVIDUAL_RECORDS_KEY, JSON.stringify(list.filter(r => r.id !== id)));
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // COMPREHENSIVE HERD MASTER RECORDS SERVICE
+  // ─────────────────────────────────────────────────────────────────
+  async fetchAllHerdRecords(): Promise<HerdLevelMasterRecord[]> {
+    if (isCloud()) {
+      try {
+        const snap = await getDocs(collection(db, 'livestock_herd_records'));
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as HerdLevelMasterRecord[];
+        mergeCachedItems(LOCAL_HERD_RECORDS_KEY, list);
+        return list;
+      } catch (err) {
+        console.warn("Offline fallback triggered for fetchAllHerdRecords. Using local storage cache:", err);
+        try {
+          return JSON.parse(localStorage.getItem(LOCAL_HERD_RECORDS_KEY) || '[]');
+        } catch {
+          return [];
+        }
+      }
+    } else {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_HERD_RECORDS_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+  },
+
+  async fetchHerdRecords(farmId: string): Promise<HerdLevelMasterRecord[]> {
+    if (isCloud()) {
+      try {
+        const q = query(collection(db, 'livestock_herd_records'), where('farmId', '==', farmId));
+        const snap = await getDocs(q);
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as HerdLevelMasterRecord[];
+        mergeCachedItems(LOCAL_HERD_RECORDS_KEY, list);
+        return list;
+      } catch (err) {
+        console.warn(`Offline fallback triggered for fetchHerdRecords(${farmId}). Using local storage cache:`, err);
+        const all = await this.fetchAllHerdRecords();
+        return all.filter(r => r.farmId === farmId);
+      }
+    } else {
+      const all = await this.fetchAllHerdRecords();
+      return all.filter(r => r.farmId === farmId);
+    }
+  },
+
+  async createHerdRecord(record: Partial<HerdLevelMasterRecord>): Promise<HerdLevelMasterRecord> {
+    const newRecord: HerdLevelMasterRecord = {
+      id: 'herdrec_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      farmId: record.farmId || '',
+      createdAt: Date.now(),
+      
+      farmName: record.farmName || '',
+      farmManager: record.farmManager || '',
+      species: record.species || 'Cattle',
+      breeds: record.breeds || '',
+      totalHerdSize: record.totalHerdSize || 0,
+      dateUpdated: record.dateUpdated || new Date().toISOString().split('T')[0],
+      
+      inventory: record.inventory || {
+        adultMales: 0,
+        adultFemales: 0,
+        pregnantQty: 0,
+        lactatingQty: 0,
+        dryQty: 0,
+        youngQty: 0,
+        replacementQty: 0,
+        sickQty: 0
+      },
+      
+      reproductive: record.reproductive || {
+        exposed: 0,
+        conceived: 0,
+        conceptionRate: 0,
+        abortions: 0,
+        births: 0,
+        singles: 0,
+        twins: 0,
+        triplets: 0,
+        stillbirths: 0,
+        mortalityAtBirth: 0
+      },
+      
+      monthlyProduction: record.monthlyProduction || [],
+      
+      feedUsage: record.feedUsage || {
+        greenFodderDaily: 0,
+        dryFodderDaily: 0,
+        concentrateDaily: 0,
+        mineralDaily: 0,
+        saltDaily: 0,
+        greenFodderMonthlyCategory: 0,
+        dryFodderMonthlyCategory: 0,
+        concentrateMonthlyCategory: 0,
+        mineralMonthlyCategory: 0,
+        saltMonthlyCategory: 0
+      },
+      
+      vaccinations: record.vaccinations || [],
+      dewormings: record.dewormings || [],
+      diseases: record.diseases || [],
+      mortalities: record.mortalities || [],
+      culled: record.culled || [],
+      
+      gAvgBirthWeight: record.gAvgBirthWeight || null,
+      gAvgWeaningWeight: record.gAvgWeaningWeight || null,
+      gAvgAdultWeight: record.gAvgAdultWeight || null,
+      
+      finances: record.finances || {
+        expFeed: 0,
+        expMedicines: 0,
+        expLabor: 0,
+        expUtilities: 0,
+        expMiscellaneous: 0,
+        incMilk: 0,
+        incMeat: 0,
+        incSale: 0,
+        incManure: 0,
+        incOther: 0
+      },
+      
+      kpis: record.kpis || {
+        mortalityPctTarget: 0,
+        mortalityPctActual: 0,
+        conceptionPctTarget: 0,
+        conceptionPctActual: 0,
+        calvingPctTarget: 0,
+        calvingPctActual: 0,
+        adgTarget: 0,
+        adgActual: 0,
+        milkYieldTarget: 0,
+        milkYieldActual: 0,
+        fcrTarget: 0,
+        fcrActual: 0
+      }
+    };
+
+    if (isCloud()) {
+      try {
+        await setDoc(doc(db, 'livestock_herd_records', newRecord.id), cleanUndefined(newRecord));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `livestock_herd_records/${newRecord.id}`);
+      }
+    } else {
+      const list = await this.fetchAllHerdRecords();
+      list.push(newRecord);
+      localStorage.setItem(LOCAL_HERD_RECORDS_KEY, JSON.stringify(list));
+    }
+    return newRecord;
+  },
+
+  async updateHerdRecord(id: string, updates: Partial<HerdLevelMasterRecord>): Promise<void> {
+    if (isCloud()) {
+      try {
+        await updateDoc(doc(db, 'livestock_herd_records', id), cleanUndefined(updates));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `livestock_herd_records/${id}`);
+      }
+    } else {
+      const list = await this.fetchAllHerdRecords();
+      const idx = list.findIndex(r => r.id === id);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem(LOCAL_HERD_RECORDS_KEY, JSON.stringify(list));
+      }
+    }
+  },
+
+  async deleteHerdRecord(id: string): Promise<void> {
+    if (isCloud()) {
+      try {
+        await deleteDoc(doc(db, 'livestock_herd_records', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `livestock_herd_records/${id}`);
+      }
+    } else {
+      const list = await this.fetchAllHerdRecords();
+      localStorage.setItem(LOCAL_HERD_RECORDS_KEY, JSON.stringify(list.filter(r => r.id !== id)));
+    }
   }
-};
+}

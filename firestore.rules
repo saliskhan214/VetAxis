@@ -33,10 +33,14 @@ service cloud.firestore {
     }
 
     function isFarmMember(farmId) {
-      return isSignedIn() && (
-        get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.ownerUid == request.auth.uid ||
-        get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.managerUid == request.auth.uid
-      );
+      return isSignedIn() &&
+        farmId != null &&
+        farmId != "" &&
+        exists(/databases/$(database)/documents/livestock_farms/$(farmId)) && (
+          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.ownerUid == request.auth.uid ||
+          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.managerUid == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('memberUids', [])
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -420,7 +424,7 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
     match /livestock_animals/{animalId} {
       allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn();
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
       allow create: if isFarmMember(incoming().farmId);
       allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
       allow delete: if isFarmMember(existing().farmId);
@@ -431,7 +435,7 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
     match /livestock_batches/{batchId} {
       allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn();
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
       allow create: if isFarmMember(incoming().farmId);
       allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
       allow delete: if isFarmMember(existing().farmId);
@@ -442,7 +446,7 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
     match /livestock_tasks/{taskId} {
       allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn();
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
       allow create: if isFarmMember(incoming().farmId);
       allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
       allow delete: if isFarmMember(existing().farmId);
@@ -472,6 +476,28 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (
         existing().ownerUid == request.auth.uid
       );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK INDIVIDUAL RECORDS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_individual_records/{recordId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK HERD RECORDS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_herd_records/{recordId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
     }
   }
 }

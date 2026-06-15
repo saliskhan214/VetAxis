@@ -44,7 +44,7 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
-    { id: 'livestock', label: 'Livestock', icon: '🐄' },
+    { id: 'livestock', label: 'Farm Management', icon: '🐄' },
     { id: 'community', label: 'Community', icon: '💬' },
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },

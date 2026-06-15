@@ -59,6 +59,12 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [payerCvvOrPin, setPayerCvvOrPin] = useState<string>('');
   const [nearbyEstimCount, setNearbyEstimCount] = useState<number>(0);
 
+  // Subscription Alert privilege evaluations
+  const userTier = currentUser.subscriptionTier;
+  const maxFreeAlerts = userTier === 'Silver' ? 15 : userTier === 'Gold' ? 30 : userTier === 'Platinum' ? Infinity : 0;
+  const myAlertsCount = posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length;
+  const isAlertFree = userTier ? (myAlertsCount < maxFreeAlerts) : false;
+
   // Load posts
   const loadPosts = async () => {
     setLoading(true);
@@ -273,9 +279,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       alert('Please state the last seen address/neighborhood.');
       return;
     }
-    if (!payerAccount.trim() || !payerName.trim() || !payerCvvOrPin.trim()) {
-      alert('Please fill out all billing credentials for authentication.');
-      return;
+    if (!isAlertFree) {
+      if (!payerAccount.trim() || !payerName.trim() || !payerCvvOrPin.trim()) {
+        alert('Please fill out all billing credentials for authentication.');
+        return;
+      }
     }
 
     setCheckoutStep('processing');
@@ -283,7 +291,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     // Simulate radio transmitter latency
     setTimeout(async () => {
       try {
-        const amount = selectedRadius === 5 ? 300 : 500;
+        const amount = isAlertFree ? 0 : (selectedRadius === 5 ? 300 : 500);
         const targetLoc: GeoLocation = {
           lat: parseFloat(String(lastSeenLat)) || 33.6844,
           lng: parseFloat(String(lastSeenLng)) || 73.0479,
@@ -343,9 +351,22 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       alert('Please state the last seen address/neighborhood.');
       return;
     }
-    if (!premiumPayerAccount.trim() || !premiumPayerName.trim() || !premiumPayerCvv.trim()) {
-      alert('Please fill out all billing credentials for authentication.');
-      return;
+
+    // Subscription Alerts limit evaluation
+    const tier = currentUser.subscriptionTier;
+    let maxFreeAlerts = 0;
+    if (tier === 'Silver') maxFreeAlerts = 15;
+    else if (tier === 'Gold') maxFreeAlerts = 30;
+    else if (tier === 'Platinum') maxFreeAlerts = Infinity;
+
+    const myAlertsCount = posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length;
+    const isAlertFree = tier ? (myAlertsCount < maxFreeAlerts) : false;
+
+    if (!isAlertFree) {
+      if (!premiumPayerAccount.trim() || !premiumPayerName.trim() || !premiumPayerCvv.trim()) {
+        alert('Please fill out all billing credentials for authentication.');
+        return;
+      }
     }
 
     setPremiumStep('processing');
@@ -353,7 +374,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     // Simulate radio transmitter latency
     setTimeout(async () => {
       try {
-        const amount = premiumRadius === 5 ? 300 : 500;
+        const amount = isAlertFree ? 0 : (premiumRadius === 5 ? 300 : 500);
         const targetLoc: GeoLocation = {
           lat: parseFloat(String(premiumLat)) || 33.6844,
           lng: parseFloat(String(premiumLng)) || 73.0479,
@@ -1071,7 +1092,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       >
                         <div className="flex justify-between items-center">
                           <strong className="text-xs font-black uppercase tracking-wide">📡 Local Shield</strong>
-                          <span className="text-red-700 font-black text-xs">₨ 300</span>
+                          {isAlertFree ? (
+                            <span className="text-emerald-700 font-extrabold text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded">FREE</span>
+                          ) : (
+                            <span className="text-red-700 font-black text-xs">₨ 300</span>
+                          )}
                         </div>
                         <p className="text-[10px] text-stone-500 mt-1">Reaches users inside strict 5km radius</p>
                       </button>
@@ -1087,7 +1112,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       >
                         <div className="flex justify-between items-center">
                           <strong className="text-xs font-black uppercase tracking-wide">🛰️ Critical Vector</strong>
-                          <span className="text-red-700 font-black text-xs">₨ 500</span>
+                          {isAlertFree ? (
+                            <span className="text-emerald-700 font-extrabold text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded">FREE</span>
+                          ) : (
+                            <span className="text-red-700 font-black text-xs">₨ 500</span>
+                          )}
                         </div>
                         <p className="text-[10px] text-stone-500 mt-1">Wide regional broadcast up to 10km</p>
                       </button>
@@ -1157,76 +1186,93 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                 <div className="space-y-4">
                   <div className="flex justify-between items-center bg-stone-50 border border-stone-100 p-3.5 rounded-2xl">
                     <span className="text-xs font-black uppercase text-stone-500">Invoice Total:</span>
-                    <strong className="text-[#5a5a40] text-sm font-black font-serif">₨ {selectedRadius === 5 ? 300 : 500} PKR</strong>
+                    <strong className="text-red-700 font-black text-sm font-serif">
+                      {isAlertFree ? 'Rs 0.00 PKR' : `₨ ${selectedRadius === 5 ? 300 : 500} PKR`}
+                    </strong>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-[#5a5a40] tracking-wider block">Select Sandbox Wallet / Gateway</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'easypaisa', label: '🟢 EasyPaisa' },
-                        { id: 'jazzcash', label: '🔴 JazzCash' },
-                        { id: 'card', label: '💳 Credit Card' }
-                      ].map((mw) => (
-                        <button
-                          key={mw.id}
-                          type="button"
-                          onClick={() => {
-                            setPaymentMethod(mw.id as any);
-                            setPayerAccount('');
-                          }}
-                          className={`py-2 px-1 rounded-xl text-[10px] border font-extrabold text-center transition-all ${
-                            paymentMethod === mw.id 
-                              ? 'bg-[#5a5a40] text-white border-black border-b-[2px]' 
-                              : 'bg-stone-50 border-stone-200 text-stone-600'
-                          }`}
-                        >
-                          {mw.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Pay fields */}
-                  <div className="space-y-3.5 pt-1 text-left">
-                    <div>
-                      <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
-                        {paymentMethod === 'card' ? 'Credit Card Number / Dummy IBAN' : 'Mobile Account Number (03xx-xxxxxxx)'}
-                      </span>
-                      <input
-                        type="text"
-                        value={payerAccount}
-                        onChange={(e) => setPayerAccount(e.target.value)}
-                        placeholder={paymentMethod === 'card' ? '4111 2222 3333 4444' : '0312 3456789'}
-                        className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3.5">
+                  {isAlertFree ? (
+                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 text-center space-y-2.5">
+                      <div className="w-9 h-9 bg-emerald-100/80 text-emerald-700 rounded-xl flex items-center justify-center text-lg mx-auto font-black select-none">✓</div>
                       <div>
-                        <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">Account holder name</span>
-                        <input
-                          type="text"
-                          value={payerName}
-                          onChange={(e) => setPayerName(e.target.value)}
-                          className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
-                          {paymentMethod === 'card' ? 'Security CV2' : 'E-PIN Code'}
-                        </span>
-                        <input
-                          type="password"
-                          value={payerCvvOrPin}
-                          onChange={(e) => setPayerCvvOrPin(e.target.value)}
-                          maxLength={paymentMethod === 'card' ? 3 : 5}
-                          placeholder="***"
-                          className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                        />
+                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block mb-0.5">Subscription Benefit Applied</span>
+                        <h4 className="font-serif font-black text-emerald-950 text-xs">{userTier} Premium Free Alert</h4>
+                        <p className="text-[10px] text-emerald-800/80 mt-1 leading-relaxed max-w-xs mx-auto">
+                          Payment credentials waived. You have posted <strong>{myAlertsCount}</strong> / <strong>{maxFreeAlerts === Infinity ? 'Unlimited' : maxFreeAlerts}</strong> alerts under your current plan features.
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-[#5a5a40] tracking-wider block">Select Sandbox Wallet / Gateway</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'easypaisa', label: '🟢 EasyPaisa' },
+                            { id: 'jazzcash', label: '🔴 JazzCash' },
+                            { id: 'card', label: '💳 Credit Card' }
+                          ].map((mw) => (
+                            <button
+                              key={mw.id}
+                              type="button"
+                              onClick={() => {
+                                setPaymentMethod(mw.id as any);
+                                setPayerAccount('');
+                              }}
+                              className={`py-2 px-1 rounded-xl text-[10px] border font-extrabold text-center transition-all ${
+                                paymentMethod === mw.id 
+                                  ? 'bg-[#5a5a40] text-white border-black border-b-[2px]' 
+                                  : 'bg-stone-50 border-stone-200 text-stone-600'
+                              }`}
+                            >
+                              {mw.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Pay fields */}
+                      <div className="space-y-3.5 pt-1 text-left">
+                        <div>
+                          <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
+                            {paymentMethod === 'card' ? 'Credit Card Number / Dummy IBAN' : 'Mobile Account Number (03xx-xxxxxxx)'}
+                          </span>
+                          <input
+                            type="text"
+                            value={payerAccount}
+                            onChange={(e) => setPayerAccount(e.target.value)}
+                            placeholder={paymentMethod === 'card' ? '4111 2222 3333 4444' : '0312 3456789'}
+                            className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3.5">
+                          <div>
+                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">Account holder name</span>
+                            <input
+                              type="text"
+                              value={payerName}
+                              onChange={(e) => setPayerName(e.target.value)}
+                              className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
+                              {paymentMethod === 'card' ? 'Security CV2' : 'E-PIN Code'}
+                            </span>
+                            <input
+                              type="password"
+                              value={payerCvvOrPin}
+                              onChange={(e) => setPayerCvvOrPin(e.target.value)}
+                              maxLength={paymentMethod === 'card' ? 3 : 5}
+                              placeholder="***"
+                              className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="flex gap-2 pt-2">
                     <button
@@ -1241,7 +1287,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       onClick={handleProcessBoostPayment}
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800"
                     >
-                      Confirm simulated Rs {selectedRadius === 5 ? 300 : 500} payment
+                      {isAlertFree ? 'Confirm Free Urgent Boost' : `Confirm simulated Rs ${selectedRadius === 5 ? 300 : 500} payment`}
                     </button>
                   </div>
                 </div>
@@ -1452,7 +1498,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       >
                         <div className="flex justify-between items-center">
                           <strong className="text-xs font-black uppercase tracking-wide">📡 Local Alert</strong>
-                          <span className="text-red-700 font-black text-xs">₨ 300</span>
+                          {isAlertFree ? (
+                            <span className="text-emerald-700 font-extrabold text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded">FREE</span>
+                          ) : (
+                            <span className="text-red-700 font-black text-xs">₨ 300</span>
+                          )}
                         </div>
                         <p className="text-[10px] text-stone-500 mt-1">Sends broadcast within strict 5km radius</p>
                       </button>
@@ -1468,7 +1518,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       >
                         <div className="flex justify-between items-center">
                           <strong className="text-xs font-black uppercase tracking-wide">⚡ Wide Shield</strong>
-                          <span className="text-red-700 font-black text-xs">₨ 500</span>
+                          {isAlertFree ? (
+                            <span className="text-emerald-700 font-extrabold text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded">FREE</span>
+                          ) : (
+                            <span className="text-red-700 font-black text-xs">₨ 500</span>
+                          )}
                         </div>
                         <p className="text-[10px] text-stone-500 mt-1">Reaches wider 10km radius coverage</p>
                       </button>
@@ -1492,82 +1546,99 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                   <div className="bg-[#fcf9f2] border border-[#e3dec9] rounded-2xl p-4 flex justify-between items-center text-xs">
                     <div>
                       <span className="text-xs block text-stone-500 font-semibold">Total Amount Due</span>
-                      <strong className="text-red-700 font-black text-xl font-serif leading-none">Rs {premiumRadius === 5 ? '300.00' : '500.00'} PKR</strong>
+                      <strong className="text-red-700 font-black text-xl font-serif leading-none">
+                        {isAlertFree ? 'Rs 0.00 PKR' : `Rs ${premiumRadius === 5 ? '300.00' : '500.00'} PKR`}
+                      </strong>
                     </div>
                     <span className="bg-[#5a5a40] text-stone-100 text-[10px] font-black uppercase px-2.5 py-1 rounded-md border border-white/10">
-                      🔒 Highly Encrypted
+                      {isAlertFree ? '✨ Plan Waiver Active' : '🔒 Highly Encrypted'}
                     </span>
                   </div>
 
-                  {/* Gateway selector */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider block">Select Simulation Payment Portal</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'easypaisa', label: 'Easypaisa', desc: 'Secure Mobile Wallet' },
-                        { id: 'jazzcash', label: 'JazzCash', desc: 'Secure Mobile Wallet' },
-                        { id: 'card', label: 'Debit/Credit', desc: 'Global Visa/Master' }
-                      ].map((gw) => (
-                        <button
-                          key={gw.id}
-                          type="button"
-                          onClick={() => {
-                            setPremiumGate(gw.id as any);
-                            setPremiumPayerAccount('');
-                          }}
-                          className={`p-2 rounded-xl text-center border-2 transition-all cursor-pointer ${
-                            premiumGate === gw.id
-                              ? 'bg-[#5a5a40] text-white border-[#3e3e2b] shadow-inner'
-                              : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
-                          }`}
-                        >
-                          <strong className="text-xs block">{gw.label}</strong>
-                          <span className="text-[8px] font-bold block opacity-85">{gw.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Account detail input form */}
-                  <div className="bg-stone-50 border border-stone-200 p-4 rounded-2xl space-y-3.5">
-                    <div>
-                      <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-1">
-                        {premiumGate === 'card' ? '16-Digit Card Number' : 'Mobile Account Number (11-Digits)'}
-                      </span>
-                      <input
-                        type="text"
-                        value={premiumPayerAccount}
-                        onChange={(e) => setPremiumPayerAccount(e.target.value)}
-                        placeholder={premiumGate === 'card' ? '4111 2222 3333 4444' : '0312 3456789'}
-                        className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3.5">
+                  {isAlertFree ? (
+                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 text-center space-y-2.5">
+                      <div className="w-9 h-9 bg-emerald-100/80 text-emerald-700 rounded-xl flex items-center justify-center text-lg mx-auto font-black select-none">✓</div>
                       <div>
-                        <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">Account holder name</span>
-                        <input
-                          type="text"
-                          value={premiumPayerName}
-                          onChange={(e) => setPremiumPayerName(e.target.value)}
-                          className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
-                          {premiumGate === 'card' ? 'Security CV2' : 'E-PIN Code'}
-                        </span>
-                        <input
-                          type="password"
-                          value={premiumPayerCvv}
-                          onChange={(e) => setPremiumPayerCvv(e.target.value)}
-                          maxLength={premiumGate === 'card' ? 3 : 5}
-                          placeholder="***"
-                          className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                        />
+                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block mb-0.5">Subscription Benefit Applied</span>
+                        <h4 className="font-serif font-black text-emerald-950 text-xs">{userTier} Premium Free Alert</h4>
+                        <p className="text-[10px] text-emerald-800/80 mt-1 leading-relaxed max-w-xs mx-auto">
+                          Payment credentials waived. You have posted <strong>{myAlertsCount}</strong> / <strong>{maxFreeAlerts === Infinity ? 'Unlimited' : maxFreeAlerts}</strong> alerts under your current plan features.
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Gateway selector */}
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider block">Select Simulation Payment Portal</span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'easypaisa', label: 'Easypaisa', desc: 'Secure Mobile Wallet' },
+                            { id: 'jazzcash', label: 'JazzCash', desc: 'Secure Mobile Wallet' },
+                            { id: 'card', label: 'Debit/Credit', desc: 'Global Visa/Master' }
+                          ].map((gw) => (
+                            <button
+                              key={gw.id}
+                              type="button"
+                              onClick={() => {
+                                setPremiumGate(gw.id as any);
+                                setPremiumPayerAccount('');
+                              }}
+                              className={`p-2 rounded-xl text-center border-2 transition-all cursor-pointer ${
+                                premiumGate === gw.id
+                                  ? 'bg-[#5a5a40] text-white border-[#3e3e2b] shadow-inner'
+                                  : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
+                              }`}
+                            >
+                              <strong className="text-xs block">{gw.label}</strong>
+                              <span className="text-[8px] font-bold block opacity-85">{gw.desc}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Account detail input form */}
+                      <div className="bg-stone-50 border border-stone-200 p-4 rounded-2xl space-y-3.5">
+                        <div>
+                          <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-1">
+                            {premiumGate === 'card' ? '16-Digit Card Number' : 'Mobile Account Number (11-Digits)'}
+                          </span>
+                          <input
+                            type="text"
+                            value={premiumPayerAccount}
+                            onChange={(e) => setPremiumPayerAccount(e.target.value)}
+                            placeholder={premiumGate === 'card' ? '4111 2222 3333 4444' : '0312 3456789'}
+                            className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3.5">
+                          <div>
+                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">Account holder name</span>
+                            <input
+                              type="text"
+                              value={premiumPayerName}
+                              onChange={(e) => setPremiumPayerName(e.target.value)}
+                              className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
+                              {premiumGate === 'card' ? 'Security CV2' : 'E-PIN Code'}
+                            </span>
+                            <input
+                              type="password"
+                              value={premiumPayerCvv}
+                              onChange={(e) => setPremiumPayerCvv(e.target.value)}
+                              maxLength={premiumGate === 'card' ? 3 : 5}
+                              placeholder="***"
+                              className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="flex gap-2 pt-2">
                     <button
@@ -1582,7 +1653,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       onClick={handleProcessPremiumPayment}
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800 cursor-pointer"
                     >
-                      Confirm simulated Rs {premiumRadius === 5 ? 300 : 500} payment
+                      {isAlertFree ? 'Publish Free Core Alert' : `Confirm simulated Rs ${premiumRadius === 5 ? 300 : 500} payment`}
                     </button>
                   </div>
                 </div>

@@ -18,6 +18,7 @@ import { ProfilePage } from './components/ProfilePage';
 import { JobBoard } from './components/JobBoard';
 import LivestockManagement from './components/LivestockManagement';
 import { SubscriptionPortal } from './components/SubscriptionPortal';
+import { GuestAnimalViewer } from './components/GuestAnimalViewer';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -31,6 +32,26 @@ export default function App() {
   const [highlightJobId, setHighlightJobId] = useState<string | null>(null);
   const [highlightApplicationId, setHighlightApplicationId] = useState<string | null>(null);
   const [highlightFarmId, setHighlightFarmId] = useState<string | null>(null);
+  const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
+  const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
+
+  // Unified dynamic QR code parameters scanner inside app boot
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const animalId = params.get('animalRecordId');
+    if (animalId) {
+      setScannedAnimalRecordId(animalId);
+      if (currentUser) {
+        setActiveSection('livestock');
+      }
+      try {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      } catch (err) {
+        console.warn('Could not clean address bar parameters:', err);
+      }
+    }
+  }, [currentUser]);
 
   // Advanced Global Loading State
   const [isLoadingSystem, setIsLoadingSystem] = useState<boolean>(false);
@@ -315,9 +336,31 @@ export default function App() {
     );
   }
 
+  // Intercept guest visits that scanned a veterinary ear-tag/collar code
+  if (!currentUser && scannedAnimalRecordId && !temporaryBypassGuestForAuth) {
+    return (
+      <GuestAnimalViewer 
+        animalRecordId={scannedAnimalRecordId}
+        onGoToAuth={() => setTemporaryBypassGuestForAuth(true)}
+        onClear={() => setScannedAnimalRecordId(null)}
+      />
+    );
+  }
+
   if (!currentUser) {
     return (
-      <div className="min-h-screen text-center">
+      <div className="min-h-screen text-center relative">
+        {/* Floating return button to easily jump back to scanned passport */}
+        {scannedAnimalRecordId && (
+          <div className="absolute top-4 left-4 z-[9999]">
+            <button
+              onClick={() => setTemporaryBypassGuestForAuth(false)}
+              className="cursor-pointer bg-[#5a5a40] text-white hover:bg-[#3e3e2b] px-4 py-2 rounded-xl text-xs font-bold border-none shadow-md flex items-center gap-1.5 transition-all font-sans"
+            >
+              ← Back to Scanned Digital Passport
+            </button>
+          </div>
+        )}
         <AuthScreen onAuthSuccess={handleAuthSuccess} authService={AuthService} />
       </div>
     );
@@ -396,6 +439,8 @@ export default function App() {
               <LivestockManagement 
                 currentUser={currentUser} 
                 highlightFarmId={highlightFarmId}
+                scannedAnimalRecordId={scannedAnimalRecordId}
+                onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
               />
             )}
 

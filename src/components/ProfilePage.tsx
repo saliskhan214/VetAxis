@@ -107,6 +107,10 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
     }
   }, [currentUser.subscriptionTier, currentUser.promoAdsUsed]);
 
+  const maxAllowedPromo = currentUser.subscriptionTier === 'Silver' ? 3 : currentUser.subscriptionTier === 'Gold' ? 5 : currentUser.subscriptionTier === 'Platinum' ? 10 : 0;
+  const remainingPromoSlots = Math.max(0, maxAllowedPromo - (currentUser.promoAdsUsed || 0));
+  const hasRemainingPromo = currentUser.subscriptionTier ? (remainingPromoSlots > 0) : false;
+
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim() || !adCtaUrl.trim()) {
@@ -114,12 +118,12 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       return;
     }
 
-    const isFree = adPaymentChoice === 'free_privilege';
+    const isAdFree = adPaymentChoice === 'free_privilege' || hasRemainingPromo;
     const durationDays = adPaymentChoice === 'pay_7_days' ? 7 : 3;
-    const pricePaid = isFree ? 0 : (adPaymentChoice === 'pay_7_days' ? 1500 : 1000);
+    const pricePaid = isAdFree ? 0 : (adPaymentChoice === 'pay_7_days' ? 1500 : 1000);
 
     // Validate payment credentials if not free
-    if (!isFree) {
+    if (!isAdFree) {
       if (!adCardName.trim() || !adCardNumber.trim() || !adCardExpiry.trim() || !adCardCvv.trim()) {
         setError('Please enter your card payment details to complete this purchase campaign.');
         return;
@@ -131,9 +135,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       }
     } else {
       // Re-verify they have credits
-      const allowed = currentUser.subscriptionTier === 'Silver' ? 3 : currentUser.subscriptionTier === 'Gold' ? 5 : currentUser.subscriptionTier === 'Platinum' ? 10 : 0;
-      const currentUsed = currentUser.promoAdsUsed || 0;
-      if (currentUsed >= allowed) {
+      if (remainingPromoSlots <= 0) {
         setError('No free ad campaign privileges remaining under your current subscription.');
         return;
       }
@@ -154,7 +156,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         ctaText: adCtaText,
         ctaUrl: adCtaUrl,
         bgGradient: adGradient,
-        badge: isFree ? `${currentUser.subscriptionTier} Promo` : 'Premium Billboard Sponsor',
+        badge: isAdFree ? `${currentUser.subscriptionTier} Promo` : 'Premium Billboard Sponsor',
         icon: adIcon,
         ownerEmail: currentUser.email,
         ownerUid: currentUser.uid,
@@ -163,7 +165,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
 
       // If they used a free privilege, we MUST increment promoAdsUsed in database & local state!
       let updatedUser = currentUser;
-      if (isFree) {
+      if (isAdFree) {
         const nextUsedCount = (currentUser.promoAdsUsed || 0) + 1;
         updatedUser = await AuthService.updateProfile(currentUser.uid, {
           promoAdsUsed: nextUsedCount
@@ -1240,7 +1242,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                       </div>
                       <div className="text-[10px] font-bold text-stone-600 mt-2.5 border-t border-[#f4f1e9] pt-2 w-full flex justify-between">
                         <span>3 Days Duration</span>
-                        <span className="bg-[#f4f1e9] px-2 py-0.5 rounded text-neutral-800 font-black">1,000 RS</span>
+                        <span className="bg-[#f4f1e9] px-2 py-0.5 rounded text-neutral-800 font-black">
+                          {hasRemainingPromo ? 'FREE (Sub Benefit)' : '1,000 RS'}
+                        </span>
                       </div>
                     </button>
 
@@ -1260,14 +1264,16 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                       </div>
                       <div className="text-[10px] font-bold text-stone-600 mt-2.5 border-t border-[#f4f1e9] pt-2 w-full flex justify-between">
                         <span>7 Days Duration</span>
-                        <span className="bg-[#f4f1e9] px-2 py-0.5 rounded text-neutral-800 font-black">1,500 RS</span>
+                        <span className="bg-[#f4f1e9] px-2 py-0.5 rounded text-neutral-800 font-black">
+                          {hasRemainingPromo ? 'FREE (Sub Benefit)' : '1,500 RS'}
+                        </span>
                       </div>
                     </button>
                   </div>
                 </div>
 
                 {/* BILLING DISCHARGE PANEL (only shown if they pay) */}
-                {adPaymentChoice !== 'free_privilege' && (
+                {adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && (
                   <div className="bg-[#f4f1e9]/65 p-5 rounded-2xl border border-[#e3dec9] space-y-4 text-left animate-fadeIn">
                     <div className="flex items-center justify-between border-b border-[#e3dec9] pb-2">
                       <span className="text-[10px] font-black uppercase text-[#5a5a40]">🔒 Secure Ad Checkout Terminal</span>
@@ -1285,7 +1291,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                           value={adCardName}
                           onChange={(e) => setAdCardName(e.target.value)}
                           className="form-control text-xs bg-white"
-                          required={adPaymentChoice !== 'free_privilege'}
+                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
                         />
                       </div>
 
@@ -1301,7 +1307,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                             setAdCardNumber(formatted);
                           }}
                           className="form-control text-xs bg-white font-mono"
-                          required={adPaymentChoice !== 'free_privilege'}
+                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
                         />
                       </div>
 
@@ -1320,7 +1326,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                             }
                           }}
                           className="form-control text-xs bg-white font-mono"
-                          required={adPaymentChoice !== 'free_privilege'}
+                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
                         />
                       </div>
 
@@ -1333,7 +1339,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                           value={adCardCvv}
                           onChange={(e) => setAdCardCvv(e.target.value.replace(/\D/g, ''))}
                           className="form-control text-xs bg-white font-mono"
-                          required={adPaymentChoice !== 'free_privilege'}
+                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
                         />
                       </div>
                     </div>
@@ -1493,19 +1499,19 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         </AnimatePresence>
 
         {/* PROFESSIONAL COMPONENT FOOTER CREDENTIALS */}
-        <footer className="pt-8 pb-4 border-t border-[#e3dec9] mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-stone-500 text-xs w-full">
-          <div className="flex items-center gap-2 font-serif font-black text-[#5a5a40]">
+        <footer className="pt-8 pb-4 border-t border-[#e3dec9] mt-12 flex flex-col md:flex-row items-center justify-between gap-6 text-stone-500 text-xs w-full px-4 sm:px-6">
+          <div className="flex items-center gap-2 font-serif font-black text-[#5a5a40] select-none shrink-0">
             <span>🐾 VetAxis Pakistan</span>
-            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0"></span>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <button
               type="button"
               onClick={() => {
                 setLegalModalType('terms');
                 setLegalModalOpen(true);
               }}
-              className="font-extrabold hover:text-[#5a5a40] hover:underline bg-transparent border-none cursor-pointer transition-colors"
+              className="font-extrabold hover:text-[#5a5a40] hover:underline bg-transparent border-none cursor-pointer transition-colors whitespace-nowrap"
             >
               Terms and conditions
             </button>
@@ -1515,12 +1521,12 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                 setLegalModalType('about');
                 setLegalModalOpen(true);
               }}
-              className="font-extrabold hover:text-[#5a5a40] hover:underline bg-transparent border-none cursor-pointer transition-colors"
+              className="font-extrabold hover:text-[#5a5a40] hover:underline bg-transparent border-none cursor-pointer transition-colors whitespace-nowrap"
             >
               About Us
             </button>
           </div>
-          <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 whitespace-nowrap shrink-0">
             Last Updated: June 2026
           </div>
         </footer>

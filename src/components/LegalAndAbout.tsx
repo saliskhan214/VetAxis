@@ -158,39 +158,39 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
   const subtitle = type === 'terms' ? 'Last Updated: June 2026' : 'Pakistan\'s Premier Veterinary Clinical Network';
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[99999] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[99999] overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        className="bg-white rounded-3xl border border-[#e3dec9] border-b-[8px] border-b-[#cdc6ad] max-w-2xl w-full flex flex-col max-h-[85vh] shadow-2xl relative text-left overflow-hidden"
+        className="bg-white rounded-3xl border border-[#e3dec9] border-b-[8px] border-b-[#cdc6ad] max-w-2xl w-full flex flex-col max-h-[90vh] md:max-h-[85vh] shadow-2xl relative text-left overflow-hidden"
       >
         {/* Header */}
-        <div className="p-6 bg-[#fcf9f2] border-b border-[#e3dec9] flex items-center justify-between shrink-0">
-          <div>
-            <h3 className="font-serif font-black text-xl text-[#373735] flex items-center gap-1.5 leading-tight">
-              <span>{type === 'terms' ? '📜' : 'ℹ️'}</span>
-              <span>{title}</span>
+        <div className="p-4 sm:p-6 bg-[#fcf9f2] border-b border-[#e3dec9] flex items-start justify-between gap-4 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-serif font-black text-base sm:text-lg md:text-xl text-[#373735] flex items-center gap-1.5 leading-tight">
+              <span className="shrink-0">{type === 'terms' ? '📜' : 'ℹ️'}</span>
+              <span className="break-words">{title}</span>
             </h3>
-            <p className="text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mt-1">{subtitle}</p>
+            <p className="text-[9px] sm:text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mt-1">{subtitle}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-stone-200 border border-[#e3dec9] flex items-center justify-center transition-all cursor-pointer text-stone-600 font-bold"
+            className="w-8 h-8 rounded-full hover:bg-stone-200 border border-[#e3dec9] flex items-center justify-center transition-all cursor-pointer text-stone-600 font-bold shrink-0 mt-0.5"
           >
             ✕
           </button>
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="p-6 md:p-8 overflow-y-auto space-y-4 select-text">
+        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto space-y-4 select-text">
           {content.split('\n\n').map((paragraph, idx) => {
             // Stylize numbered headings in terms and conditions (e.g., "1. Acceptance of Terms" or sub-clauses)
             const isHeading = paragraph.match(/^(\d+\.|[A-Z\s]+:)/);
             if (isHeading) {
               return (
-                <h4 key={idx} className="font-serif font-black text-[#373735] text-sm md:text-base pt-2 first:pt-0">
+                <h4 key={idx} className="font-serif font-black text-[#373735] text-xs sm:text-sm md:text-base pt-2 first:pt-0">
                   {paragraph}
                 </h4>
               );
@@ -214,11 +214,11 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
         </div>
 
         {/* Footer actions */}
-        <div className="p-5 bg-[#fcf9f2] border-t border-[#e3dec9] flex justify-end shrink-0">
+        <div className="p-4 sm:p-5 bg-[#fcf9f2] border-t border-[#e3dec9] flex justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="btn-tactile-3d bg-[#5a5a40] border-[#3e3e2b] text-white hover:bg-[#3e3e2b] text-xs font-black uppercase tracking-wider px-6 py-2.5 cursor-pointer"
+            className="btn-tactile-3d bg-[#5a5a40] border-[#3e3e2b] text-white hover:bg-[#3e3e2b] text-xs font-black uppercase tracking-wider px-5 sm:px-6 py-2 sm:py-2.5 cursor-pointer"
           >
             Acknowledge & Close
           </button>

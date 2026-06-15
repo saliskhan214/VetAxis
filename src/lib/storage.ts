@@ -95,9 +95,7 @@ function saveLocalUsers(list: UserProfile[]) {
 
 export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile | null {
   if (user && user.email && user.email.toLowerCase().trim() === 'saliskhan214@gmail.com') {
-    if (!user.subscriptionTier) {
-      user.subscriptionTier = 'Gold';
-    }
+    user.subscriptionTier = 'Platinum';
     user.isVerified = true;
 
     // Use a single stable localStorage key for Salis's subscription expiration

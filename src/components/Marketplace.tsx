@@ -185,6 +185,16 @@ export function Marketplace({ currentUser }: MarketplaceProps) {
       return;
     }
 
+    // Subscription Limit check for posting product ads (Unlimited for premium, max 3 for unsubscribed)
+    const isPremium = !!currentUser.subscriptionTier;
+    if (!isPremium) {
+      const myProductsCount = products.filter(p => p.ownerEmail === currentUser.email).length;
+      if (myProductsCount >= 3) {
+        setFormError('⚠️ Placement Limit: Unsubscribed accounts are restricted to 3 active product postings. Please upgrade to Silver, Gold, or Platinum to unlock unlimited marketplace listings!');
+        return;
+      }
+    }
+
     setSubmitLoading(true);
 
     try {

@@ -29,7 +29,10 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
         'Premium Silver badge on directory portfolio',
         'Custom interactive 3D Silver member card',
         'High directory sorted listing rank',
-        'Post up to 3 FREE Veterinary Billboard Ads (3d active)'
+        'Manage up to 3 Farm Workspaces',
+        '15 FREE Emergency Radar Alerts',
+        'Unlimited Product & Pet Ads',
+        'Post up to 3 FREE Veterinary Billboard Ads'
       ]
     },
     {
@@ -45,7 +48,10 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
         'Official Gold partner directory badge',
         'Durable Guilloche golden 3D member card styling',
         'Advanced directory listing sort priority',
-        'Post up to 5 FREE Veterinary Billboard Ads (3d active)',
+        'Manage up to 10 Farm Workspaces',
+        '30 FREE Emergency Radar Alerts',
+        'Unlimited Product & Pet Ads',
+        'Post up to 5 FREE Veterinary Billboard Ads',
         'Advanced customized digital clinic analytics'
       ],
       popular: true
@@ -62,7 +68,10 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
       benefits: [
         'Ultra Elite interactive holographic 3D dark metal card',
         'Absolute topmost search directory ranking',
-        'Post up to 10 FREE Veterinary Billboard Ads (3d active)',
+        'Manage Unlimited Farm Workspaces',
+        'Unlimited FREE Emergency Radar Alerts',
+        'Unlimited Product & Pet Ads',
+        'Post up to 10 FREE Veterinary Billboard Ads',
         'Premium priority customer support & custom branding tools',
         'Holographic highlighted product listings (Marketplace & Pet Ads)'
       ]
@@ -785,6 +794,27 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f4f1e9] font-semibold text-[#373735]">
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-black">🚜 Farm Workspaces managed</td>
+                <td className="p-4 text-center text-red-500">Max 1 Farm</td>
+                <td className="p-4 text-center text-slate-700">Max 3 Farms</td>
+                <td className="p-4 text-center text-amber-800">Max 10 Farms</td>
+                <td className="p-4 text-center text-indigo-700 font-extrabold">Unlimited Farms</td>
+              </tr>
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-black">🔔 Free Emergency Radar Alerts</td>
+                <td className="p-4 text-center text-stone-500">Paid (₨ 300 / 500)</td>
+                <td className="p-4 text-center text-slate-700 font-extrabold">15 Free Alerts</td>
+                <td className="p-4 text-center text-amber-800 font-extrabold">30 Free Alerts</td>
+                <td className="p-4 text-center text-indigo-700 font-black">Unlimited Free</td>
+              </tr>
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-black">📦 Marketplace Product & Pet Ads</td>
+                <td className="p-4 text-center text-red-500">Max 3 ads</td>
+                <td className="p-4 text-center text-slate-700 font-black">Unlimited Ads</td>
+                <td className="p-4 text-center text-amber-800 font-black">Unlimited Ads</td>
+                <td className="p-4 text-center text-indigo-700 font-black">Unlimited Ads</td>
+              </tr>
               <tr>
                 <td className="p-4 pl-6 text-black font-extrabold">Vet Directory sorted list rank priority</td>
                 <td className="p-4 text-center text-[#7a766f]">Standard Low</td>

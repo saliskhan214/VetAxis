@@ -96,14 +96,23 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
       </div>
     );
   } else if (tier === 'Platinum') {
-    cardClass = 'bg-gradient-to-br from-neutral-900 via-zinc-800 to-neutral-950 border-neutral-700 border-b-[6px] border-b-black shadow-2xl shadow-neutral-950/50';
+    cardClass = 'bg-[#1a1b1e] border border-[#3e4147] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.12),_0_12px_35px_rgba(0,0,0,0.85)] text-neutral-50';
     textClass = 'text-neutral-50';
     subTextClass = 'text-neutral-400';
-    borderHighlight = 'border-teal-500/50 shadow-teal-900/40';
+    borderHighlight = 'border-[#4c4f57]/80 shadow-black/50';
     showHolo = true;
+    const genderLabel = profile.name.toLowerCase().includes('naseeb') || profile.name.toLowerCase().includes('ullah') ? 'MALE ♂' : 'ELITE ✦';
     badgeEl = (
-      <div className="absolute top-0 right-0 bg-gradient-to-l from-purple-600 via-indigo-600 to-teal-500 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-bl-2xl tracking-widest shadow-sm animate-pulse flex items-center gap-1">
-        💎 PLATINUM ELITE
+      <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none rounded-tr-3xl">
+        <div 
+          style={{
+            background: 'linear-gradient(135deg, #e2e8f0 0%, #ffffff 50%, #cbd5e1 100%)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3), inset 0 0.5px 0.5px rgba(255,255,255,0.8)'
+          }}
+          className="absolute top-2.5 -right-6 w-24 text-neutral-800 text-[8px] font-black uppercase text-center py-0.5 tracking-widest shadow-xs rotate-45 flex items-center justify-center gap-0.5"
+        >
+          {genderLabel}
+        </div>
       </div>
     );
   } else {
@@ -175,6 +184,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
         {badgeEl}
 
         {/* Content Box */}
+        {/* TRADITIONAL CARD RENDERS FOR ALL TIER (UNIFIED FOR IDENTICAL HEIGHT/SIZE) */}
         <div className="relative z-10 flex-1 flex flex-col justify-between">
           <div>
             <div className="flex items-start gap-4 mb-4">
@@ -189,8 +199,8 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
               ) : (
                 <div className={`w-16 h-16 rounded-2xl text-xl font-black flex items-center justify-center font-serif shrink-0 border-2 transition-transform ${hovered ? 'scale-105' : ''} ${
                   tier === 'Silver' ? 'bg-slate-300 text-slate-800 border-slate-400' :
-                  tier === 'Gold' ? 'bg-amber-400 text-amber-950 border-amber-600' :
-                  tier === 'Platinum' ? 'bg-neutral-800 text-neutral-100 border-teal-400' :
+                  tier === 'Gold' ? 'bg-[#fcd34d] text-[#78350f] border-amber-600' :
+                  tier === 'Platinum' ? 'bg-neutral-800 text-neutral-100 border-[#3e4147]' :
                   'bg-[#f4f1e9] text-[#5a5a40] border-[#e3dec9]'
                 }`}>
                   {initials}
@@ -215,7 +225,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                   <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[8px] uppercase font-black tracking-widest border ${
                     tier === 'Silver' ? 'bg-slate-100 text-slate-700 border-slate-300' :
                     tier === 'Gold' ? 'bg-amber-100 text-amber-950 border-amber-300' :
-                    tier === 'Platinum' ? 'bg-neutral-800 text-slate-300 border-neutral-700' :
+                    tier === 'Platinum' ? 'bg-neutral-800 text-neutral-300 border-neutral-700' :
                     'bg-[#f4f1e9] text-[#5a5a40] border-[#e3dec9]'
                   }`}>
                     {profile.role === 'doctor' ? 'Practitioner' : profile.role === 'clinic' ? 'Hospital Centre' : 'Assistant Nurse'}
@@ -224,17 +234,13 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                     <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                       tier === 'Silver' ? 'bg-slate-500/10 text-slate-700' :
                       tier === 'Gold' ? 'bg-amber-600/10 text-amber-900 border border-amber-500/20' :
-                      'bg-purple-500/20 text-indigo-200 border border-purple-500/30'
+                      'bg-indigo-500/20 text-indigo-300 border border-indigo-500/10'
                     }`}>
                       👑 {tier} Member
                     </span>
                   )}
                   {profile.isOnline ? (
-                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[6px] text-[8px] font-black uppercase tracking-wider border select-none ${
-                      tier === 'Platinum'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/35'
-                        : 'bg-[#edf6ef] text-emerald-700 border-emerald-200'
-                    }`}>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[6px] text-[8px] font-black uppercase tracking-wider border select-none bg-[#edf6ef] text-emerald-700 border-emerald-200">
                       <span className="relative flex h-1.5 w-1.5 shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
@@ -243,9 +249,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                     </span>
                   ) : (
                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[6px] text-[8px] font-black uppercase tracking-wider border select-none ${
-                      tier === 'Platinum'
-                        ? 'bg-neutral-800 text-neutral-400 border-neutral-700'
-                        : 'bg-stone-50 text-stone-500 border-stone-200'
+                      tier === 'Platinum' ? 'bg-neutral-800 text-neutral-400 border-neutral-750' : 'bg-stone-50 text-stone-500 border-stone-200'
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-stone-300 inline-block shrink-0"></span>
                       <span>{formatLastSeen(profile.lastSeen)}</span>
@@ -259,21 +263,21 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
             {profile.totalReviews && profile.totalReviews > 0 ? (
               <div className={`flex items-center gap-1.5 text-xs font-bold mb-4 px-3 py-1.5 rounded-xl w-fit border ${
                 tier === 'Silver' ? 'bg-slate-100/80 border-slate-200 text-slate-800' :
-                tier === 'Gold' ? 'bg-amber-100/60 border-amber-300 text-amber-950' :
-                tier === 'Platinum' ? 'bg-neutral-855 border-neutral-700 text-slate-200' :
+                tier === 'Gold' ? 'bg-[#fef3c7] border-amber-300 text-amber-950' :
+                tier === 'Platinum' ? 'bg-neutral-800 border-neutral-700 text-neutral-200' :
                 'bg-[#fcf9f2] border-[#e3dec9] text-[#3c3c3b]'
               }`}>
                 <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
                 <span className="font-mono">{profile.avgRating?.toFixed(1)}</span>
-                <span className={tier === 'Platinum' ? 'text-neutral-400 font-semibold' : 'text-[#a49f92] font-semibold'}>
+                <span className={`${tier === 'Platinum' ? 'text-neutral-400' : 'text-[#a49f92]'} font-semibold`}>
                   ({profile.totalReviews} reviews)
                 </span>
               </div>
             ) : (
               <div className={`text-[10px] font-black uppercase tracking-wider mb-4 px-2.5 py-1 rounded-xl w-fit border inline-flex items-center gap-1 ${
                 tier === 'Silver' ? 'bg-slate-200/50 border-slate-300 text-slate-500' :
-                tier === 'Gold' ? 'bg-amber-200/50 border-amber-400 text-amber-800' :
-                tier === 'Platinum' ? 'bg-neutral-800 border-neutral-700 text-neutral-400' :
+                tier === 'Gold' ? 'bg-amber-100/50 border-amber-300 text-amber-700' :
+                tier === 'Platinum' ? 'bg-neutral-800 border-neutral-700 text-neutral-450' :
                 'bg-stone-50 border-stone-200 text-[#a49f92]'
               }`}>
                 ⭐ No client reviews
@@ -284,20 +288,20 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
             <div className="space-y-2 text-xs font-semibold">
               {profile.expertise && (
                 <div>
-                  <span className={`font-black uppercase text-[8px] tracking-wider block ${tier === 'Platinum' ? 'text-neutral-500' : 'text-[#a49f92]'}`}>Specialty:</span>
+                  <span className="font-black uppercase text-[8px] tracking-wider block text-[#a49f92]">Specialty:</span>
                   <div className={`truncate max-w-[280px] ${tier === 'Platinum' ? 'text-neutral-200' : 'text-[#373735]'}`}>{profile.expertise}</div>
                 </div>
               )}
               {profile.facilities && (
                 <div>
-                  <span className={`font-black uppercase text-[8px] tracking-wider block ${tier === 'Platinum' ? 'text-neutral-500' : 'text-[#a49f92]'}`}>Facilities:</span>
+                  <span className="font-black uppercase text-[8px] tracking-wider block text-[#a49f92]">Facilities:</span>
                   <div className={`truncate max-w-[280px] ${tier === 'Platinum' ? 'text-neutral-200' : 'text-[#373735]'}`}>{profile.facilities}</div>
                 </div>
               )}
               {profile.address && (
                 <div>
-                  <span className={`font-black uppercase text-[8px] tracking-wider block ${tier === 'Platinum' ? 'text-neutral-500' : 'text-[#a49f92]'}`}>Address:</span>
-                  <div className={`truncate max-w-[280px] ${tier === 'Platinum' ? 'text-neutral-200' : 'text-[#373735]'}`}>{profile.address}</div>
+                  <span className="font-black uppercase text-[8px] tracking-wider block text-[#a49f92]">Address:</span>
+                  <div className={`truncate max-w-[280px] ${tier === 'Platinum' ? 'text-neutral-300' : 'text-[#373735]'}`}>{profile.address}</div>
                 </div>
               )}
             </div>
@@ -305,12 +309,10 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
             {/* Proximity indicator text */}
             {distance !== null && (
               <div className={`mt-3.5 p-2 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${
-                tier === 'Platinum'
-                  ? 'bg-teal-950/40 border-teal-500/30 text-teal-300'
-                  : 'bg-emerald-50/50 border-emerald-100 text-[#1b7c31]'
+                tier === 'Platinum' ? 'bg-neutral-800/80 border-[#3e4147] text-neutral-200' : 'bg-emerald-50/50 border-emerald-100 text-[#1b7c31]'
               }`}>
                 <span>📍</span>
-                <span>This service is <span className="font-extrabold underline">{distance < 1 ? `${Math.round(distance * 1000)} meters` : `${distance.toFixed(1)} km`}</span> far away from you.</span>
+                <span>This service is <span className="font-extrabold underline">{distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`}</span> far away from you.</span>
               </div>
             )}
 
@@ -322,7 +324,6 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     if (profile.location?.lat && profile.location?.lng) {
-                      // Open saved location precisely on Google Maps
                       window.open(`https://www.google.com/maps?q=${profile.location.lat},${profile.location.lng}`, '_blank');
                     } else {
                       const query = encodeURIComponent(`${profile.name} ${profile.address || ''}`);
@@ -330,12 +331,12 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                     }
                   }}
                   className={`w-full py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border transition-all hover:shadow-md active:translate-y-[1px] cursor-pointer ${
-                    tier === 'Platinum'
-                      ? 'bg-neutral-800 text-teal-300 border-teal-500/30 hover:bg-neutral-750 hover:border-teal-400'
-                      : tier === 'Gold'
-                      ? 'bg-amber-950 text-white border-amber-950 hover:bg-amber-900'
+                    tier === 'Gold'
+                      ? 'bg-[#451a03] text-white border-amber-950 hover:bg-[#78350f]'
                       : tier === 'Silver'
                       ? 'bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-150'
+                      : tier === 'Platinum'
+                      ? 'bg-neutral-800 text-neutral-100 border-[#3e4147] hover:bg-neutral-700'
                       : 'bg-[#edf6ef] hover:bg-[#e2f0e4] text-[#2ebd4d] border-[#2ebd4d]/20'
                   }`}
                 >
@@ -346,17 +347,13 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
             )}
           </div>
 
-          {/* Platinum / Gold privilege of direct WhatsApp Lead connection in card */}
-          {(tier === 'Gold' || tier === 'Platinum') && (
+          {/* Gold privilege of direct WhatsApp Lead connection in card */}
+          {tier === 'Gold' && (
             <div className="mt-4">
               <button
                 type="button"
                 onClick={stopPropAndWhatsApp}
-                className={`w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border shadow-sm transition-all focus:outline-none ${
-                  tier === 'Gold'
-                    ? 'bg-amber-950 text-white border-amber-950 hover:bg-amber-900 border-b-[3px] border-b-amber-950/80 active:translate-y-[1px]'
-                    : 'bg-gradient-to-r from-teal-500 to-indigo-600 text-white border-teal-500 hover:from-teal-400 hover:to-indigo-500 border-b-[3px] border-b-indigo-950 active:translate-y-[1px]'
-                }`}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-amber-950 shadow-sm transition-all focus:outline-none bg-[#451a03] text-white hover:bg-[#78350f] border-b-[3px] border-b-black/80 active:translate-y-[1px]"
               >
                 <Compass className="w-4 h-4 text-emerald-400 fill-emerald-400 shrink-0" />
                 <span>WhatsApp Clinical Contact</span>
@@ -365,14 +362,12 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
           )}
 
           {/* Footer segment */}
-          <div className={`mt-5 pt-4 border-t flex items-center justify-between ${
-            tier === 'Platinum' ? 'border-neutral-800' : 'border-neutral-100'
-          }`}>
+          <div className={`mt-5 pt-4 border-t flex items-center justify-between ${tier === 'Platinum' ? 'border-[#3e4147]' : 'border-neutral-100'}`}>
             {distance !== null ? (
               <span className={`px-2.5 py-1 text-[9px] font-black tracking-wider rounded-lg border uppercase font-mono ${
                 tier === 'Silver' ? 'bg-slate-100 border-slate-300 text-slate-700' :
-                tier === 'Gold' ? 'bg-amber-100 border-amber-300 text-amber-800' :
-                tier === 'Platinum' ? 'bg-neutral-800 border-teal-500/30 text-teal-300' :
+                tier === 'Gold' ? 'bg-[#fef3c7] border-amber-300 text-amber-800' :
+                tier === 'Platinum' ? 'bg-neutral-800 border-[#3e4147] text-neutral-300' :
                 'bg-[#edf6ef] border-emerald-200 text-emerald-700'
               }`}>
                 📍 {distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`} distance
@@ -382,8 +377,8 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
             )}
 
             <span className={`text-xs font-black flex items-center gap-1 transition-transform ${hovered ? 'translate-x-1' : ''} ${
-              tier === 'Platinum' ? 'text-teal-400 hover:text-teal-300' :
               tier === 'Gold' ? 'text-amber-950' :
+              tier === 'Platinum' ? 'text-neutral-100' :
               'text-[#5a5a40]'
             }`}>
               <span>View Profile</span>

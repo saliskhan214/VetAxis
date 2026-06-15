@@ -278,6 +278,31 @@
         "createdAt": { "type": "number" }
       },
       "required": ["sponsorName", "title", "description", "ctaText", "ctaUrl", "ownerUid", "ownerEmail", "ownerRole", "pricePaid", "durationDays", "expiresAt", "createdAt"]
+    },
+    "IndividualAnimalRecord": {
+      "title": "IndividualAnimalRecord",
+      "description": "Comprehensive individual life file details for breeding and finances",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "farmId": { "type": "string" },
+        "animalId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["farmId", "animalId", "createdAt"]
+    },
+    "HerdLevelMasterRecord": {
+      "title": "HerdLevelMasterRecord",
+      "description": "Comprehensive herd-level registry stats, demographics and inventory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "farmId": { "type": "string" },
+        "farmName": { "type": "string" },
+        "totalHerdSize": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["farmId", "farmName", "totalHerdSize", "createdAt"]
     }
   },
   "firestore": {
@@ -332,6 +357,14 @@
     "/promotional_ads/{adId}": {
       "schema": "PromotionalAd",
       "description": "Paid advertising campaigns created by veterinarians and clinics"
+    },
+    "/livestock_individual_records/{recordId}": {
+      "schema": "IndividualAnimalRecord",
+      "description": "Comprehensive individual life file records for specific animals"
+    },
+    "/livestock_herd_records/{recordId}": {
+      "schema": "HerdLevelMasterRecord",
+      "description": "Comprehensive monthly/yearly herd registers and inventories"
     }
   }
 }
