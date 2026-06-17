@@ -94,22 +94,40 @@ function saveLocalUsers(list: UserProfile[]) {
 }
 
 export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile | null {
-  if (user && user.email && user.email.toLowerCase().trim() === 'saliskhan214@gmail.com') {
-    user.subscriptionTier = 'Platinum';
-    user.isVerified = true;
+  if (user && user.email) {
+    const emailLower = user.email.toLowerCase().trim();
+    if (emailLower === 'saliskhan214@gmail.com') {
+      user.subscriptionTier = 'Platinum';
+      user.isVerified = true;
 
-    // Use a single stable localStorage key for Salis's subscription expiration
-    let expiresStr = localStorage.getItem('va_salis_sub_expires');
-    let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
-    
-    if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs) {
-      expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
-      localStorage.setItem('va_salis_sub_expires', expiresMs.toString());
-    }
-    
-    // Always enforce this stable expiration for Salis's temporary platinum/gold tier
-    if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now()) {
-      user.subscriptionExpiresAt = expiresMs;
+      // Use a single stable localStorage key for Salis's subscription expiration
+      let expiresStr = localStorage.getItem('va_salis_sub_expires');
+      let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
+      
+      if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs) {
+        expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem('va_salis_sub_expires', expiresMs.toString());
+      }
+      
+      // Always enforce this stable expiration for Salis's temporary platinum/gold tier
+      if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now()) {
+        user.subscriptionExpiresAt = expiresMs;
+      }
+    } else if (emailLower === 'bunnykhan329@gmail.com') {
+      user.subscriptionTier = 'Silver';
+      user.isVerified = true;
+
+      let expiresStr = localStorage.getItem('va_bunny_sub_expires');
+      let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
+      
+      if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs) {
+        expiresMs = Date.now() + 365 * 24 * 60 * 60 * 1000;
+        localStorage.setItem('va_bunny_sub_expires', expiresMs.toString());
+      }
+      
+      if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now()) {
+        user.subscriptionExpiresAt = expiresMs;
+      }
     }
   }
   return user;

@@ -75,7 +75,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
   let showHolo = false;
 
   if (tier === 'Silver') {
-    cardClass = 'bg-gradient-to-br from-[#e2e8f0] via-[#f8fafc] to-[#cbd5e1] border-slate-300 border-b-[6px] border-b-slate-400 shadow-lg';
+    cardClass = 'bg-gradient-to-br from-[#e2e8f0] via-[#f8fafc] to-[#cbd5e1] border-slate-300 border-b-[5px] border-b-slate-400 shadow-lg';
     textClass = 'text-slate-900';
     subTextClass = 'text-slate-600';
     borderHighlight = 'border-slate-300 shadow-slate-200';
@@ -85,7 +85,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
       </div>
     );
   } else if (tier === 'Gold') {
-    cardClass = 'bg-gradient-to-br from-[#fcd34d] via-[#fef08a] to-[#d97706] border-amber-400 border-b-[6px] border-b-amber-600 shadow-xl shadow-amber-100/40';
+    cardClass = 'bg-gradient-to-br from-[#fcd34d] via-[#fef08a] to-[#d97706] border-amber-400 border-b-[5px] border-b-amber-600 shadow-xl shadow-amber-100/40';
     textClass = 'text-amber-950 font-semibold';
     subTextClass = 'text-amber-900';
     borderHighlight = 'border-amber-400 shadow-amber-200';
@@ -96,7 +96,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
       </div>
     );
   } else if (tier === 'Platinum') {
-    cardClass = 'bg-[#1a1b1e] border border-[#3e4147] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.12),_0_12px_35px_rgba(0,0,0,0.85)] text-neutral-50';
+    cardClass = 'bg-[#1a1b1e] border border-[#3e4147] border-b-[5px] border-b-neutral-850 shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.12),_0_12px_35px_rgba(0,0,0,0.85)] text-neutral-50';
     textClass = 'text-neutral-50';
     subTextClass = 'text-neutral-400';
     borderHighlight = 'border-[#4c4f57]/80 shadow-black/50';
@@ -316,50 +316,8 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
               </div>
             )}
 
-            {/* Location button for exact location on Google Maps */}
-            {profile.role !== 'doctor' && (
-              <div className="mt-3.5">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (profile.location?.lat && profile.location?.lng) {
-                      window.open(`https://www.google.com/maps?q=${profile.location.lat},${profile.location.lng}`, '_blank');
-                    } else {
-                      const query = encodeURIComponent(`${profile.name} ${profile.address || ''}`);
-                      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-                    }
-                  }}
-                  className={`w-full py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border transition-all hover:shadow-md active:translate-y-[1px] cursor-pointer ${
-                    tier === 'Gold'
-                      ? 'bg-[#451a03] text-white border-amber-950 hover:bg-[#78350f]'
-                      : tier === 'Silver'
-                      ? 'bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-150'
-                      : tier === 'Platinum'
-                      ? 'bg-neutral-800 text-neutral-100 border-[#3e4147] hover:bg-neutral-700'
-                      : 'bg-[#edf6ef] hover:bg-[#e2f0e4] text-[#2ebd4d] border-[#2ebd4d]/20'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5 shrink-0" />
-                  <span>📍 ( See Location )</span>
-                </button>
-              </div>
-            )}
+            {/* Location indicator metadata */}
           </div>
-
-          {/* Gold privilege of direct WhatsApp Lead connection in card */}
-          {tier === 'Gold' && (
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={stopPropAndWhatsApp}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-amber-950 shadow-sm transition-all focus:outline-none bg-[#451a03] text-white hover:bg-[#78350f] border-b-[3px] border-b-black/80 active:translate-y-[1px]"
-              >
-                <Compass className="w-4 h-4 text-emerald-400 fill-emerald-400 shrink-0" />
-                <span>WhatsApp Clinical Contact</span>
-              </button>
-            </div>
-          )}
 
           {/* Footer segment */}
           <div className={`mt-5 pt-4 border-t flex items-center justify-between ${tier === 'Platinum' ? 'border-[#3e4147]' : 'border-neutral-100'}`}>

@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark } from 'lucide-react';
@@ -29,6 +29,13 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [legalModalOpen, setLegalModalOpen] = useState<boolean>(false);
   const [legalModalType, setLegalModalType] = useState<'terms' | 'about'>('terms');
+
+  // Automatically scroll screen to top/start of popup when legal modal opens
+  useEffect(() => {
+    if (legalModalOpen) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [legalModalOpen]);
 
   const PAKISTAN_CITIES = [
     { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },

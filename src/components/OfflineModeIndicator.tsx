@@ -192,13 +192,16 @@ export function OfflineModeIndicator({
               </div>
 
               {/* Progress Bar Indicator */}
-              <div className="w-full bg-emerald-150/60 h-2 rounded-full overflow-hidden relative border border-emerald-200/40">
+              <div className="w-full bg-emerald-100 h-4.5 rounded-full overflow-hidden relative border border-emerald-200/40 shadow-inner flex items-center">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: isSyncActive ? `${syncProgress}%` : '100%' }}
                   transition={{ ease: "easeOut", duration: 0.2 }}
-                  className="h-full bg-emerald-600 rounded-full"
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
                 />
+                <span className="absolute left-1/2 -translate-x-1/2 text-[9px] font-black uppercase text-emerald-950 font-mono tracking-widest drop-shadow-sm pointer-events-none">
+                  Sync Progress: {isSyncActive ? `${syncProgress}%` : '100% COMPLETE'}
+                </span>
               </div>
             </div>
           </motion.div>

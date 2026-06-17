@@ -190,9 +190,9 @@ export interface VetNotification {
   userId: string;
   senderId: string;
   senderName: string;
-  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder';
+  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action';
   targetId: string;
-  targetType: 'post' | 'job' | 'application' | 'farm';
+  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment';
   message: string;
   read: boolean;
   createdAt: number;

@@ -499,5 +499,49 @@ service cloud.firestore {
       allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
       allow delete: if isFarmMember(existing().farmId);
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // VETAXIS CLINIC AND CLINICAL RECORDS RULES
+    // ─────────────────────────────────────────────────────────────────
+
+    match /clinic_appointments/{apptId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid);
+      allow delete: if isSignedIn();
+    }
+
+    match /clinic_soap_records/{soapId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.clinicId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.clinicId == request.auth.uid && request.resource.data.clinicId == request.auth.uid;
+      allow delete: if isSignedIn();
+    }
+
+    match /clinic_prescriptions/{prescId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.clinicId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.clinicId == request.auth.uid && request.resource.data.clinicId == request.auth.uid;
+      allow delete: if isSignedIn();
+    }
+
+    match /clinic_invoices/{invoiceId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.clinicId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.clinicId == request.auth.uid && request.resource.data.clinicId == request.auth.uid;
+      allow delete: if isSignedIn();
+    }
+
+    match /clinic_service_catalog/{serviceId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /clinic_drugs_inventory/{drugId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

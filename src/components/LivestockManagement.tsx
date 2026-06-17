@@ -164,6 +164,29 @@ export default function LivestockManagement({
   } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState<boolean>(false);
 
+  // Automatically scroll screen to top/start of popup when any modal opens
+  useEffect(() => {
+    if (
+      showCreateFarmModal || 
+      declineReasonModal || 
+      taskCompletionModal || 
+      showIndividualRecordModal || 
+      showHerdRecordModal || 
+      showQrPassModal || 
+      confirmDialog
+    ) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [
+    showCreateFarmModal, 
+    declineReasonModal, 
+    taskCompletionModal, 
+    showIndividualRecordModal, 
+    showHerdRecordModal, 
+    showQrPassModal, 
+    confirmDialog
+  ]);
+
   // Manual Offline overrides & synchronize control hooks
   const [isOfflineModeActive, setIsOfflineModeActive] = useState<boolean>(!navigator.onLine);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);

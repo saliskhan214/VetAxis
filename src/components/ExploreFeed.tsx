@@ -1,6 +1,7 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
-import { ExploreService, LocationService, PromotionalAdsService } from '../lib/storage';
+import { ExploreService, LocationService, PromotionalAdsService, NotificationService } from '../lib/storage';
+import { ClinicService } from '../lib/clinicService';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
@@ -178,6 +179,89 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const [reviewSort, setReviewSort] = useState<'newest' | 'highest'>('newest');
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+
+  // Clinic Booking states for pet owners
+  const [isBookingModeOpen, setIsBookingModeOpen] = useState<boolean>(false);
+  const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingForm, setBookingForm] = useState({
+    patientName: '',
+    ownerName: currentUser.name || '',
+    ownerPhone: currentUser.phone || '',
+    date: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0], // tomorrow
+    time: '11:00',
+    type: 'consultation' as 'consultation' | 'surgery' | 'grooming' | 'vaccination' | 'follow-up' | 'emergency',
+    notes: ''
+  });
+
+  const handleClinicBookingSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedProfile) return;
+    if (!bookingForm.patientName || !bookingForm.ownerName || !bookingForm.ownerPhone) {
+      setBookingError('Please fill Patient Name, Owner Name, and Owner Direct Phone/WhatsApp.');
+      return;
+    }
+
+    try {
+      const records = {
+        id: 'apt_user_' + Date.now(),
+        clinicId: selectedProfile.uid,
+        patientName: bookingForm.patientName,
+        ownerName: bookingForm.ownerName,
+        ownerPhone: bookingForm.ownerPhone,
+        date: bookingForm.date,
+        time: bookingForm.time,
+        vetId: 'vet_assigned',
+        vetName: selectedProfile.name, // Clinic Name
+        type: bookingForm.type,
+        status: 'Scheduled' as const,
+        isRecurring: false,
+        recurrencePattern: 'None' as const,
+        notes: bookingForm.notes || 'Online client booking via VetAxis homepage Clinic Card.',
+        createdAt: Date.now(),
+        userId: currentUser.uid
+      };
+
+      await ClinicService.saveAppointment(records);
+
+      try {
+        await NotificationService.createNotification({
+          userId: selectedProfile.uid,
+          senderId: currentUser.uid,
+          senderName: bookingForm.ownerName,
+          type: 'appointment_booked',
+          targetId: records.id,
+          targetType: 'appointment',
+          message: `${bookingForm.ownerName} has booked an appointment. See more`,
+          read: false
+        });
+      } catch (notifErr) {
+        console.error('Failed to create booking notification:', notifErr);
+      }
+
+      setBookingSuccess('🎉 Appointment successfully scheduled! The dynamic clinic has been updated.');
+      setBookingError(null);
+      
+      // Reset
+      setBookingForm({
+        patientName: '',
+        ownerName: currentUser.name || '',
+        ownerPhone: currentUser.phone || '',
+        date: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0],
+        time: '11:00',
+        type: 'consultation',
+        notes: ''
+      });
+      
+      setTimeout(() => {
+        setBookingSuccess(null);
+        setIsBookingModeOpen(false);
+      }, 3000);
+
+    } catch (err: any) {
+      setBookingError(err.message || 'Failed code route execution.');
+    }
+  };
 
   // Sliding banner & promotion states (10 seconds per slide)
   const [currentSlideIdx, setCurrentSlideIdx] = useState<number>(0);
@@ -375,6 +459,9 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     setReviewRating(0);
     setReviewComment('');
     setReviewError(null);
+    setIsBookingModeOpen(false);
+    setBookingSuccess(null);
+    setBookingError(null);
   };
 
   // Submit profile evaluation review
@@ -921,7 +1008,153 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                       🗺️ Show on Map
                     </a>
                   )}
+
+                  {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
+                    <button
+                      type="button"
+                      onClick={() => setIsBookingModeOpen(!isBookingModeOpen)}
+                      className={`btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 border border-emerald-300 font-bold transition-all cursor-pointer rounded-xl ${
+                        isBookingModeOpen 
+                          ? 'bg-[#5a5a40] text-white border-b-[3px] border-b-[#3c3c2b]' 
+                          : 'bg-emerald-200 text-emerald-900 font-black border-b-[3px] border-b-emerald-400 hover:bg-emerald-250 animate-pulse'
+                      }`}
+                    >
+                      📅 {isBookingModeOpen ? 'Close Booking Panel' : 'Book Online Appointment'}
+                    </button>
+                  )}
                 </div>
+
+                {/* INLINE APPOINTMENT BOOKING PANEL */}
+                {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-6 p-5 bg-[#edf6ef] border border-emerald-200 border-b-[4px] border-b-emerald-300 rounded-3xl text-left text-xs font-semibold space-y-4 shadow-inner"
+                  >
+                    <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                      <h4 className="font-serif font-black text-sm text-emerald-950 flex items-center gap-1.5 uppercase tracking-wider">
+                        <span>📅 Book Online Appointment</span>
+                      </h4>
+                      <span className="text-[9px] text-emerald-800 font-bold bg-white px-2 py-0.5 rounded-lg border border-emerald-200">Express Clinic Portal</span>
+                    </div>
+
+                    {bookingSuccess ? (
+                      <div className="p-4 bg-emerald-50 border border-emerald-400 text-emerald-800 font-bold rounded-xl text-center">
+                        {bookingSuccess}
+                      </div>
+                    ) : (
+                      <form onSubmit={handleClinicBookingSubmit} className="space-y-3">
+                        {bookingError && (
+                          <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 font-extrabold rounded-lg text-center">
+                            ⚠️ {bookingError}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#373735]">Patient Name & Breed/Species <span className="text-red-500">*</span></label>
+                            <input 
+                              type="text" 
+                              required
+                              placeholder="e.g. Cleo (Persian Cat) or Bruno (Labrador)" 
+                              value={bookingForm.patientName} 
+                              onChange={(e) => setBookingForm({...bookingForm, patientName: e.target.value})} 
+                              className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-xs" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#373735]">Pet Owner Name <span className="text-red-500">*</span></label>
+                            <input 
+                              type="text" 
+                              required
+                              placeholder="Your Name" 
+                              value={bookingForm.ownerName} 
+                              onChange={(e) => setBookingForm({...bookingForm, ownerName: e.target.value})} 
+                              className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-xs" 
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#373735]">WhatsApp / Hotline Phone <span className="text-red-500">*</span></label>
+                            <input 
+                              type="text" 
+                              required
+                              placeholder="e.g. 0333-1234567" 
+                              value={bookingForm.ownerPhone} 
+                              onChange={(e) => setBookingForm({...bookingForm, ownerPhone: e.target.value})} 
+                              className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-xs" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#373735]">Booking Context / Type</label>
+                            <select 
+                              value={bookingForm.type} 
+                              onChange={(e) => setBookingForm({...bookingForm, type: e.target.value as any})} 
+                              className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-xs"
+                            >
+                              <option value="consultation">📅 Clinical Consultation</option>
+                              <option value="surgery">🩺 Special Surgery</option>
+                              <option value="grooming">✂️ Dynamic Grooming</option>
+                              <option value="vaccination">💉 Vaccination Cycle</option>
+                              <option value="follow-up">🔄 Routine Follow-up</option>
+                              <option value="emergency">🚨 Emergency Assistance</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#373735]">Appointment Date</label>
+                            <input 
+                              type="date" 
+                              value={bookingForm.date} 
+                              onChange={(e) => setBookingForm({...bookingForm, date: e.target.value})} 
+                              className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-xs" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#373735]">Appointment Time</label>
+                            <input 
+                              type="time" 
+                              value={bookingForm.time} 
+                              onChange={(e) => setBookingForm({...bookingForm, time: e.target.value})} 
+                              className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-xs" 
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-[#373735]">Description of Symptoms or Notes</label>
+                          <textarea 
+                            placeholder="Write brief clinical notes, duration, or general symptoms..." 
+                            value={bookingForm.notes} 
+                            onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})} 
+                            className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl h-18 text-xs resize-none" 
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-emerald-250">
+                          <button 
+                            type="button" 
+                            onClick={() => setIsBookingModeOpen(false)} 
+                            className="bg-stone-100 hover:bg-stone-250 text-stone-700 px-3 py-1.5 rounded-xl font-bold cursor-pointer border-none"
+                          >
+                            Close
+                          </button>
+                          <button 
+                            type="submit" 
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-1.5 rounded-xl font-bold border-none cursor-pointer shadow-sm active:translate-y-[1px]"
+                          >
+                            File Booking Record
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </motion.div>
+                )}
 
                 {/* Information details */}
                 <div className="space-y-4 mb-6 text-left">

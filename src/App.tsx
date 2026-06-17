@@ -6,6 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
+import { ClinicService } from './lib/clinicService';
 
 // Import modular layouts
 import { Navbar } from './components/Navbar';
@@ -19,6 +20,7 @@ import { JobBoard } from './components/JobBoard';
 import LivestockManagement from './components/LivestockManagement';
 import { SubscriptionPortal } from './components/SubscriptionPortal';
 import { GuestAnimalViewer } from './components/GuestAnimalViewer';
+import { ClinicManagement } from './components/ClinicManagement';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -32,6 +34,7 @@ export default function App() {
   const [highlightJobId, setHighlightJobId] = useState<string | null>(null);
   const [highlightApplicationId, setHighlightApplicationId] = useState<string | null>(null);
   const [highlightFarmId, setHighlightFarmId] = useState<string | null>(null);
+  const [highlightAppointmentId, setHighlightAppointmentId] = useState<string | null>(null);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
 
@@ -77,6 +80,53 @@ export default function App() {
 
     const checkNotifications = async (isFirstRun: boolean) => {
       try {
+        // ─── Automated 6-hour Appointment reminders ──────────────────
+        try {
+          // Fetch appointments where the user is either the pet owner or the clinic
+          const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
+          const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
+          
+          // Combine both lists uniquely
+          const combinedAppts = [...myUserAppts];
+          myClinicAppts.forEach(ca => {
+            if (!combinedAppts.some(a => a.id === ca.id)) {
+              combinedAppts.push(ca);
+            }
+          });
+
+          const now = new Date();
+          for (const appt of combinedAppts) {
+            if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
+              const [year, month, day] = appt.date.split('-').map(Number);
+              const [hours, minutes] = appt.time.split(':').map(Number);
+              if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
+                const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                const diffMs = apptDate.getTime() - now.getTime();
+                const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
+
+                // Trigger if scheduled time is within 6 hours (and is in the future)
+                if (diffMs > 0 && diffMs <= sixHoursMs) {
+                  appt.sent6hReminder = true;
+                  await ClinicService.saveAppointment(appt);
+
+                  await NotificationService.createNotification({
+                    userId: appt.userId,
+                    senderId: appt.clinicId,
+                    senderName: appt.vetName || 'Vet Clinic',
+                    type: 'status_change',
+                    targetId: appt.id,
+                    targetType: 'appointment',
+                    message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
+                    read: false
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("6h reminder checking failed:", err);
+        }
+
         const list = await NotificationService.fetchNotifications(currentUser.uid);
         if (!isMounted) return;
 
@@ -158,6 +208,7 @@ export default function App() {
     setHighlightJobId(null);
     setHighlightApplicationId(null);
     setHighlightFarmId(null);
+    setHighlightAppointmentId(null);
 
     // Set correct highlight states based on targetType and redirect
     if (notif.targetType === 'post') {
@@ -172,6 +223,9 @@ export default function App() {
     } else if (notif.targetType === 'farm') {
       setHighlightFarmId(notif.targetId);
       setActiveSection('livestock');
+    } else if (notif.targetType === 'appointment') {
+      setHighlightAppointmentId(notif.targetId);
+      setActiveSection('clinic_management');
     }
   };
 
@@ -183,6 +237,7 @@ export default function App() {
     setHighlightJobId(null);
     setHighlightApplicationId(null);
     setHighlightFarmId(null);
+    setHighlightAppointmentId(null);
   };
 
   // Real-time Auth connection tracker to prevent race conditions on startup
@@ -228,6 +283,86 @@ export default function App() {
   // Unified Firebase test connection check on initial system boot
   useEffect(() => {
     testConnection();
+  }, []);
+
+  // Global auto-scroller when any popup modal/dialog opens
+  useEffect(() => {
+    let lastActionTime = 0;
+    
+    const handlePopupOpened = (element: HTMLElement) => {
+      const now = Date.now();
+      // Debounce slightly to prevent recursive triggers within 300ms
+      if (now - lastActionTime < 300) return;
+      lastActionTime = now;
+
+      // Scroll the main screen viewport to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Scroll the popup container/overlay itself to its top
+      element.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Also scroll any internal scrollable panels within the modal to their top
+      const scrollables = element.querySelectorAll('.overflow-y-auto');
+      scrollables.forEach(el => {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      // If there's an active dialog card inside the overlay, scroll it elegantly into view
+      const dialogArea = element.querySelector('[role="dialog"], .bg-white, .bg-neutral-900, .bg-\\[\\#fcf9f2\\]');
+      if (dialogArea) {
+        dialogArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    const isModalElement = (node: Node): node is HTMLElement => {
+      if (!(node instanceof HTMLElement)) return false;
+      const cn = node.className;
+      if (typeof cn !== 'string') return false;
+      
+      const isFixed = node.classList.contains('fixed') && !node.classList.contains('pointer-events-none');
+      const hasBackdrop = cn.includes('bg-black/') || cn.includes('backdrop-blur') || cn.includes('bg-stone-900/');
+      const hasDialog = node.getAttribute('role') === 'dialog' || node.querySelector('[role="dialog"]') !== null;
+      
+      return isFixed || hasBackdrop || hasDialog;
+    };
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (const node of Array.from(mutation.addedNodes)) {
+            if (isModalElement(node)) {
+              handlePopupOpened(node);
+              return;
+            }
+            if (node instanceof HTMLElement) {
+              const innerModal = Array.from(node.querySelectorAll('*')).find(el => isModalElement(el));
+              if (innerModal instanceof HTMLElement) {
+                handlePopupOpened(innerModal);
+                return;
+              }
+            }
+          }
+        } else if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (isModalElement(target)) {
+            const isHidden = target.classList.contains('hidden') || target.style.display === 'none';
+            if (!isHidden) {
+              handlePopupOpened(target);
+              return;
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+
+    return () => observer.disconnect();
   }, []);
 
 
@@ -457,6 +592,14 @@ export default function App() {
                 currentUser={currentUser}
                 onUpdateUser={handleUpdateUserProfile}
                 onNavigateToSection={handleNavigate}
+              />
+            )}
+
+            {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (
+              <ClinicManagement 
+                user={currentUser} 
+                highlightAppointmentId={highlightAppointmentId}
+                onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
               />
             )}
           </motion.div>

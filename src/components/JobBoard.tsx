@@ -32,6 +32,13 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   const [formError, setFormError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
 
+  // Automatically scroll screen to top/start of popup when jod board popup opens
+  useEffect(() => {
+    if (isPostModalOpen) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [isPostModalOpen]);
+
   // Job post inputs
   const [title, setTitle] = useState<string>('');
   const [jobType, setJobType] = useState<JobPost['jobType']>('Full-time');

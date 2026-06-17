@@ -28,6 +28,21 @@ export function Navbar({
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [lockPopupMessage, setLockPopupMessage] = useState<string | null>(null);
+  const [timerId, setTimerId] = useState<any>(null);
+
+  const isClinicSubscribed = user.subscriptionTier === 'Silver' || user.subscriptionTier === 'Gold' || user.subscriptionTier === 'Platinum';
+
+  const triggerLockPopup = () => {
+    if (timerId) {
+      clearTimeout(timerId);
+    }
+    setLockPopupMessage("facility is lock please subscribe to premium category");
+    const tid = setTimeout(() => {
+      setLockPopupMessage(null);
+    }, 5000);
+    setTimerId(tid);
+  };
 
   const initials = user.name
     .trim()
@@ -44,6 +59,7 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
+    { id: 'clinic_management', label: 'Clinic Management', icon: '🏥' },
     { id: 'livestock', label: 'Farm Management', icon: '🐄' },
     { id: 'community', label: 'Community', icon: '💬' },
     { id: 'marketplace', label: 'Products', icon: '🛒' },
@@ -286,23 +302,40 @@ export function Navbar({
                       if (item.id === 'subscription') {
                         return user.role === 'clinic' || user.role === 'doctor';
                       }
+                      if (item.id === 'clinic_management') {
+                        return user.role === 'clinic';
+                      }
                       return true;
                     })
                     .map(item => {
                       const isActive = activeSection === item.id;
+                      const isLocked = item.id === 'clinic_management' && user.role === 'clinic' && !isClinicSubscribed;
                       return (
                         <motion.button
                           key={item.id}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => handleMobileNav(item.id)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold transition-all border border-transparent text-left cursor-pointer ${
+                          onClick={() => {
+                            if (isLocked) {
+                              triggerLockPopup();
+                            } else {
+                              handleMobileNav(item.id);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-extrabold transition-all border border-transparent text-left cursor-pointer ${
                             isActive
                               ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[4px] border-b-[#3e3e2b]'
                               : 'bg-transparent text-[#5a5a40] hover:bg-[#fcf9f2] hover:border-[#e3dec9]'
                           }`}
                         >
-                          <span className="text-lg">{item.icon}</span>
-                          <span>{item.label}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{item.icon}</span>
+                            <span>{item.label}</span>
+                          </div>
+                          {isLocked && (
+                            <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-lg font-black flex items-center gap-1 uppercase tracking-wider text-[8px]">
+                              🔒 Lock
+                            </span>
+                          )}
                         </motion.button>
                       );
                     })}
@@ -382,6 +415,24 @@ export function Navbar({
 
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* 5-second Lock Popup toast */}
+      <AnimatePresence>
+        {lockPopupMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-sm bg-stone-900 border-2 border-red-500 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3"
+          >
+            <span className="text-2xl">🔒</span>
+            <div className="flex flex-col text-left">
+              <span className="font-serif font-black text-xs uppercase tracking-wider text-red-400">Access Restricted</span>
+              <span className="text-xs font-bold text-stone-100">{lockPopupMessage}</span>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </>
