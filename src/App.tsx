@@ -77,54 +77,59 @@ export default function App() {
 
     let isMounted = true;
     const seenIds = new Set<string>();
+    let lastReminderCheck = 0;
 
     const checkNotifications = async (isFirstRun: boolean) => {
       try {
-        // ─── Automated 6-hour Appointment reminders ──────────────────
-        try {
-          // Fetch appointments where the user is either the pet owner or the clinic
-          const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
-          const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
-          
-          // Combine both lists uniquely
-          const combinedAppts = [...myUserAppts];
-          myClinicAppts.forEach(ca => {
-            if (!combinedAppts.some(a => a.id === ca.id)) {
-              combinedAppts.push(ca);
-            }
-          });
+        // ─── Automated 6-hour Appointment reminders (Throttled to once every 120 seconds for performance) ──────────────────
+        const nowMs = Date.now();
+        if (isFirstRun || nowMs - lastReminderCheck > 120 * 1000) {
+          lastReminderCheck = nowMs;
+          try {
+            // Fetch appointments where the user is either the pet owner or the clinic
+            const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
+            const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
+            
+            // Combine both lists uniquely
+            const combinedAppts = [...myUserAppts];
+            myClinicAppts.forEach(ca => {
+              if (!combinedAppts.some(a => a.id === ca.id)) {
+                combinedAppts.push(ca);
+              }
+            });
 
-          const now = new Date();
-          for (const appt of combinedAppts) {
-            if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
-              const [year, month, day] = appt.date.split('-').map(Number);
-              const [hours, minutes] = appt.time.split(':').map(Number);
-              if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
-                const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-                const diffMs = apptDate.getTime() - now.getTime();
-                const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
+            const now = new Date();
+            for (const appt of combinedAppts) {
+              if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
+                const [year, month, day] = appt.date.split('-').map(Number);
+                const [hours, minutes] = appt.time.split(':').map(Number);
+                if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
+                  const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                  const diffMs = apptDate.getTime() - now.getTime();
+                  const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
 
-                // Trigger if scheduled time is within 6 hours (and is in the future)
-                if (diffMs > 0 && diffMs <= sixHoursMs) {
-                  appt.sent6hReminder = true;
-                  await ClinicService.saveAppointment(appt);
+                  // Trigger if scheduled time is within 6 hours (and is in the future)
+                  if (diffMs > 0 && diffMs <= sixHoursMs) {
+                    appt.sent6hReminder = true;
+                    await ClinicService.saveAppointment(appt);
 
-                  await NotificationService.createNotification({
-                    userId: appt.userId,
-                    senderId: appt.clinicId,
-                    senderName: appt.vetName || 'Vet Clinic',
-                    type: 'status_change',
-                    targetId: appt.id,
-                    targetType: 'appointment',
-                    message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
-                    read: false
-                  });
+                    await NotificationService.createNotification({
+                      userId: appt.userId,
+                      senderId: appt.clinicId,
+                      senderName: appt.vetName || 'Vet Clinic',
+                      type: 'status_change',
+                      targetId: appt.id,
+                      targetType: 'appointment',
+                      message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
+                      read: false
+                    });
+                  }
                 }
               }
             }
+          } catch (err) {
+            console.error("6h reminder checking failed:", err);
           }
-        } catch (err) {
-          console.error("6h reminder checking failed:", err);
         }
 
         const list = await NotificationService.fetchNotifications(currentUser.uid);
@@ -555,11 +560,11 @@ export default function App() {
             )}
 
             {activeSection === 'marketplace' && (
-              <Marketplace currentUser={currentUser} />
+              <Marketplace currentUser={currentUser} onNavigate={setActiveSection} />
             )}
 
             {activeSection === 'pet_ads' && (
-              <PetAds currentUser={currentUser} />
+              <PetAds currentUser={currentUser} onNavigate={setActiveSection} />
             )}
 
             {activeSection === 'jobs' && (

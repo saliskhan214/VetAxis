@@ -27,6 +27,7 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
       badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
       icon: '✦',
       benefits: [
+        'Full Clinic Management Facility (Clinics only)',
         'Premium Silver badge on directory portfolio',
         'Custom interactive 3D Silver member card',
         'High directory sorted listing rank',
@@ -46,6 +47,7 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
       badgeColor: 'bg-amber-100 text-amber-950 border-amber-300',
       icon: '👑',
       benefits: [
+        'Full Clinic Management Facility (Clinics only)',
         'Official Gold partner directory badge',
         'Durable Guilloche golden 3D member card styling',
         'Advanced directory listing sort priority',
@@ -67,6 +69,7 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
       badgeColor: 'bg-indigo-900/10 text-indigo-700 border-indigo-200',
       icon: '💎',
       benefits: [
+        'Full Clinic Management Facility (Clinics only)',
         'Ultra Elite interactive holographic 3D dark metal card',
         'Absolute topmost search directory ranking',
         'Manage Unlimited Farm Workspaces',
@@ -83,56 +86,12 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
   const isPremium = !!currentUser.subscriptionTier;
   const expiryTime = currentUser.subscriptionExpiresAt || 0;
 
-  // Real-time active usage metrics
-  const [userFarmsCount, setUserFarmsCount] = useState<number>(0);
-  const [userAdsCount, setUserAdsCount] = useState<number>(0);
-
-  // Manual interactive simulators so the user can test the limit-exceeded vs limits-safe behaviors
-  const [simulatedFarms, setSimulatedFarms] = useState<number | null>(null);
-  const [simulatedAds, setSimulatedAds] = useState<number | null>(null);
-
-  useEffect(() => {
-    const loadUsageMetrics = async () => {
-      try {
-        const farmsList = await LivestockService.fetchFarms();
-        const myFarms = farmsList.filter(f => f.ownerUid === currentUser.uid).length;
-        setUserFarmsCount(myFarms);
-
-        const adsList = await PromotionalAdsService.fetchActiveAds();
-        const myAds = adsList.filter(ad => ad.ownerUid === currentUser.uid).length;
-        setUserAdsCount(myAds);
-      } catch (err) {
-        console.error("Error loading usage metric counts inside core subscription portal:", err);
-      }
-    };
-    loadUsageMetrics();
-  }, [currentUser.uid]);
-
   // Premium limits calculations
   const tier = currentUser.subscriptionTier;
   const isSubscriber = !!tier;
 
-  let maxFarms = 1; // standard limits
-  let maxAds = 1;
-  if (tier === 'Silver') {
-    maxFarms = 3;
-    maxAds = 3;
-  } else if (tier === 'Gold') {
-    maxFarms = 10;
-    maxAds = 5;
-  } else if (tier === 'Platinum') {
-    maxFarms = Infinity;
-    maxAds = 10;
-  }
-
-  const activeFarmsCount = simulatedFarms !== null ? simulatedFarms : userFarmsCount;
-  const activeAdsCount = simulatedAds !== null ? simulatedAds : userAdsCount;
-
-  // Plan Limit Check: Has the user's active plan limit been exceeded?
-  const isLimitExceeded = isSubscriber && (activeFarmsCount > maxFarms || activeAdsCount > maxAds);
-
-  // For premium users, we hide pricing completely until plan limit is exceeded.
-  const shouldHidePricing = isSubscriber && !isLimitExceeded;
+  // Removed interactive plan boundaries and resource monitor simulator variables
+  const shouldHidePricing = false;
 
   // Real-time ticking state for dynamic interactive countdown live updating
   const [nowState, setNowState] = useState<number>(Date.now());
@@ -215,11 +174,8 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
 
     setCheckoutLoading(true);
     try {
-      // Math: extending current expiration or calculating new 30 days lease cycle
-      const currentExpiry = currentUser.subscriptionExpiresAt && currentUser.subscriptionExpiresAt > Date.now()
-        ? currentUser.subscriptionExpiresAt
-        : Date.now();
-      const newExpiry = currentExpiry + (30 * 24 * 60 * 60 * 1000);
+      // Math: dynamic monthly lease cycle capped at maximum 30 days from today
+      const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
 
       const updated = await AuthService.updateProfile(currentUser.uid, {
         subscriptionTier: selectedTier,
@@ -486,101 +442,7 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
         </div>
       )}
 
-      {/* SUBSCRIPTION LIMITS PROGRESS TRACKER PANEL FOR PREMIUM USERS */}
-      {isSubscriber && (
-        <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#f4f1e9] pb-3 gap-2">
-            <div>
-              <h3 className="font-serif font-black text-lg text-black flex items-center gap-1.5">
-                <span>📊 Interactive Plan Boundaries & Resource Monitor</span>
-              </h3>
-              <p className="text-xs font-semibold text-[#7a766f]">
-                Premium users do not see standard pricing catalogs unless active account limits have been exceeded.
-              </p>
-            </div>
-            <span className={`px-2.5 py-1 text-[10px] w-fit font-black uppercase tracking-wider rounded-lg border ${isLimitExceeded ? 'bg-rose-100 border-rose-300 text-rose-800 animate-pulse' : 'bg-emerald-100 border-emerald-300 text-emerald-800'}`}>
-              {isLimitExceeded ? '⚠️ Limits Surpassed (Pricing Unlocked)' : '✓ Covered (Pricing Hidden)'}
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs select-none">
-            {/* Farms Limit Bar */}
-            <div className="space-y-2 p-4 bg-[#fcf9f2] rounded-2xl border border-[#e3dec9]">
-              <div className="flex justify-between items-center font-bold">
-                <span className="text-[#373735]">Farm Workspaces Directory Limit:</span>
-                <span className={`text-[10px] font-mono tracking-wider text-right ${activeFarmsCount > maxFarms ? 'text-red-700 font-extrabold' : 'text-[#7a766f]'}`}>
-                  {activeFarmsCount} / {maxFarms === Infinity ? 'Unlimited' : maxFarms} Active
-                </span>
-              </div>
-              <div className="w-full bg-[#f4f1e9] h-2 rounded-full overflow-hidden">
-                <div 
-                  style={{ width: `${Math.min(100, (activeFarmsCount / (maxFarms === Infinity ? 20 : maxFarms)) * 100)}%` }}
-                  className={`h-full rounded-full transition-all duration-300 ${activeFarmsCount > maxFarms ? 'bg-red-500 animate-pulse' : 'bg-[#5a5a40]'}`}
-                />
-              </div>
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-[#7a766f]">Simulated Workspaces Count:</span>
-                <div className="flex items-center gap-1">
-                  <button 
-                    type="button"
-                    onClick={() => setSimulatedFarms(Math.max(0, activeFarmsCount - 1))}
-                    className="w-6 h-6 bg-white hover:bg-stone-100 rounded-lg border border-[#e3dec9] flex items-center justify-center font-black cursor-pointer shadow-xs"
-                  >
-                    -
-                  </button>
-                  <span className="font-mono font-bold w-6 text-center">{activeFarmsCount}</span>
-                  <button 
-                    type="button"
-                    onClick={() => setSimulatedFarms(activeFarmsCount + 1)}
-                    className="w-6 h-6 bg-white hover:bg-stone-100 rounded-lg border border-[#e3dec9] flex items-center justify-center font-black cursor-pointer shadow-xs"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Billboard Ads Limit Bar */}
-            <div className="space-y-2 p-4 bg-[#fcf9f2] rounded-2xl border border-[#e3dec9]">
-              <div className="flex justify-between items-center font-bold">
-                <span className="text-[#373735]">Veterinary Billboard Ad Spots:</span>
-                <span className={`text-[10px] font-mono tracking-wider text-right ${activeAdsCount > maxAds ? 'text-red-700 font-extrabold' : 'text-[#7a766f]'}`}>
-                  {activeAdsCount} / {maxAds} Allocated
-                </span>
-              </div>
-              <div className="w-full bg-[#f4f1e9] h-2 rounded-full overflow-hidden">
-                <div 
-                  style={{ width: `${Math.min(100, (activeAdsCount / maxAds) * 100)}%` }}
-                  className={`h-full rounded-full transition-all duration-300 ${activeAdsCount > maxAds ? 'bg-red-500 animate-pulse' : 'bg-[#5a5a40]'}`}
-                />
-              </div>
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-[#7a766f]">Simulated Ad Campaign Count:</span>
-                <div className="flex items-center gap-1">
-                  <button 
-                    type="button"
-                    onClick={() => setSimulatedAds(Math.max(0, activeAdsCount - 1))}
-                    className="w-6 h-6 bg-white hover:bg-stone-100 rounded-lg border border-[#e3dec9] flex items-center justify-center font-black cursor-pointer shadow-xs"
-                  >
-                    -
-                  </button>
-                  <span className="font-mono font-bold w-6 text-center">{activeAdsCount}</span>
-                  <button 
-                    type="button"
-                    onClick={() => setSimulatedAds(activeAdsCount + 1)}
-                    className="w-6 h-6 bg-white hover:bg-stone-100 rounded-lg border border-[#e3dec9] flex items-center justify-center font-black cursor-pointer shadow-xs"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="text-[10px] text-stone-500 leading-relaxed max-w-2xl">
-            💡 <strong>Simulation Tooltip Guide:</strong> Try clicking the <strong>+</strong> button to exceed your pricing limits (e.g. increase simulated farms count to 4 on Silver). The catalog pricing below will immediately unlock in real-time. Drop it back within limits to hide pricing again!
-          </div>
-        </div>
-      )}
 
       {/* PLAN CHOICES COMPARE TIERS GRID */}
       <div className="space-y-4">

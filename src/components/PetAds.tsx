@@ -6,10 +6,12 @@ import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Spar
 
 interface PetAdsProps {
   currentUser: UserProfile;
+  onNavigate?: (section: string) => void;
 }
 
-export function PetAds({ currentUser }: PetAdsProps) {
+export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
   const [ads, setAds] = useState<PetAd[]>([]);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [speciesFilter, setSpeciesFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -111,13 +113,27 @@ export function PetAds({ currentUser }: PetAdsProps) {
       return;
     }
 
-    // Subscription Limit check for posting classified ads (Unlimited for premium, max 3 for unsubscribed)
+    // Subscription Limit check for posting classified ads (Unlimited for premium, max 15 per month for clinics/doctors)
     const isPremium = !!currentUser.subscriptionTier;
     if (!isPremium) {
-      const myAdsCount = ads.filter(a => a.ownerEmail === currentUser.email).length;
-      if (myAdsCount >= 3) {
-        setFormError('⚠️ Placement Limit: Unsubscribed accounts are restricted to 3 active classified pet ads. Please upgrade to Silver, Gold, or Platinum inside the Practitioner Billing Centre to unlock unlimited submissions!');
-        return;
+      const isClinicOrDoctor = currentUser.role === 'clinic' || currentUser.role === 'doctor';
+      
+      if (isClinicOrDoctor) {
+        // Clinics & doctors get 15 postings per month (last 30 days)
+        const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const myRecentAds = ads.filter(a => a.ownerEmail === currentUser.email && a.createdAt >= oneMonthAgo).length;
+        if (myRecentAds >= 15) {
+          setShowUpgradeModal(true);
+          setFormError('⚠️ Placement Limit Exceeded: Unsubscribed clinics/doctors are restricted to 15 classified pet advertisements per month. Upgrade to Silver, Gold, or Platinum to get unlimited postings!');
+          return;
+        }
+      } else {
+        // Other roles are restricted to 3 active listings
+        const myAdsCount = ads.filter(a => a.ownerEmail === currentUser.email).length;
+        if (myAdsCount >= 3) {
+          setFormError('⚠️ Placement Limit: Unsubscribed accounts are restricted to 3 active classified pet ads. Please upgrade to Silver, Gold, or Platinum inside the Practitioner Billing Centre to unlock unlimited submissions!');
+          return;
+        }
       }
     }
 
@@ -808,6 +824,55 @@ export function PetAds({ currentUser }: PetAdsProps) {
           })}
         </div>
       )}
+
+      {/* Premium Upgrade Modal Popup */}
+      <AnimatePresence>
+        {showUpgradeModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white border-2 border-[#a0522d]/60 border-b-[8px] border-b-[#7d3e20]/60 max-w-md w-full rounded-3xl p-6 shadow-2xl relative overflow-hidden text-center"
+            >
+              <div className="absolute top-0 inset-x-0 h-2.5 bg-gradient-to-r from-amber-400 via-[#a0522d] to-amber-500" />
+              
+              <div className="mx-auto w-16 h-16 bg-amber-50 border border-amber-200 rounded-full flex items-center justify-center text-3xl mb-4 mt-2">
+                🔒
+              </div>
+
+              <h2 className="font-serif font-black text-2xl text-stone-900 mb-2">
+                Premium Upgrade Required
+              </h2>
+              
+              <p className="text-stone-600 text-xs font-semibold leading-relaxed mb-6">
+                Unsubscribed practitioners (clinics and doctors) are entitled to a maximum of <strong>15 classified pet advertisements</strong> per month. Upgrade to our Silver, Gold, or Platinum plans to enjoy unlimited high-visibility listings and auto-highlighted cards!
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpgradeModal(false);
+                    if (onNavigate) onNavigate('subscription');
+                  }}
+                  className="w-full py-3 btn-tactile-3d-primary font-bold text-xs cursor-pointer inline-flex items-center justify-center gap-1.5 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
+                >
+                  💳 Go to Subscription Portal
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="w-full py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl border border-stone-200 transition-all cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

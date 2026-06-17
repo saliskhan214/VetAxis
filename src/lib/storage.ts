@@ -120,14 +120,20 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
       let expiresStr = localStorage.getItem('va_bunny_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
-      if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs) {
-        expiresMs = Date.now() + 365 * 24 * 60 * 60 * 1000;
+      // Enforce 1 month duration (30 days) and overwrite any old 365-day values
+      if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs || expiresMs > Date.now() + 31 * 24 * 60 * 60 * 1000) {
+        expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
         localStorage.setItem('va_bunny_sub_expires', expiresMs.toString());
       }
       
-      if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now()) {
+      if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now() || user.subscriptionExpiresAt > expiresMs) {
         user.subscriptionExpiresAt = expiresMs;
       }
+    }
+
+    // CAP RULE: No user should exceed a 1-month plan/subscription limit
+    if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() + 30 * 24 * 60 * 60 * 1000) {
+      user.subscriptionExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
     }
   }
   return user;
