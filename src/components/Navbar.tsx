@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { UserProfile, VetNotification } from '../types';
 import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import logoImg from '../assets/images/vetaxis_logo_1781845245326.jpg';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -77,14 +76,9 @@ export function Navbar({
             whileHover={{ scale: 1.05, y: -1 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => onNavigate('explore')}
-            className="flex items-center gap-2.5 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none"
+            className="flex items-center gap-2 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none"
           >
-            <img 
-              src={logoImg} 
-              alt="VetAxis Logo" 
-              className="h-8.5 w-8.5 rounded-xl object-cover shadow-xs border border-[#e3dec9]/60"
-              referrerPolicy="no-referrer"
-            />
+            <span className="text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">🐾</span>
             <span className="tracking-tight font-display text-2xl">
               Vet<span className="text-[#a0522d] font-bold">Axis</span>
             </span>
@@ -275,12 +269,7 @@ export function Navbar({
               <div>
                 <div className="p-5 flex items-center justify-between border-b border-[#f4f1e9]">
                   <div className="flex items-center gap-2 font-serif text-xl font-bold text-[#5a5a40]">
-                    <img 
-                      src={logoImg} 
-                      alt="VetAxis Logo" 
-                      className="h-6 w-6 rounded-lg object-cover shadow-xs border border-[#e3dec9]/40"
-                      referrerPolicy="no-referrer"
-                    /> Vet<span className="text-[#a0522d]">Axis</span>
+                    <span>🐾</span> Vet<span className="text-[#a0522d]">Axis</span>
                     {user.subscriptionTier ? (
                       <span className={`text-white rounded-md text-[8px] font-black px-1.5 py-0.5 tracking-wider uppercase ${
                         user.subscriptionTier === 'Silver' ? 'bg-slate-500' :

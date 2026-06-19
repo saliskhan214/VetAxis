@@ -7,7 +7,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
-import logoImg from './assets/images/vetaxis_logo_1781845245326.jpg';
 
 // Import modular layouts
 import { Navbar } from './components/Navbar';
@@ -467,12 +466,9 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4 animate-pulse">
-          <img 
-            src={logoImg} 
-            alt="VetAxis Logo" 
-            className="h-16 w-16 rounded-2xl object-cover shadow-lg border border-[#e3dec9]/60"
-            referrerPolicy="no-referrer"
-          />
+          <div className="h-16 w-16 bg-[#004d40] rounded-2xl flex items-center justify-center shadow-lg text-[#fdfbf7] font-black text-2xl tracking-widest">
+            VA
+          </div>
           <h1 className="text-xl font-bold text-stone-800 tracking-tight text-center">VetAxis</h1>
           <p className="text-stone-500 text-xs font-mono text-center">Securing connection to clinical network...</p>
         </div>

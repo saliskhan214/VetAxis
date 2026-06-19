@@ -3,7 +3,6 @@ import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
-import logoImg from '../assets/images/vetaxis_logo_1781845245326.jpg';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: any) => void;
@@ -154,14 +153,9 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="flex items-center gap-3.5 font-serif text-3xl font-bold tracking-tight select-none"
+            className="flex items-center gap-3 font-serif text-3xl font-bold tracking-tight select-none"
           >
-            <img 
-              src={logoImg} 
-              alt="VetAxis Logo" 
-              className="h-10.5 w-10.5 rounded-2xl object-cover shadow-md border border-white/20"
-              referrerPolicy="no-referrer"
-            /> Vet<span className="text-amber-400">Axis</span>
+            <span className="text-3xl filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.2)]">🐾</span> Vet<span className="text-amber-400">Axis</span>
           </motion.div>
           <p className="text-neutral-300 font-medium font-sans text-sm tracking-wide">
             Pakistan's Premier Veterinary Clinical Network
@@ -201,15 +195,9 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
       <div className="col-span-12 lg:col-span-7 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 overflow-y-auto">
         
         {/* Brand Head for Mobile Views only */}
-        <div className="lg:hidden flex flex-col items-center justify-center text-center mb-8">
-          <div className="flex items-center gap-2.5 justify-center font-serif text-4xl font-extrabold text-[#5a5a40]">
-            <img 
-              src={logoImg} 
-              alt="VetAxis Logo" 
-              className="h-9.5 w-9.5 rounded-xl object-cover shadow-sm border border-[#e3dec9]/60"
-              referrerPolicy="no-referrer"
-            />
-            <span>Vet<span className="text-[#a0522d]">Axis</span></span>
+        <div className="lg:hidden text-center mb-8">
+          <div className="font-serif text-4xl font-extrabold text-[#5a5a40]">
+            🐾 Vet<span className="text-[#a0522d]">Axis</span>
           </div>
           <p className="text-xs uppercase tracking-wider font-bold text-[#7a766f] mt-1">Pakistan's Premium Clinical Platform</p>
         </div>
