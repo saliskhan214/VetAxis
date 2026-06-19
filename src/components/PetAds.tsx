@@ -19,6 +19,8 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(true);
+  const [legalAgreed, setLegalAgreed] = useState<boolean>(false);
 
   // Form states
   const [formOpen, setFormOpen] = useState<boolean>(false);
@@ -95,6 +97,11 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    if (!legalAgreed) {
+      setFormError('⚠️ Safe Trade Consent Required: You must check the legal affirmation box to confirm that you adhere to our anti-scam guidelines and hold the platform harmless.');
+      return;
+    }
 
     if (!petType || !desc.trim() || !location.trim() || !whatsapp.trim()) {
       setFormError('Please fill in all required fields marked (*).');
@@ -240,6 +247,79 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
             Acquire healthy animals looking for lovely adoptive families or browse legal pet rehoming advertisements.
           </p>
         </div>
+      </div>
+
+      {/* 🛡️ SAFE TRADING COMPLIANCE & LEGAL PROTECTION CENTER */}
+      <div className="bg-[#fcf9f2] border-2 border-amber-200 border-b-[6px] border-b-amber-300 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-lg">🛡️</div>
+            <div>
+              <h3 className="font-serif font-black text-sm md:text-base text-stone-900">
+                Safe Trading Compliance & Anti-Scam Precautions
+              </h3>
+              <p className="text-[10px] md:text-xs font-bold text-stone-500">
+                Mandatory directives for secure transactions on local classified forums.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSafeTradeOpen(!safeTradeOpen)}
+            className="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-[10px] font-black uppercase text-stone-700 rounded-lg border border-stone-200 transition-all cursor-pointer"
+          >
+            {safeTradeOpen ? 'Hide Panel' : 'Show Guide'}
+          </button>
+        </div>
+
+        {safeTradeOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Alert 1 */}
+              <div className="p-3 bg-white rounded-2xl border border-amber-100 text-left space-y-1.5">
+                <div className="text-xs font-black text-amber-800 flex items-center gap-1">
+                  <span>❌ ZERO ADVANCE DEPOSITS</span>
+                </div>
+                <p className="text-[10px] font-semibold text-stone-600 leading-relaxed">
+                  Never pay sellers in advance via EasyPaisa, JazzCash, or bank transfers. Scam artists frequently use fake pictures and vanish after getting a holding deposit. Only pay after a physical handover.
+                </p>
+              </div>
+
+              {/* Alert 2 */}
+              <div className="p-3 bg-white rounded-2xl border border-amber-100 text-left space-y-1.5">
+                <div className="text-xs font-black text-[#5a5a40] flex items-center gap-1">
+                  <span>🏢 CLINICAL INSPECTIONS ONLY</span>
+                </div>
+                <p className="text-[10px] font-semibold text-stone-600 leading-relaxed">
+                  Finalize breed handovers at professional veterinary clinics. Arrange a direct medical test to identify hidden physiological abnormalities, congenital disorders, or fraudulent vaccination cards.
+                </p>
+              </div>
+
+              {/* Alert 3 */}
+              <div className="p-3 bg-white rounded-2xl border border-amber-100 text-left space-y-1.5">
+                <div className="text-xs font-black text-blue-800 flex items-center gap-1">
+                  <span>🎖️ TRUST SEAL VERIFICATION</span>
+                </div>
+                <p className="text-[10px] font-semibold text-stone-600 leading-relaxed">
+                  Verify the listings' badges. Subscribed practitioners carry certified Bronze, Silver, Gold, or Platinum borders indicating a verified track record. Exercise extreme caution with newly registered accounts.
+                </p>
+              </div>
+            </div>
+
+            {/* Legal Liability Disclaimer Statement */}
+            <div className="p-3.5 bg-neutral-900 text-white rounded-2xl space-y-1 font-mono text-[9px] select-none leading-relaxed border border-stone-800">
+              <span className="text-amber-400 font-extrabold uppercase">⚖️ STANDALONE VENUE DISCLAIMER (LEGAL PROTECTION NOTICE):</span>
+              <p className="text-neutral-300 font-semibold">
+                This website constitutes an un-inspected community classified notice board. The application architecture and owners act strictly as hosting venues. The platform possesses zero control or validation regarding animal health status, seller legality, or transaction fidelity. By continuing to browse or transact, all participants irrevocably waive their right to pursue civil actions, demand financial remediation, or issue legal liability notices to the platform owners for scam events, viral transfers, or physical injury.
+              </p>
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* TOAST SYSTEM */}
@@ -436,6 +516,21 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
                     <img src={image} className="w-full h-full object-cover rounded-xl" alt="preview" />
                   </div>
                 )}
+
+                {/* Mandatory Legal & Safety Precaution Agreement Box */}
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 select-none">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={legalAgreed}
+                      onChange={(e) => setLegalAgreed(e.target.checked)}
+                      className="mt-1 w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div className="text-stone-800 text-[11px] leading-relaxed font-semibold">
+                      I agree to the <span className="text-[#a0522d] font-bold">Safe Trading & Anti-Scam Precautions</span>. I certify that I own this animal legally or am fully authorized to list it. I declare that all medical records, breed specs, and vaccination details are 100% accurate. I agree that the platform owners bear absolute <strong className="text-stone-900 underline">zero liability</strong> for any physical, emotional, or financial transactions that arise, holding the webapp safe from legal notices or issues.
+                    </div>
+                  </label>
+                </div>
 
                 <div className="flex gap-3 pt-2">
                   <button

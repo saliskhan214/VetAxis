@@ -186,7 +186,7 @@ const DEFAULT_APPOINTMENTS = (clinicId: string): ClinicAppointment[] => {
 
   return [
     {
-      id: 'apt_1',
+      id: `apt_${clinicId}_1`,
       clinicId,
       patientName: 'Sheru (German Shepherd)',
       ownerName: 'Zainab Ahmed',
@@ -201,7 +201,7 @@ const DEFAULT_APPOINTMENTS = (clinicId: string): ClinicAppointment[] => {
       createdAt: Date.now() - 3600000 * 12
     },
     {
-      id: 'apt_2',
+      id: `apt_${clinicId}_2`,
       clinicId,
       patientName: 'Mano (Persian Cat)',
       ownerName: 'Ali Raza',
@@ -216,7 +216,7 @@ const DEFAULT_APPOINTMENTS = (clinicId: string): ClinicAppointment[] => {
       createdAt: Date.now() - 3600000 * 10
     },
     {
-      id: 'apt_3',
+      id: `apt_${clinicId}_3`,
       clinicId,
       patientName: 'Lucy (Pug)',
       ownerName: 'Farhan Beg',
@@ -231,7 +231,7 @@ const DEFAULT_APPOINTMENTS = (clinicId: string): ClinicAppointment[] => {
       createdAt: Date.now() - 24 * 3600000
     },
     {
-      id: 'apt_4',
+      id: `apt_${clinicId}_4`,
       clinicId,
       patientName: 'Rocky (Husky)',
       ownerName: 'Kamil Khan',
@@ -253,9 +253,9 @@ const DEFAULT_SOAPS = (clinicId: string): ClinicSoapRecord[] => {
   const yesterday = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split('T')[0];
   return [
     {
-      id: 'soap_1',
+      id: `soap_${clinicId}_1`,
       clinicId,
-      appointmentId: 'apt_3',
+      appointmentId: `apt_${clinicId}_3`,
       patientName: 'Lucy (Pug)',
       ownerName: 'Farhan Beg',
       ownerPhone: '03339090901',
@@ -276,12 +276,12 @@ const DEFAULT_INVOICES = (clinicId: string): ClinicInvoice[] => {
   const yesterday = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split('T')[0];
   return [
     {
-      id: 'inv_1',
+      id: `inv_${clinicId}_1`,
       clinicId,
-      appointmentId: 'apt_3',
+      appointmentId: `apt_${clinicId}_3`,
+      date: yesterday,
       patientName: 'Lucy (Pug)',
       ownerName: 'Farhan Beg',
-      date: yesterday,
       items: [
         { id: 'i1', name: 'General Consultation', quantity: 1, unitPrice: 1500, category: 'consultation' },
         { id: 'i2', name: 'Amoxicillin Dosage Pack', quantity: 1, unitPrice: 400, category: 'medicine' },

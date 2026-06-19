@@ -336,9 +336,9 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
     match /job_applications/{applicationId} {
       allow read: if isSignedIn() && (
-        resource.data.get('applicantId', '') == request.auth.uid ||
-        resource.data.get('clinicId', '') == request.auth.uid ||
-        resource.data.get('clinicEmail', '') == request.auth.token.email
+        resource.data.applicantId == request.auth.uid ||
+        resource.data.clinicId == request.auth.uid ||
+        resource.data.clinicEmail == request.auth.token.email
       );
 
       allow create: if isSignedIn() && (
@@ -505,10 +505,10 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
 
     match /clinic_appointments/{apptId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid);
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid);
-      allow create: if isSignedIn() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
-      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid);
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid));
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && (request.resource.data.clinicId == request.auth.uid || ('userId' in request.resource.data && request.resource.data.userId == request.auth.uid));
+      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid));
       allow delete: if isSignedIn();
     }
 
