@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, User, MapPin, Mail, Sparkles, AlertTriangle, Trash2, Camera, RefreshCw, Megaphone, ChevronRight } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
 
+
 interface ProfileProps {
   currentUser: UserProfile;
   onUpdateUser: (updated: UserProfile) => void;
