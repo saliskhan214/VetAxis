@@ -337,15 +337,8 @@ export const ClinicService = {
         const q = query(collection(db, 'clinic_appointments'), where('clinicId', '==', clinicId));
         const snaps = await getDocs(q);
         const results = snaps.docs.map(d => d.data() as ClinicAppointment);
-        if (results.length === 0) {
-          // Fallback seeding
-          const seeds = DEFAULT_APPOINTMENTS(clinicId);
-          for (const s of seeds) {
-            await setDoc(doc(db, 'clinic_appointments', s.id), s);
-          }
-          return seeds;
-        }
-        return results;
+        // Exclude preset seeds
+        return results.filter(a => !['1', '2', '3', '4'].includes(a.id.replace(`apt_${clinicId}_`, '')));
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'clinic_appointments');
         return [];
@@ -353,11 +346,11 @@ export const ClinicService = {
     } else {
       let local = localStorage.getItem(LOCAL_APPTS_KEY);
       if (!local) {
-        const seeds = DEFAULT_APPOINTMENTS(clinicId);
-        localStorage.setItem(LOCAL_APPTS_KEY, JSON.stringify(seeds));
-        return seeds;
+        localStorage.setItem(LOCAL_APPTS_KEY, JSON.stringify([]));
+        return [];
       }
-      return JSON.parse(local) as ClinicAppointment[];
+      const parsed = JSON.parse(local) as ClinicAppointment[];
+      return parsed.filter(a => !['1', '2', '3', '4'].includes(a.id.replace(`apt_${clinicId}_`, '')));
     }
   },
 
@@ -421,14 +414,7 @@ export const ClinicService = {
         const q = query(collection(db, 'clinic_soap_records'), where('clinicId', '==', clinicId));
         const snaps = await getDocs(q);
         const results = snaps.docs.map(d => d.data() as ClinicSoapRecord);
-        if (results.length === 0) {
-          const seeds = DEFAULT_SOAPS(clinicId);
-          for (const s of seeds) {
-            await setDoc(doc(db, 'clinic_soap_records', s.id), s);
-          }
-          return seeds;
-        }
-        return results;
+        return results.filter(s => s.id !== `soap_${clinicId}_1`);
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'clinic_soap_records');
         return [];
@@ -436,11 +422,11 @@ export const ClinicService = {
     } else {
       let local = localStorage.getItem(LOCAL_SOAP_KEY);
       if (!local) {
-        const seeds = DEFAULT_SOAPS(clinicId);
-        localStorage.setItem(LOCAL_SOAP_KEY, JSON.stringify(seeds));
-        return seeds;
+        localStorage.setItem(LOCAL_SOAP_KEY, JSON.stringify([]));
+        return [];
       }
-      return JSON.parse(local) as ClinicSoapRecord[];
+      const parsed = JSON.parse(local) as ClinicSoapRecord[];
+      return parsed.filter(s => s.id !== `soap_${clinicId}_1`);
     }
   },
 
@@ -582,14 +568,7 @@ export const ClinicService = {
         const q = query(collection(db, 'clinic_invoices'), where('clinicId', '==', clinicId));
         const snaps = await getDocs(q);
         const results = snaps.docs.map(d => d.data() as ClinicInvoice);
-        if (results.length === 0) {
-          const seeds = DEFAULT_INVOICES(clinicId);
-          for (const s of seeds) {
-            await setDoc(doc(db, 'clinic_invoices', s.id), s);
-          }
-          return seeds;
-        }
-        return results;
+        return results.filter(i => i.id !== `inv_${clinicId}_1`);
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'clinic_invoices');
         return [];
@@ -597,11 +576,11 @@ export const ClinicService = {
     } else {
       let local = localStorage.getItem(LOCAL_INVOICE_KEY);
       if (!local) {
-        const seeds = DEFAULT_INVOICES(clinicId);
-        localStorage.setItem(LOCAL_INVOICE_KEY, JSON.stringify(seeds));
-        return seeds;
+        localStorage.setItem(LOCAL_INVOICE_KEY, JSON.stringify([]));
+        return [];
       }
-      return JSON.parse(local) as ClinicInvoice[];
+      const parsed = JSON.parse(local) as ClinicInvoice[];
+      return parsed.filter(i => i.id !== `inv_${clinicId}_1`);
     }
   },
 
