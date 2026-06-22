@@ -41,6 +41,7 @@ export interface ClinicSoapRecord {
   clinicId: string;
   appointmentId?: string;
   patientName: string;
+  species?: string;
   ownerName: string;
   ownerPhone: string;
   date: string; // YYYY-MM-DD
@@ -72,6 +73,7 @@ export interface ClinicPrescription {
   clinicId: string;
   soapId?: string;
   patientName: string;
+  species?: string;
   ownerName: string;
   ownerPhone: string;
   date: string;
@@ -500,24 +502,6 @@ export const ClinicService = {
     if (isCloud()) {
       try {
         await setDoc(doc(db, 'clinic_prescriptions', presc.id), cleaned);
-        if (presc.dispensedFromStock) {
-          try {
-            const snaps = await getDocs(collection(db, 'clinic_drugs_inventory'));
-            const drugs = snaps.docs.map(d => d.data() as DrugRecord);
-            for (const pd of presc.drugs) {
-              const matchedIdx = drugs.findIndex(d => d.name.toLowerCase() === pd.name.toLowerCase());
-              if (matchedIdx !== -1) {
-                const matchedDrug = drugs[matchedIdx];
-                if (matchedDrug.stockQuantity > 0) {
-                  matchedDrug.stockQuantity = Math.max(0, matchedDrug.stockQuantity - 1);
-                  await setDoc(doc(db, 'clinic_drugs_inventory', matchedDrug.id), cleanUndefined(matchedDrug));
-                }
-              }
-            }
-          } catch (stockErr) {
-            console.warn('[ClinicService] Failed to auto-deduct online pharmacy stock:', stockErr);
-          }
-        }
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `clinic_prescriptions/${presc.id}`);
       }
@@ -531,18 +515,6 @@ export const ClinicService = {
         all.push(cleaned);
       }
       localStorage.setItem(LOCAL_PRESC_KEY, JSON.stringify(all));
-
-      // Dispense from stock logic simulation if selected
-      if (presc.dispensedFromStock) {
-        const drugs = JSON.parse(localStorage.getItem(LOCAL_DRUGS_KEY) || '[]') as DrugRecord[];
-        presc.drugs.forEach(pd => {
-          const itemIdx = drugs.findIndex(d => d.name.toLowerCase() === pd.name.toLowerCase());
-          if (itemIdx !== -1 && drugs[itemIdx].stockQuantity > 0) {
-            drugs[itemIdx].stockQuantity = Math.max(0, drugs[itemIdx].stockQuantity - 1);
-          }
-        });
-        localStorage.setItem(LOCAL_DRUGS_KEY, JSON.stringify(drugs));
-      }
     }
   },
 
