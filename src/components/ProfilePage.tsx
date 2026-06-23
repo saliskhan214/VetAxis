@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, FormEvent, useEffect, useRef } from 'react';
 import { UserProfile } from '../types';
-import { AuthService, PromotionalAdsService } from '../lib/storage';
+import { AuthService, PromotionalAdsService, LocationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, User, MapPin, Mail, Sparkles, AlertTriangle, Trash2, Camera, RefreshCw, Megaphone, ChevronRight } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
@@ -414,13 +414,17 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
           currentUser.role === 'assistant' ? 'Nurse' :
           'Livestock Breeder / Pet Owner'
         );
-        payload.address = doctorCity;
-        const matchedCity = PAKISTAN_CITIES.find(c => c.name === doctorCity) || PAKISTAN_CITIES[0];
-        payload.location = {
-          lat: matchedCity.lat,
-          lng: matchedCity.lng,
-          address: matchedCity.name
-        };
+        payload.address = doctorCity.trim() || 'Islamabad';
+        
+        // Prefer keeping existing saved precise location coordinates unless the user explicitly altered the practice city name.
+        if (currentUser.address !== payload.address || !currentUser.location?.lat) {
+          const coords = LocationService.resolveCoordinates(payload.address, currentUser.uid);
+          payload.location = {
+            lat: coords.lat,
+            lng: coords.lng,
+            address: coords.address
+          };
+        }
       }
       if (currentUser.role === 'clinic') {
         payload.facilities = facilities.trim() || 'General OPD';
@@ -429,6 +433,16 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
           setError('Clinic physical address is required.');
           setLoading(false);
           return;
+        }
+
+        // Prefer keeping existing saved precise coordinates unless address changed
+        if (currentUser.address !== payload.address || !currentUser.location?.lat) {
+          const coords = LocationService.resolveCoordinates(payload.address, currentUser.uid);
+          payload.location = {
+            lat: coords.lat,
+            lng: coords.lng,
+            address: coords.address
+          };
         }
       }
 
@@ -745,20 +759,17 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                     </div>
                     <div className="space-y-1">
                       <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">
-                        {currentUser.role === 'user' ? 'Location City / district' : 'Practice City / Town'}
+                        {currentUser.role === 'user' ? 'Location City / district *' : 'Practice City / Town *'}
                       </span>
-                      <select
-                        className="form-control text-xs bg-white cursor-pointer"
+                      <input
+                        type="text"
+                        required
+                        className="form-control text-xs bg-white font-serif"
+                        placeholder="e.g. Islamabad, Lahore, Multan"
                         value={doctorCity}
                         onChange={(e) => setDoctorCity(e.target.value)}
                         disabled={loading}
-                      >
-                        {PAKISTAN_CITIES.map((c) => (
-                          <option key={c.name} value={c.name}>
-                            🇵🇰 {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                 )}

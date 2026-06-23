@@ -831,7 +831,7 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
               </tr>
               <tr>
                 <td className="p-4 pl-6 text-[#5a5a40] font-black">📦 Marketplace Product & Pet Ads</td>
-                <td className="p-4 text-center text-red-500">Max 3 ads</td>
+                <td className="p-4 text-center text-red-500">Max 3 ads weekly</td>
                 <td className="p-4 text-center text-slate-700 font-black">Unlimited Ads</td>
                 <td className="p-4 text-center text-amber-800 font-black">Unlimited Ads</td>
                 <td className="p-4 text-center text-indigo-700 font-black">Unlimited Ads</td>

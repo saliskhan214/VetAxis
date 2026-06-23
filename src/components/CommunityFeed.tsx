@@ -1,12 +1,40 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
 import { CommunityService, NotificationService, LocationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, MessageCircle, AlertCircle, Heart, ThumbsUp, AlertTriangle, 
   ShieldCheck, TrendingUp, Users, Megaphone, Navigation, CreditCard, 
-  CheckCircle, DollarSign, MapPin, Zap, Radio, Send, X, HelpCircle
+  CheckCircle, DollarSign, MapPin, Zap, Radio, Send, X, HelpCircle,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
+
+const formatErrorMessage = (message: string): string => {
+  if (!message) return 'An unexpected error occurred.';
+  if (message.startsWith('{') || message.includes('"error"')) {
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed.error) {
+        return parsed.error;
+      }
+    } catch (_) {}
+  }
+  return message;
+};
+
+const PAKISTAN_CITIES = [
+  { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },
+  { name: 'Lahore', lat: 31.5204, lng: 74.3587 },
+  { name: 'Karachi', lat: 24.8607, lng: 67.0011 },
+  { name: 'Peshawar', lat: 34.0151, lng: 71.5249 },
+  { name: 'Quetta', lat: 30.1798, lng: 66.9750 },
+  { name: 'Rawalpindi', lat: 33.5651, lng: 73.0169 },
+  { name: 'Faisalabad', lat: 31.4504, lng: 73.1350 },
+  { name: 'Multan', lat: 30.1575, lng: 71.5249 },
+  { name: 'Sialkot', lat: 32.4945, lng: 74.5229 },
+  { name: 'Gujranwala', lat: 32.1877, lng: 74.1945 },
+  { name: 'Hyderabad', lat: 25.3960, lng: 68.3578 },
+];
 
 interface CommunityFeedProps {
   currentUser: UserProfile;
@@ -17,16 +45,32 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  
+  const [cityFilter, setCityFilter] = useState<string>(() => {
+    const userCity = currentUser.address || '';
+    const hasCity = PAKISTAN_CITIES.some(c => c.name.toLowerCase() === userCity.toLowerCase());
+    return hasCity ? userCity : 'all';
+  });
+
+  const [newPostCity, setNewPostCity] = useState<string>(() => {
+    const userCity = currentUser.address || '';
+    const hasCity = PAKISTAN_CITIES.some(c => c.name.toLowerCase() === userCity.toLowerCase());
+    return hasCity ? userCity : 'Islamabad';
+  });
 
   // Compose variables
   const [newTitle, setNewTitle] = useState<string>('');
   const [newPostText, setNewPostText] = useState<string>('');
-  const [newCategory, setNewCategory] = useState<'lost' | 'adoption' | 'help' | 'general'>('general');
+  const [newCategory, setNewCategory] = useState<'lost' | 'adoption' | 'help' | 'general' | 'emergency'>('general');
   
   // States
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [postToDelete, setPostToDelete] = useState<CommunityPost | null>(null);
+
+  // sliding emergency story states
+  const [selectedStoryPost, setSelectedStoryPost] = useState<CommunityPost | null>(null);
+  const storiesContainerRef = useRef<HTMLDivElement>(null);
 
   // Separate upfront Premium Lost Post Alert system states
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState<boolean>(false);
@@ -75,6 +119,28 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       console.error('Failed to load posts', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLocatePost = (postId: string) => {
+    const post = posts.find((p) => p.id === postId);
+    if (post) {
+      if (activeFilter !== 'all' && activeFilter !== post.category) {
+        setActiveFilter('all');
+      }
+      
+      setTimeout(() => {
+        const el = document.getElementById(`post-${postId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-red-500', 'ring-4', 'scale-[1.02]');
+          setTimeout(() => {
+            el.classList.remove('ring-red-500', 'ring-4', 'scale-[1.02]');
+          }, 3000);
+        } else {
+          triggerToast("Locating post on active stream...", "success");
+        }
+      }, 150);
     }
   };
 
@@ -191,7 +257,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         newCategory,
         currentUser,
         newTitle.trim() || undefined,
-        undefined // No image URL cover attachment
+        undefined, // No image URL cover attachment
+        undefined, // isBoosted
+        undefined, // boostDetails
+        undefined, // images
+        newPostCity
       );
 
       setPosts((prev) => [created, ...prev]);
@@ -203,7 +273,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
       triggerToast('✓ Your professional community post has been published successfully!');
     } catch (err: any) {
-      triggerToast(err.message || 'Post failed.', 'error');
+      triggerToast(formatErrorMessage(err.message || 'Post failed.'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -340,11 +410,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
   const handleProcessPremiumPayment = async () => {
     if (!premiumTitle.trim()) {
-      alert('Please state a title for the premium lost alert.');
+      alert('Please state a title for the emergency alert.');
       return;
     }
     if (!premiumText.trim()) {
-      alert('Please describe your missing pet in detail.');
+      alert('Please describe the emergency in detail.');
       return;
     }
     if (!premiumAddress.trim()) {
@@ -352,73 +422,51 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       return;
     }
 
-    // Subscription Alerts limit evaluation
-    const tier = currentUser.subscriptionTier;
-    let maxFreeAlerts = 0;
-    if (tier === 'Silver') maxFreeAlerts = 15;
-    else if (tier === 'Gold') maxFreeAlerts = 30;
-    else if (tier === 'Platinum') maxFreeAlerts = Infinity;
-
-    const myAlertsCount = posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length;
-    const isAlertFree = tier ? (myAlertsCount < maxFreeAlerts) : false;
-
-    if (!isAlertFree) {
-      if (!premiumPayerAccount.trim() || !premiumPayerName.trim() || !premiumPayerCvv.trim()) {
-        alert('Please fill out all billing credentials for authentication.');
-        return;
-      }
-    }
-
     setPremiumStep('processing');
 
-    // Simulate radio transmitter latency
     setTimeout(async () => {
       try {
-        const amount = isAlertFree ? 0 : (premiumRadius === 5 ? 300 : 500);
-        const targetLoc: GeoLocation = {
-          lat: parseFloat(String(premiumLat)) || 33.6844,
-          lng: parseFloat(String(premiumLng)) || 73.0479,
-          address: premiumAddress.trim()
-        };
-
-        const postDetails = {
-          amountPaid: amount,
-          lastSeenLoc: targetLoc,
-          radiusKm: premiumRadius,
-          notifiedCount: 0,
-          ts: Date.now()
-        };
+        const targetCity = PAKISTAN_CITIES.find(c => premiumAddress.toLowerCase().includes(c.name.toLowerCase()))?.name || currentUser.address || 'All Cities';
 
         const created = await CommunityService.createPost(
           premiumText.trim(),
-          'lost',
+          'emergency',
           currentUser,
           premiumTitle.trim(),
-          undefined, // no image URL attachment
-          true, // isBoosted
-          postDetails,
-          premiumImages
+          undefined,
+          true,
+          undefined,
+          premiumImages,
+          targetCity,
+          premiumAddress.trim()
         );
 
-        // Update posts state to instantly show glowing animations on the client feed
         setPosts((prev) => [created, ...prev]);
         setPremiumStep('success');
       } catch (err: any) {
         console.error(err);
-        alert(err.message || 'Encryption failed during security rules validation.');
+        alert(formatErrorMessage(err.message || 'Failed to publish emergency alert.'));
         setPremiumStep('details');
       }
-    }, 2800);
+    }, 1500);
   };
 
   // Filters
   const filteredPosts = posts.filter((p) => {
-    if (activeFilter === 'all') return true;
-    return p.category === activeFilter;
+    // 1. Category filter
+    const matchesCategory = activeFilter === 'all' || p.category === activeFilter;
+    if (!matchesCategory) return false;
+
+    // 2. City Filter
+    if (cityFilter === 'all') return true;
+    
+    // Show posts matching the selected city, or general/global posts that have no set city or explicitly set to 'All Cities'
+    const postCity = p.city || 'All Cities';
+    return postCity === 'All Cities' || postCity.toLowerCase().trim() === cityFilter.toLowerCase().trim();
   });
 
   // Calculate stats for sidebar
-  const categoryCounts = { lost: 0, adoption: 0, help: 0, general: 0 };
+  const categoryCounts = { lost: 0, adoption: 0, help: 0, general: 0, emergency: 0 };
   posts.forEach((p) => {
     if (categoryCounts[p.category] !== undefined) categoryCounts[p.category]++;
   });
@@ -435,130 +483,238 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   return (
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4">
       
-      {/* PROFESSIONAL BOARD HERO HEADER */}
-      <div className="relative bg-[#3e3e2b] text-white p-8 md:p-10 rounded-3xl overflow-hidden border border-[#5a5a40] border-b-[8px] border-b-[#2e2e1f] shadow-xl animate-fadeIn">
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-10" />
-        <div className="absolute top-1/2 right-12 -translate-y-1/2 opacity-15 pointer-events-none hidden md:block">
-          <Megaphone className="w-44 h-44 text-[#a3a375]" />
-        </div>
-        <div className="relative z-10 space-y-3 text-left">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#5a5a40] text-[#fcf9f2] rounded-lg text-[10px] font-black tracking-widest uppercase border border-white/10">
-            📡 Live Broadcast Network
-          </span>
-          <h2 className="text-3xl md:text-4xl font-serif font-black tracking-tight leading-tight">
-            Verified Clinical & Public Bulletin
-          </h2>
-          <p className="text-[#cdc6ad] text-sm font-medium max-w-xl">
-            Post clinic advisories, request community-wide veterinary assistance, facilitate pet adoptions, or utilize the premium <strong className="text-white">Emergency Radar Shield</strong> to search missing pets rapidly.
-          </p>
-        </div>
-      </div>
+      {/* ACTIVE EMERGENCY STORIES ROW (Now occupying top spot as requested) */}
+      {(() => {
+        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const activeEmergencyPosts = posts.filter(
+          (p) => (p.category === 'emergency' || p.isBoosted) && p.ts >= thirtyDaysAgo
+        );
 
-      {/* ACTIVE BOOSTED EMERGENCY AD ALERTS */}
-      {posts.filter(p => p.isBoosted).length > 0 && (
-        <div className="bg-gradient-to-br from-red-50 via-rose-50 to-amber-50 border-2 border-red-500 rounded-3xl p-6 shadow-[0_15px_30px_rgba(239,68,68,0.15)] flex flex-col gap-4 text-left relative overflow-hidden">
-          <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-red-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg relative">
-                <span className="absolute inset-0 rounded-2xl bg-red-600 animate-ping opacity-25"></span>
-                <span className="text-lg">📢</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="bg-red-600 text-white font-mono text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest leading-none">
-                    PRIORITY EMERGENCY AD
-                  </span>
-                  <span className="text-[10px] text-zinc-500 font-bold">
-                    Active Broadcaster Signal
-                  </span>
+        const scrollStories = (direction: 'left' | 'right') => {
+          if (storiesContainerRef.current) {
+            const scrollAmount = 300;
+            storiesContainerRef.current.scrollBy({
+              left: direction === 'left' ? -scrollAmount : scrollAmount,
+              behavior: 'smooth'
+            });
+          }
+        };
+
+        if (activeEmergencyPosts.length === 0) {
+          return (
+            <div className="relative bg-gradient-to-br from-[#fcfbf9] via-[#f7f5ef] to-stone-100 border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] rounded-3xl p-6 md:p-8 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 text-left overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(#5a5a40_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-5 pointer-events-none" />
+              <div className="flex items-start gap-4 z-10">
+                <div className="w-12 h-12 rounded-2xl bg-[#5a5a40]/10 text-[#5a5a40] flex items-center justify-center shrink-0 shadow-inner">
+                  <Megaphone className="w-5 h-5 animate-pulse text-[#5a5a40]" />
                 </div>
-                <h3 className="font-serif font-black text-red-950 text-lg leading-tight">
-                  Active Emergency Lost Pet Ads
-                </h3>
+                <div className="space-y-1">
+                  <span className="bg-[#5a5a40] text-stone-100 font-mono text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-widest leading-none">
+                    Verified Broadcasts
+                  </span>
+                  <h4 className="font-serif font-black text-[#2c2c1c] text-base leading-tight">
+                    Verify & Locate Emergency Incidents
+                  </h4>
+                  <p className="text-xs text-stone-600 font-semibold leading-relaxed max-w-xl">
+                    High-priority community safety alerts, missing pet reports, and urgent clinic advisories are featured instantly in this spot. No emergency signals are currently flagged.
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 z-10">
-            {posts.filter(p => p.isBoosted).map((post) => (
-              <div 
-                key={post.id}
-                className="bg-white border border-red-100 hover:border-red-300 rounded-3xl p-5 space-y-4 shadow-xs transition-all hover:shadow-md relative overflow-hidden flex flex-col justify-between"
+              <button
+                onClick={openPremiumAlertModal}
+                className="w-full md:w-auto bg-red-600 hover:bg-red-700 text-white text-[11px] font-black uppercase tracking-widest px-6 py-3.5 rounded-2xl shadow-md border-b-[4px] border-b-red-800 transition-all cursor-pointer whitespace-nowrap leading-none z-10"
               >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-                      📍 Last Seen: {post.boostDetails?.lastSeenLoc.address || 'Local Region'}
-                    </span>
-                    <span className="text-[9px] text-[#7a766f] font-mono">
-                      {new Date(post.ts).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-serif font-bold text-[#3c3c2b] text-base leading-tight hover:text-red-700 transition-colors">
-                      {post.title || "Emergency Lost Pet Alert"}
-                    </h4>
-                    <p className="text-xs text-[#52523b] font-medium leading-relaxed mt-1.5 whitespace-pre-wrap">
-                      {post.text || post.description}
-                    </p>
-                  </div>
+                🚨 Post Emergency Alert
+              </button>
+            </div>
+          );
+        }
 
-                  {/* Pictures Preview */}
-                  {post.images && post.images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      {post.images.map((imgSrc: string, imgIdx: number) => (
-                        <div key={imgIdx} className="relative aspect-video rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group shadow-inner">
-                          <img 
-                            src={imgSrc} 
-                            alt={`Emergency Preview ${imgIdx + 1}`} 
-                            className="w-full h-full object-cover select-none"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Notification System Signal Status */}
-                  <div className="bg-red-50/70 rounded-xl p-2.5 border border-red-100 text-[10px] space-y-1">
-                    <div className="flex items-center gap-1.5 text-red-800 font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
-                      <span>Broadcaster Dispatch System</span>
-                    </div>
-                    <p className="text-zinc-650 font-semibold">
-                      🔔 Sent high-priority sound alarm and push alerts to <strong className="font-sans font-extrabold text-red-700">{post.boostDetails?.notifiedCount || 12} matching users & veterinarians</strong> inside the {post.boostDetails?.radiusKm || 5}km secure perimeter.
-                    </p>
-                  </div>
+        return (
+          <div className="bg-gradient-to-br from-red-50 via-rose-50/50 to-amber-50/30 border-2 border-red-400 border-b-[6px] border-b-red-500 rounded-3xl p-6 shadow-md flex flex-col gap-4 text-left relative overflow-hidden">
+            {/* Decorative elements */}
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-red-100/60 rounded-full blur-3xl opacity-60 pointer-events-none" />
+            
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg relative">
+                  <span className="absolute inset-0 rounded-2xl bg-red-600 animate-ping opacity-25"></span>
+                  <span className="text-lg">🚨</span>
                 </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-zinc-100 mt-2">
-                  <div className="flex items-center gap-1.5 text-[9px] text-red-700 font-black tracking-widest uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping"></span>
-                    <span>Radar {post.boostDetails?.radiusKm || 5}km Shield</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="bg-red-600 text-white font-mono text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest leading-none">
+                      EMERGENCY STORIES
+                    </span>
+                    <span className="text-[10px] text-red-900/80 font-bold">
+                      Active 30 Days Signal Life
+                    </span>
                   </div>
+                  <h3 className="font-serif font-black text-red-950 text-lg leading-tight">
+                    {activeEmergencyPosts.length > 1 ? 'Recent Sliding Emergency Stories' : 'Active Emergency Spotlight'}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Slider Controls (Only visible when more than 1 post is listed) */}
+              {activeEmergencyPosts.length > 1 && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      const el = document.getElementById(`post-${post.id}`);
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        el.classList.add('ring-red-600', 'ring-4', 'scale-[1.02]');
-                        setTimeout(() => {
-                          el.classList.remove('ring-red-600', 'ring-4', 'scale-[1.02]');
-                        }, 4000);
-                      }
-                    }}
-                    className="cursor-pointer bg-[#5a5a40] hover:bg-[#3e3e2b] text-white text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-md border-none shadow-xs transition-transform hover:scale-103 whitespace-nowrap"
+                    onClick={() => scrollStories('left')}
+                    className="cursor-pointer p-2 rounded-xl bg-white hover:bg-red-100 border border-red-200 text-red-700 shadow-xs transition-colors flex items-center justify-center"
                   >
-                    Locate Alert 🔎
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => scrollStories('right')}
+                    className="cursor-pointer p-2 rounded-xl bg-white hover:bg-red-100 border border-red-200 text-red-700 shadow-xs transition-colors flex items-center justify-center"
+                  >
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
+              )}
+            </div>
+
+            {/* Stories list rendering */}
+            {activeEmergencyPosts.length === 1 ? (
+              // Single post spotlight card (standard preview layout)
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-2 z-10 w-full">
+                {activeEmergencyPosts.map((post) => {
+                  const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
+                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const hasImage = post.images && post.images.length > 0;
+                  
+                  return (
+                    <div 
+                      key={post.id}
+                      className="bg-white border border-red-200 hover:border-red-350 rounded-2xl p-5 shadow-sm transition-all relative overflow-hidden flex flex-col md:flex-row gap-5"
+                    >
+                      {/* Media thumbnail */}
+                      {hasImage ? (
+                        <div className="w-full md:w-56 shrink-0 aspect-video md:aspect-[4/3] rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
+                          <img 
+                            src={post.images![0]} 
+                            className="w-full h-full object-cover"
+                            alt="Emergency cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full md:w-56 shrink-0 aspect-video md:aspect-[4/3] rounded-xl bg-red-50 border border-red-100 text-red-600 flex flex-col items-center justify-center p-4 text-center">
+                          <Megaphone className="w-8 h-8 animate-bounce mb-1.5" />
+                          <span className="text-[10px] uppercase font-black tracking-wider leading-none">Emergency Signal</span>
+                        </div>
+                      )}
+
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div className="space-y-3 text-left">
+                          <div className="flex items-center gap-2 flex-wrap text-stone-500">
+                            <span className="text-[9px] text-red-700 font-black uppercase bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">
+                              🕒 {daysRemaining} days remaining
+                            </span>
+                            {(post.address || post.boostDetails?.lastSeenLoc?.address) && (
+                              <span className="text-[9.5px] text-stone-700 font-extrabold bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-red-500" />
+                                {post.address || post.boostDetails?.lastSeenLoc?.address}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-serif font-black text-[#2c2c1c] text-base leading-snug">
+                              {post.title || "Emergency Help Requested"}
+                            </h4>
+                            <p className="text-xs text-stone-600 font-medium leading-relaxed mt-1.5 line-clamp-3">
+                              {post.text}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-dashed border-red-100 mt-4">
+                          <span className="text-[9px] font-black tracking-wider uppercase text-red-600">
+                            🚨 Spotlight Feed Entry
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleLocatePost(post.id)}
+                              className="cursor-pointer bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-xl border-none shadow-xs transition-colors animate-pulse"
+                            >
+                              Locate & Focus 🔎
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            ) : (
+              // sliding carousel stories view when length > 1
+              <div 
+                ref={storiesContainerRef}
+                className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x scroll-smooth select-none max-w-full"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {activeEmergencyPosts.map((post) => {
+                  const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
+                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const hasImage = post.images && post.images.length > 0;
+                  
+                  return (
+                    <div 
+                      key={post.id}
+                      onClick={() => handleLocatePost(post.id)}
+                      className="cursor-pointer snap-start shrink-0 w-[310px] sm:w-[355px] h-[190px] bg-white hover:bg-stone-50 rounded-2xl p-4 transition-all relative flex gap-3.5 border-2 border-red-100 hover:border-red-350 hover:shadow-md text-left group"
+                    >
+                      {/* Left content column (flexible) */}
+                      <div className="flex-1 flex flex-col justify-between min-w-0">
+                        <div className="space-y-1.5">
+                          {/* Card Author/Badge header */}
+                          <div className="flex items-center gap-2">
+                            <span className="bg-red-500 text-white font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                              🚨 EMERGENCY ({daysRemaining}d left)
+                            </span>
+                          </div>
+                          
+                          {/* Title */}
+                          <h4 className="font-serif font-black text-[#2c2c1c] text-xs leading-tight line-clamp-1">
+                            {post.title || "Emergency Alert"}
+                          </h4>
+                          
+                          {/* Description text preview (makes preview visible even if not clicked/touched) */}
+                          <p className="text-[10px] text-stone-600 font-semibold leading-snug line-clamp-4">
+                            {post.text}
+                          </p>
+                        </div>
+
+                        {/* Location */}
+                        <div className="flex items-center gap-1 text-[9px] text-red-700 font-extrabold truncate">
+                          <MapPin className="w-3 h-3 text-red-500 shrink-0" />
+                          <span className="truncate">{post.address || post.boostDetails?.lastSeenLoc?.address || post.city}</span>
+                        </div>
+                      </div>
+
+                      {/* Right image/thumbnail column */}
+                      <div className="w-24 h-full shrink-0 rounded-xl overflow-hidden bg-stone-50 border border-stone-100 flex items-center justify-center relative">
+                        {hasImage ? (
+                          <img 
+                            src={post.images![0]} 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 animate-fadeIn"
+                            alt="Story thumbnail"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-tr from-red-500 to-rose-400 text-white flex flex-col items-center justify-center p-2 text-center">
+                            <Megaphone className="w-5 h-5 animate-pulse" />
+                            <span className="text-[7.5px] uppercase font-black tracking-wider text-white/95 mt-1">SIGNAL</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TOAST PANEL */}
       <AnimatePresence>
@@ -585,7 +741,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         {/* LEFT COMPOSER & FEEDS (8 columns) */}
         <div className="col-span-12 lg:col-span-8 space-y-6">
           
-          {/* UPFRONT PREMIUM EMERGENCY TRIGGER CARD */}
+          {/* UPFRONT EMERGENCY TRIGGER CARD */}
           <div className="bg-gradient-to-r from-red-50 to-orange-50/80 border-2 border-dashed border-red-300 rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-sm text-left">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md animate-pulse">
@@ -593,11 +749,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="bg-red-600 text-[8px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">Premium Access</span>
-                  <h4 className="font-serif font-black text-red-900 text-sm">Need Help Urgently? Priority Broadcast System</h4>
+                  <span className="bg-red-600 text-[8px] font-black text-white px-2 py-0.5 rounded uppercase tracking-wider">Urgent Broadcast</span>
+                  <h4 className="font-serif font-black text-red-900 text-sm">Have an Emergency? Post a General Emergency Alert</h4>
                 </div>
                 <p className="text-xs text-red-700/80 font-semibold leading-normal">
-                  Pay micro-fees (<strong className="text-red-900">PKR 300 to PKR 500</strong>) to submit an urgent Alert and instantly trigger local push notifications to all users & vets within 10km.
+                  Publish a high-priority emergency alert. It will be posted with the general tag and shared as a 30-day sliding story preview. Free for all local guardians.
                 </p>
               </div>
             </div>
@@ -605,7 +761,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               onClick={openPremiumAlertModal}
               className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white text-[11px] font-black uppercase tracking-widest px-6 py-3.5 rounded-2xl shadow-md border-b-[4px] border-b-red-800 transition-all cursor-pointer whitespace-nowrap"
             >
-              🚨 Trigger Premium Alert
+              🚨 Post Emergency Alert
             </button>
           </div>
 
@@ -655,32 +811,50 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               </div>
 
               {/* ACTION ROW BAR */}
-              <div className="border-t border-[#f4f1e9] pt-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="border-t border-[#f4f1e9] pt-4 flex flex-col lg:flex-row gap-4 items-center justify-between">
                 
-                {/* Category selector */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-extrabold text-[#a49f92] uppercase tracking-wider">Category Tag:</span>
-                  {[
-                    { id: 'adoption', label: '🟢 Adoption', activeClass: 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold' },
-                    { id: 'help', label: '🔵 Help Call', activeClass: 'bg-blue-50 border-blue-500 text-blue-700 font-bold' },
-                    { id: 'general', label: '📝 General', activeClass: 'bg-stone-100 border-[#5a5a40] text-[#5a5a40] font-bold' }
-                  ].map((cat) => {
-                    const isSelected = newCategory === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => setNewCategory(cat.id as any)}
-                        className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                          isSelected
-                            ? `${cat.activeClass} border-b-[3px] scale-[1.02] shadow-sm`
-                            : 'bg-white border-[#e3dec9] border-b-[2px] text-[#7a766f] hover:bg-[#fcf9f2]'
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    );
-                  })}
+                {/* Category & City selector */}
+                <div className="flex items-center gap-3.5 flex-wrap w-full lg:w-auto">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-extrabold text-[#a49f92] uppercase tracking-wider">Category Tag:</span>
+                    {[
+                      { id: 'adoption', label: '🟢 Adoption', activeClass: 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold' },
+                      { id: 'help', label: '🔵 Help Call', activeClass: 'bg-blue-50 border-blue-500 text-blue-700 font-bold' },
+                      { id: 'general', label: '📝 General', activeClass: 'bg-stone-100 border-[#5a5a40] text-[#5a5a40] font-bold' }
+                    ].map((cat) => {
+                      const isSelected = newCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setNewCategory(cat.id as any)}
+                          className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                            isSelected
+                              ? `${cat.activeClass} border-b-[3px] scale-[1.02] shadow-sm`
+                              : 'bg-white border-[#e3dec9] border-b-[2px] text-[#7a766f] hover:bg-[#fcf9f2]'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="h-4 w-px bg-stone-200 hidden lg:block" />
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-extrabold text-[#a49f92] uppercase tracking-wider">Target City:</span>
+                    <select
+                      value={newPostCity}
+                      onChange={(e) => setNewPostCity(e.target.value)}
+                      className="cursor-pointer bg-white border border-[#e3dec9] border-b-[2px] px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#5a5a40] font-serif focus:outline-none focus:ring-1 focus:ring-[#5a5a40]"
+                    >
+                      <option value="All Cities">🌐 All Cities (General)</option>
+                      {PAKISTAN_CITIES.map((c) => (
+                        <option key={c.name} value={c.name}>🇵🇰 {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-4 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
@@ -700,29 +874,52 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
             </form>
           </div>
 
-          {/* STREAM SECTION FILTER PANEL */}
-          <div className="flex flex-wrap gap-2 bg-white border border-[#e3dec9] p-2 rounded-2xl shadow-sm text-left">
-            {[
-              { id: 'all', label: '🌐 All Streams', activeClass: 'bg-[#5a5a40] border-[#5a5a40] border-b-[3px] border-b-[#3e3e2b] text-white font-extrabold' },
-              { id: 'lost', label: '🔴 Missing Pets & Alerts', activeClass: 'bg-[#df4747] border-[#c23838] border-b-[3px] border-b-[#9e2a2a] text-white font-extrabold' },
-              { id: 'adoption', label: '🟢 Adoption Circles', activeClass: 'bg-emerald-600 border-emerald-700 border-b-[3px] border-b-emerald-800 text-white font-extrabold' },
-              { id: 'help', label: '🔵 Assistance Queries', activeClass: 'bg-blue-600 border-blue-700 border-b-[3px] border-b-blue-800 text-white font-extrabold' }
-            ].map((f) => {
-              const isActive = activeFilter === f.id;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setActiveFilter(f.id)}
-                  className={`cursor-pointer px-4.5 py-2.5 text-xs font-bold rounded-xl border transition-all ${
-                    isActive
-                      ? f.activeClass
-                      : 'bg-[#fcf9f2] border-[#e3dec9] border-b-[2px] text-[#7a766f] hover:bg-white hover:text-black'
-                  }`}
+          {/* STREAM SECTION & CITY LOCALIZE FILTER PANEL */}
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between text-left">
+            <div className="flex flex-wrap gap-2 bg-white border border-[#e3dec9] p-2 rounded-2xl shadow-sm flex-1">
+              {[
+                { id: 'all', label: '🌐 All Streams', activeClass: 'bg-[#5a5a40] border-[#5a5a40] border-b-[3px] border-b-[#3e3e2b] text-white font-extrabold' },
+                { id: 'emergency', label: '🚨 Emergency Alerts', activeClass: 'bg-red-600 border-red-700 border-b-[3px] border-b-red-800 text-white font-extrabold' },
+                { id: 'lost', label: '🔴 Missing Pets', activeClass: 'bg-[#df4747] border-[#c23838] border-b-[3px] border-b-[#9e2a2a] text-white font-extrabold' },
+                { id: 'adoption', label: '🟢 Adoption Circles', activeClass: 'bg-emerald-600 border-emerald-700 border-b-[3px] border-b-emerald-800 text-white font-extrabold' },
+                { id: 'help', label: '🔵 Assistance Queries', activeClass: 'bg-blue-600 border-blue-700 border-b-[3px] border-b-blue-800 text-white font-extrabold' }
+              ].map((f) => {
+                const isActive = activeFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setActiveFilter(f.id)}
+                    className={`cursor-pointer px-4 py-2.5 text-xs font-bold rounded-xl border transition-all ${
+                      isActive
+                        ? f.activeClass
+                        : 'bg-[#fcf9f2] border-[#e3dec9] border-b-[2px] text-[#7a766f] hover:bg-white hover:text-black'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Localized City Segregator */}
+            <div className="flex items-center gap-2 bg-white border border-[#e3dec9] p-2 rounded-2xl shadow-sm md:min-w-[240px]">
+              <div className="bg-[#fcf9f2] p-2 rounded-xl text-amber-600 border border-[#e3dec9]">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-xs">
+                <span className="text-[9px] font-extrabold text-[#a49f92] uppercase block tracking-wider leading-tight">Post Locality</span>
+                <select
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  className="bg-transparent border-none font-bold text-stone-700 w-full focus:outline-none focus:ring-0 cursor-pointer text-xs p-0 pt-0.5 outline-none"
                 >
-                  {f.label}
-                </button>
-              );
-            })}
+                  <option value="all">📍 All of Pakistan (Unfiltered)</option>
+                  {PAKISTAN_CITIES.map((c) => (
+                    <option key={c.name} value={c.name}>🇵🇰 {c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* MAIN CHRONOLOGICAL POST STREAM */}
@@ -828,8 +1025,13 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                                   {post.role === 'doctor' ? '🩺' : post.role === 'clinic' ? '🏥' : '🐾'}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-[#a49f92] font-semibold flex items-center gap-2 uppercase tracking-wider mt-1">
+                              <div className="text-[10px] text-[#a49f92] font-semibold flex flex-wrap items-center gap-1.5 uppercase tracking-wider mt-1.5">
                                 <span className="text-[#5a5a40] font-bold">{post.role}</span>
+                                <span>•</span>
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#fcf9f2] text-amber-800 font-extrabold font-serif rounded border border-[#e3dec9] normal-case text-[9px]">
+                                  <MapPin className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                  {post.city || 'All Cities'}
+                                </span>
                                 <span>•</span>
                                 <span>
                                   {new Date(post.ts).toLocaleDateString('en-PK', {
@@ -1336,7 +1538,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         )}
       </AnimatePresence>
 
-      {/* UPFRONT SEPARATE PREMIUM LOST POST ALERT SYSTEM MODAL */}
+      {/* UPFRONT SEPARATE GENERAL EMERGENCY ALERT SYSTEM MODAL */}
       <AnimatePresence>
         {isPremiumModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] overflow-y-auto">
@@ -1347,17 +1549,20 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               className="bg-white rounded-3xl border-2 border-red-500 w-full max-w-lg p-6 text-left shadow-2xl relative overflow-hidden"
             >
               
-              {/* Radar glowing decorative graphic background */}
+              {/* Glowing decorative alert backdrop */}
               <div className="absolute top-0 right-0 w-36 h-36 bg-red-500/5 rounded-bl-full pointer-events-none -z-10" />
 
               <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
                 <div className="flex items-center gap-1.5 text-red-600">
                   <Megaphone className="w-5 h-5 animate-pulse" />
-                  <h3 className="text-base font-serif font-black uppercase tracking-wider">Premium Emergency Alert Post</h3>
+                  <h3 className="text-base font-serif font-black uppercase tracking-wider">Post Emergency Alert</h3>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsPremiumModalOpen(false)}
+                  onClick={() => {
+                    setIsPremiumModalOpen(false);
+                    setPremiumImages([]);
+                  }}
                   className="p-1 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700"
                 >
                   <X className="w-5 h-5" />
@@ -1368,7 +1573,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               {premiumStep === 'details' && (
                 <div className="space-y-4">
                   <p className="text-stone-600 text-xs leading-relaxed font-semibold">
-                    You are posting an upfront Premium Lost Pet Alert. Verified push notification signals will be sent instantly to all nearby users & clinical centers.
+                    You are posting an Emergency Alert to the community board. This alert will be tagged highly on the main feed and featured in the active sliding story banner above!
                   </p>
 
                   {/* Title of Alert */}
@@ -1378,18 +1583,18 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                       type="text"
                       value={premiumTitle}
                       onChange={(e) => setPremiumTitle(e.target.value)}
-                      placeholder="e.g. Missing Persian Cat near Sector G-11"
+                      placeholder="e.g. Lost Cat or Urgent Blood Donor Required"
                       className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
                     />
                   </div>
 
                   {/* Description of Alert */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-red-700 tracking-wider block">2. Describe Pet and reward details</label>
+                    <label className="text-[10px] font-black uppercase text-red-700 tracking-wider block">2. Describe Emergency Details</label>
                     <textarea
                       value={premiumText}
                       onChange={(e) => setPremiumText(e.target.value)}
-                      placeholder="Highlight distinguishing features, custom reward details, contact phone, and timestamp..."
+                      placeholder="Describe what occurred, distinctive features, contact info, and current needs..."
                       rows={3}
                       className="w-full text-xs font-sans font-semibold bg-[#fcf9f2]/60 border border-[#e3dec9] p-3 rounded-xl outline-none resize-none"
                     />
@@ -1397,7 +1602,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
                   {/* Option to add pictures (2 maximum, 1MB maximum each) */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-red-700 tracking-wider block">3. Attach Photos of Lost Animal/Pet (Maximum 2, 1MB each)</label>
+                    <label className="text-[10px] font-black uppercase text-red-700 tracking-wider block">3. Attach Photos (Maximum 2, 1MB each)</label>
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <label className={`cursor-pointer inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border-2 border-dashed border-[#e3dec9] bg-stone-50 hover:bg-stone-100 text-xs text-[#5a5a40] font-black ${premiumImages.length >= 2 ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -1483,183 +1688,17 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     </div>
                   </div>
 
-                  {/* Range selection */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-red-700 tracking-wider block">5. Broadcast Radius Range</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setPremiumRadius(5)}
-                        className={`p-3.5 rounded-2xl text-left border-2 transition-all cursor-pointer ${
-                          premiumRadius === 5
-                            ? 'bg-red-50/40 border-red-500 text-red-900 shadow-sm'
-                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <strong className="text-xs font-black uppercase tracking-wide">📡 Local Alert</strong>
-                          {isAlertFree ? (
-                            <span className="text-emerald-700 font-extrabold text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded">FREE</span>
-                          ) : (
-                            <span className="text-red-700 font-black text-xs">₨ 300</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-stone-500 mt-1">Sends broadcast within strict 5km radius</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setPremiumRadius(10)}
-                        className={`p-3.5 rounded-2xl text-left border-2 transition-all cursor-pointer ${
-                          premiumRadius === 10
-                            ? 'bg-red-50/40 border-red-500 text-red-900 shadow-sm'
-                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <strong className="text-xs font-black uppercase tracking-wide">⚡ Wide Shield</strong>
-                          {isAlertFree ? (
-                            <span className="text-emerald-700 font-extrabold text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded">FREE</span>
-                          ) : (
-                            <span className="text-red-700 font-black text-xs">₨ 500</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-stone-500 mt-1">Reaches wider 10km radius coverage</p>
-                      </button>
-                    </div>
-                  </div>
-
                   <button
                     type="button"
-                    onClick={() => setPremiumStep('payment')}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white py-3.5 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800 shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={handleProcessPremiumPayment}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-3.5 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800 shadow-md flex items-center justify-center gap-2 cursor-pointer mt-4"
                   >
-                    <span>Proceed to Secure Checkout</span>
-                    <span>→</span>
+                    <span>Publish Emergency Alert 📢</span>
                   </button>
                 </div>
               )}
 
-              {/* STEP 2: Secure payment details selection */}
-              {premiumStep === 'payment' && (
-                <div className="space-y-4">
-                  <div className="bg-[#fcf9f2] border border-[#e3dec9] rounded-2xl p-4 flex justify-between items-center text-xs">
-                    <div>
-                      <span className="text-xs block text-stone-500 font-semibold">Total Amount Due</span>
-                      <strong className="text-red-700 font-black text-xl font-serif leading-none">
-                        {isAlertFree ? 'Rs 0.00 PKR' : `Rs ${premiumRadius === 5 ? '300.00' : '500.00'} PKR`}
-                      </strong>
-                    </div>
-                    <span className="bg-[#5a5a40] text-stone-100 text-[10px] font-black uppercase px-2.5 py-1 rounded-md border border-white/10">
-                      {isAlertFree ? '✨ Plan Waiver Active' : '🔒 Highly Encrypted'}
-                    </span>
-                  </div>
-
-                  {isAlertFree ? (
-                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 text-center space-y-2.5">
-                      <div className="w-9 h-9 bg-emerald-100/80 text-emerald-700 rounded-xl flex items-center justify-center text-lg mx-auto font-black select-none">✓</div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block mb-0.5">Subscription Benefit Applied</span>
-                        <h4 className="font-serif font-black text-emerald-950 text-xs">{userTier} Premium Free Alert</h4>
-                        <p className="text-[10px] text-emerald-800/80 mt-1 leading-relaxed max-w-xs mx-auto">
-                          Payment credentials waived. You have posted <strong>{myAlertsCount}</strong> / <strong>{maxFreeAlerts === Infinity ? 'Unlimited' : maxFreeAlerts}</strong> alerts under your current plan features.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Gateway selector */}
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider block">Select Simulation Payment Portal</span>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: 'easypaisa', label: 'Easypaisa', desc: 'Secure Mobile Wallet' },
-                            { id: 'jazzcash', label: 'JazzCash', desc: 'Secure Mobile Wallet' },
-                            { id: 'card', label: 'Debit/Credit', desc: 'Global Visa/Master' }
-                          ].map((gw) => (
-                            <button
-                              key={gw.id}
-                              type="button"
-                              onClick={() => {
-                                setPremiumGate(gw.id as any);
-                                setPremiumPayerAccount('');
-                              }}
-                              className={`p-2 rounded-xl text-center border-2 transition-all cursor-pointer ${
-                                premiumGate === gw.id
-                                  ? 'bg-[#5a5a40] text-white border-[#3e3e2b] shadow-inner'
-                                  : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
-                              }`}
-                            >
-                              <strong className="text-xs block">{gw.label}</strong>
-                              <span className="text-[8px] font-bold block opacity-85">{gw.desc}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Account detail input form */}
-                      <div className="bg-stone-50 border border-stone-200 p-4 rounded-2xl space-y-3.5">
-                        <div>
-                          <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-1">
-                            {premiumGate === 'card' ? '16-Digit Card Number' : 'Mobile Account Number (11-Digits)'}
-                          </span>
-                          <input
-                            type="text"
-                            value={premiumPayerAccount}
-                            onChange={(e) => setPremiumPayerAccount(e.target.value)}
-                            placeholder={premiumGate === 'card' ? '4111 2222 3333 4444' : '0312 3456789'}
-                            className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3.5">
-                          <div>
-                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">Account holder name</span>
-                            <input
-                              type="text"
-                              value={premiumPayerName}
-                              onChange={(e) => setPremiumPayerName(e.target.value)}
-                              className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                            />
-                          </div>
-                          <div>
-                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
-                              {premiumGate === 'card' ? 'Security CV2' : 'E-PIN Code'}
-                            </span>
-                            <input
-                              type="password"
-                              value={premiumPayerCvv}
-                              onChange={(e) => setPremiumPayerCvv(e.target.value)}
-                              maxLength={premiumGate === 'card' ? 3 : 5}
-                              placeholder="***"
-                              className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setPremiumStep('details')}
-                      className="flex-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 py-3 rounded-2xl font-bold text-xs"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleProcessPremiumPayment}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800 cursor-pointer"
-                    >
-                      {isAlertFree ? 'Publish Free Core Alert' : `Confirm simulated Rs ${premiumRadius === 5 ? 300 : 500} payment`}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: Processing Animation */}
+              {/* STEP 2: Processing Animation */}
               {premiumStep === 'processing' && (
                 <div className="py-12 text-center space-y-4">
                   <div className="relative w-16 h-16 mx-auto">
@@ -1667,32 +1706,35 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     <Radio className="w-6 h-6 text-red-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-ping" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="font-serif font-black text-[#373735] text-sm uppercase tracking-wider">Tuning local transceivers...</h4>
+                    <h4 className="font-serif font-black text-[#373735] text-sm uppercase tracking-wider">Publishing Alert Signal...</h4>
                     <p className="text-[11px] text-stone-500 leading-relaxed max-w-xs mx-auto">
-                      Resolving localized coordinates within {premiumRadius}km. Validating encryption rules to trigger alert logs inside peer dashboards...
+                      Persisting incident record to community database... Setting category markers and scheduling 30-day sliding preview metrics...
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* STEP 4: Success confirmation Screen */}
+              {/* STEP 3: Success confirmation Screen */}
               {premiumStep === 'success' && (
                 <div className="py-6 text-center space-y-4">
                   <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-emerald-500 border-2 border-emerald-300 shadow-sm">
                     <CheckCircle className="w-8 h-8 fill-current" />
                   </div>
                   <div className="space-y-1.5 leading-snug">
-                    <h4 className="font-serif font-black text-gray-900 text-base">Premium Alert Published Successfully!</h4>
+                    <h4 className="font-serif font-black text-gray-900 text-base">Emergency Alert Active!</h4>
                     <p className="text-xs text-stone-600 max-w-sm mx-auto">
-                      Simulated transaction of <strong>₨ {premiumRadius === 5 ? 300 : 500} PKR</strong> successfully verified! Your premium lost alert is now active and push broadcasts have been delivered to nearby guardians.
+                      Your emergency alert was successfully published to the general feed and integrated into the active sliding stories banner at the top for 30 days!
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsPremiumModalOpen(false)}
+                    onClick={() => {
+                      setIsPremiumModalOpen(false);
+                      setPremiumImages([]);
+                    }}
                     className="bg-[#5a5a40] text-white py-2.5 px-6 rounded-xl font-serif font-black text-xs shadow-md border-b-[3px] border-b-[#323223]"
                   >
-                    Close & View Active Radar Block
+                    View Active Story Board
                   </button>
                 </div>
               )}

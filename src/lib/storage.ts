@@ -862,14 +862,113 @@ async function getValidUserEmails(): Promise<Set<string>> {
 // ─────────────────────────────────────────────────────────────────
 export const LocationService = {
   haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371; // earth radius in km
-    const toRad = (d: number) => (d * Math.PI) / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLng = toRad(lng2 - lng1);
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lng2 - lng1) * Math.PI / 180;
     const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  resolveCoordinates(cityName: string, uid?: string): { lat: number; lng: number; address: string } {
+    const cleaned = (cityName || '').trim();
+    if (!cleaned) {
+      return { lat: 33.6844, lng: 73.0479, address: 'Islamabad' };
+    }
+    const normalized = cleaned.toLowerCase();
+    
+    // Comprehensive dictionary of Pakistani cities/towns with exact center coordinates
+    const cityDict: Record<string, { lat: number; lng: number }> = {
+      islamabad: { lat: 33.6844, lng: 73.0479 },
+      lahore: { lat: 31.5204, lng: 74.3587 },
+      karachi: { lat: 24.8607, lng: 67.0011 },
+      peshawar: { lat: 34.0151, lng: 71.5249 },
+      quetta: { lat: 30.1798, lng: 66.9750 },
+      rawalpindi: { lat: 33.5651, lng: 73.0169 },
+      faisalabad: { lat: 31.4504, lng: 73.1350 },
+      multan: { lat: 30.1575, lng: 71.5249 },
+      sialkot: { lat: 32.4945, lng: 74.5229 },
+      gujranwala: { lat: 32.1877, lng: 74.1945 },
+      hyderabad: { lat: 25.3960, lng: 68.3578 },
+      pattoki: { lat: 31.0204, lng: 73.8532 },
+      sargodha: { lat: 32.0740, lng: 72.6861 },
+      bahawalpur: { lat: 29.3544, lng: 71.6911 },
+      sukkur: { lat: 27.7244, lng: 68.8475 },
+      jhang: { lat: 31.2721, lng: 72.3275 },
+      sheikhupura: { lat: 31.7131, lng: 73.9783 },
+      larkana: { lat: 27.5601, lng: 68.2166 },
+      gujrat: { lat: 32.5736, lng: 74.0789 },
+      mardan: { lat: 34.1989, lng: 72.0314 },
+      kasur: { lat: 31.1156, lng: 74.4531 },
+      'rahim yar khan': { lat: 28.4195, lng: 70.3023 },
+      rahimyarkhan: { lat: 28.4195, lng: 70.3023 },
+      sahiwal: { lat: 30.6692, lng: 73.1114 },
+      okara: { lat: 30.8100, lng: 73.4504 },
+      'wah cantt': { lat: 33.7811, lng: 72.7231 },
+      'dera ghazi khan': { lat: 30.0511, lng: 70.6350 },
+      dgkhan: { lat: 30.0511, lng: 70.6350 },
+      'mirpur khas': { lat: 25.5251, lng: 69.0159 },
+    };
+
+    let base = cityDict[normalized];
+    if (!base) {
+      // Find partial or fuzzy match
+      const matchKey = Object.keys(cityDict).find(k => normalized.includes(k) || k.includes(normalized));
+      if (matchKey) {
+        base = cityDict[matchKey];
+      }
+    }
+
+    if (!base) {
+      // Generate deterministic, realistic coordinate for unknown towns within Pakistan
+      let hash = 0;
+      for (let i = 0; i < normalized.length; i++) {
+        hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      // Pakistan Latitude is ~24 to ~37, Longitude is ~61 to ~76
+      const detLat = 28.0 + (Math.abs(hash) % 1000) / 1000 * 5.5;   // 28.0 to 33.5
+      const detLng = 68.5 + (Math.abs(hash >> 3) % 1000) / 1000 * 5.5; // 68.5 to 74.0
+      base = { lat: detLat, lng: detLng };
+    }
+
+    // Apply active, deterministic minor practitioner jitter/offset if user/clinic ID is specified,
+    // so they are not statically clustered at the exact center of the city.
+    let lat = base.lat;
+    let lng = base.lng;
+    if (uid) {
+      let uidHash = 0;
+      for (let i = 0; i < uid.length; i++) {
+        uidHash = uid.charCodeAt(i) + ((uidHash << 5) - uidHash);
+      }
+      // Minor offset of roughly 0.003 to 0.015 degrees (~300m to ~2.0km) inside that practice town
+      const offsetLat = ((Math.abs(uidHash) % 300) - 150) / 10000; // max +/- 0.015
+      const offsetLng = (((Math.abs(uidHash) >> 2) % 300) - 150) / 10000;
+      lat += offsetLat;
+      lng += offsetLng;
+    }
+
+    return {
+      lat,
+      lng,
+      address: cleaned
+    };
   }
 };
 
@@ -958,10 +1057,32 @@ export const ExploreService = {
       case SORT_TYPES.NEAREST: {
         return listCopy.sort((a, b) => {
           if (userLoc) {
-            const distA = a.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, a.location.lat, a.location.lng) : 99999;
-            const distB = b.location?.lat ? LocationService.haversine(userLoc.lat, userLoc.lng, b.location.lat, b.location.lng) : 99999;
-            if (distA !== distB) return distA - distB;
+            let distA: number | null = null;
+            if (a.role === 'clinic') {
+              const latA = a.location?.lat || (a as any).lat;
+              const lngA = a.location?.lng || (a as any).lng;
+              if (latA && lngA) {
+                distA = LocationService.getDistance(userLoc.lat, userLoc.lng, latA, lngA);
+              }
+            }
+
+            let distB: number | null = null;
+            if (b.role === 'clinic') {
+              const latB = b.location?.lat || (b as any).lat;
+              const lngB = b.location?.lng || (b as any).lng;
+              if (latB && lngB) {
+                distB = LocationService.getDistance(userLoc.lat, userLoc.lng, latB, lngB);
+              }
+            }
+
+            if (distA !== null && distB !== null) {
+              return distA - distB;
+            }
+            if (distA !== null) return -1;
+            if (distB !== null) return 1;
           }
+          const tierDiff = getTierOrder(b) - getTierOrder(a);
+          if (tierDiff !== 0) return tierDiff;
           return (b.avgRating || 0) - (a.avgRating || 0);
         });
       }
@@ -972,9 +1093,15 @@ export const ExploreService = {
           const score = (p: UserProfile) => {
             const rScore = (p.avgRating || 0) * 10;
             let dScore = 0;
-            if (userLoc && p.location?.lat) {
-              const km = LocationService.haversine(userLoc.lat, userLoc.lng, p.location.lat, p.location.lng);
-              dScore = -(km * 1.5);
+            if (userLoc && p.role === 'clinic') {
+              const latP = p.location?.lat || (p as any).lat;
+              const lngP = p.location?.lng || (p as any).lng;
+              if (latP && lngP) {
+                const km = LocationService.getDistance(userLoc.lat, userLoc.lng, latP, lngP);
+                dScore = -(km * 1.5);
+              } else {
+                dScore = -1000;
+              }
             }
             const isRecent = Date.now() - p.createdAt < 30 * 24 * 3600000 ? 5 : 0;
             return rScore + dScore + isRecent;
@@ -1085,9 +1212,20 @@ export const CommunityService = {
       }
     }
     const validEmails = await getValidUserEmails();
+    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
     return list.filter(post => {
       const email = (post.authorEmail || '').toLowerCase().trim();
-      return !email || validEmails.has(email);
+      const isValidUser = !email || validEmails.has(email);
+      if (!isValidUser) return false;
+      
+      // Auto-expire 'general' category posts after 90 days
+      if (post.category === 'general') {
+        if (now - post.ts > ninetyDaysMs) {
+          return false;
+        }
+      }
+      return true;
     });
   },
 
@@ -1105,7 +1243,9 @@ export const CommunityService = {
       notifiedCount: number;
       ts: number;
     },
-    images?: string[]
+    images?: string[],
+    city?: string,
+    address?: string
   ): Promise<CommunityPost> {
     const post: CommunityPost = {
       id: 'post_' + Date.now(),
@@ -1117,6 +1257,8 @@ export const CommunityService = {
       text: text.trim(),
       category,
       ts: Date.now(),
+      city: city || author.address || author.location?.address || 'All Cities',
+      address: address?.trim() || undefined,
       reactions: { '❤️': [], '👍': [], '❗': [] },
       title: title?.trim() || undefined,
       imageUrl: imageUrl?.trim() || undefined,
@@ -1439,8 +1581,8 @@ export const PetAdsService = {
 
     const now = Date.now();
     for (const ad of list) {
-      // Determine if premium
-      const isPremium = ad.isPremium || (ad.ownerRole === 'clinic' || ad.ownerRole === 'doctor');
+      // Determine if premium (has active subscription)
+      const isPremium = !!ad.isPremium;
       const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
       if (now - ad.createdAt > maxAge) {
         // Expired! Delete it

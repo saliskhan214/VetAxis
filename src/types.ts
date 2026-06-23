@@ -1,33 +1,7 @@
 export type UserRole = 'doctor' | 'clinic' | 'assistant' | 'user';
 
-export function canUserReview(reviewerRole: UserRole, targetRole: UserRole): boolean {
-  // 1. Roles as Doctors cant rate or give reviews doctors
-  if (reviewerRole === 'doctor' && targetRole === 'doctor') {
-    return false;
-  }
-  // 2. Roles as clinics cant rate or give reviews clinics
-  if (reviewerRole === 'clinic' && targetRole === 'clinic') {
-    return false;
-  }
-  // 3. Helpers (assistant) cant rate and give reviews to helpers (assistant)
-  if (reviewerRole === 'assistant' && targetRole === 'assistant') {
-    return false;
-  }
-  // 4. Helpers (assistant) can give rate and reviews to clinics and doctors
-  if (reviewerRole === 'assistant' && (targetRole === 'clinic' || targetRole === 'doctor')) {
-    return true;
-  }
-  // 5. Only General users can rate and give reviews to Clinics, doctors, and helpers
-  if (reviewerRole === 'user') {
-    return targetRole === 'clinic' || targetRole === 'doctor' || targetRole === 'assistant';
-  }
-  // 6. Clinics can rate or give reviews to doctors and helpers
-  if (reviewerRole === 'clinic' && (targetRole === 'doctor' || targetRole === 'assistant')) {
-    return true;
-  }
-
-  // Fallback / any other combination (e.g. doctors trying to rate non-doctors, etc.)
-  return false;
+export function canUserReview(reviewerRole?: UserRole | string | null, targetRole?: UserRole | string | null): boolean {
+  return true;
 }
 
 export interface GeoLocation {
@@ -113,7 +87,7 @@ export interface CommunityPost {
   role: UserRole;
   profilePic: string;
   text: string;
-  category: 'lost' | 'adoption' | 'help' | 'general';
+  category: 'lost' | 'adoption' | 'help' | 'general' | 'emergency';
   ts: number;
   reactions: {
     [key: string]: string[]; // maps '❤️' | '👍' | '❗' to array of user emails/UIDs
@@ -122,6 +96,8 @@ export interface CommunityPost {
   imageUrl?: string; // Rich media card support
   images?: string[]; // Up to 2 base64 images, 1MB max each
   isBoosted?: boolean; // Emergency Boost Flag
+  city?: string; // Geographic City tag for filtering separation
+  address?: string; // Emergency or generalized address tag
   boostDetails?: {
     amountPaid: number;
     lastSeenLoc: GeoLocation;

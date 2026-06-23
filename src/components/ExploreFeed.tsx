@@ -95,6 +95,24 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
   const [gpsPopupVisible, setGpsPopupVisible] = useState<boolean>(false);
   const [gpsPopupMessage, setGpsPopupMessage] = useState<string>('');
+  const [userGpsCoords, setUserGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Automatically fetch exact user GPS coordinates on mount to enable precise distance calculations
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setUserGpsCoords({ lat: latitude, lng: longitude });
+          console.log("Automatically locked user GPS coordinates:", latitude, longitude);
+        },
+        (err) => {
+          console.warn("Unable to fetch high-precision user GPS coordinates automatically:", err);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+  }, []);
 
   // Nearest sorting & geographic filter popup states
   const [doctorLocationModalOpen, setDoctorLocationModalOpen] = useState<boolean>(false);
@@ -456,8 +474,17 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     setSelectedProfile(profile);
     const reviews = profile.reviews || [];
     setModalReviews(reviews);
-    setReviewRating(0);
-    setReviewComment('');
+    
+    // Check if current user has already submitted a review
+    const existing = reviews.find(r => r.reviewerEmail === currentUser?.email);
+    if (existing) {
+      setReviewRating(existing.rating);
+      setReviewComment(existing.comment || '');
+    } else {
+      setReviewRating(0);
+      setReviewComment('');
+    }
+
     setReviewError(null);
     setIsBookingModeOpen(false);
     setBookingSuccess(null);
@@ -513,14 +540,30 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         prev.map((p) => (p.uid === selectedProfile.uid ? updatedProfile : p))
       );
 
-      setReviewComment('');
-      setReviewRating(0);
+      // Keep the fields populated with the review they just submitted/edited
+      const existing = updatedReviews.find(r => r.reviewerEmail === currentUser?.email);
+      if (existing) {
+        setReviewRating(existing.rating);
+        setReviewComment(existing.comment || '');
+      } else {
+        setReviewComment('');
+        setReviewRating(0);
+      }
     } catch (err: any) {
       setReviewError(err.message || 'Failed to submit review.');
     } finally {
       setSubmitLoading(false);
     }
   };
+
+  // Pass the browser GPS coordinates if we have them, otherwise fall back to saved address/coords
+  const resolvedUserLocForSort = userGpsCoords 
+    ? { lat: userGpsCoords.lat, lng: userGpsCoords.lng, address: 'Current GPS' }
+    : (currentUser.location || (currentUser.address ? { 
+        lat: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lat,
+        lng: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lng,
+        address: currentUser.address
+      } : null));
 
   // Sorted and filtered list
   const filteredProfessionals = ExploreService.sortUsers(
@@ -547,7 +590,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
       return true;
     }),
     sortBy,
-    currentUser.location || null
+    resolvedUserLocForSort
   );
 
   // Review rendering sorting
@@ -863,15 +906,18 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
           {filteredProfessionals.map((prof) => {
             const initials = prof.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
             
-            // Calculate distance if GPS latlng is present
+            // Calculate distance strictly for clinic profiles using getDistance
             let distance: number | null = null;
-            if (currentUser.location && prof.location?.lat && prof.location?.lng) {
-              distance = LocationService.haversine(
-                currentUser.location.lat,
-                currentUser.location.lng,
-                prof.location.lat,
-                prof.location.lng
-              );
+            if (prof.role === 'clinic') {
+              const userLat = userGpsCoords?.lat || currentUser.location?.lat;
+              const userLng = userGpsCoords?.lng || currentUser.location?.lng;
+
+              const lat = (prof as any).lat || (prof.location && prof.location.lat);
+              const lng = (prof as any).lng || (prof.location && prof.location.lng);
+
+              if (userLat && userLng && lat && lng) {
+                distance = LocationService.getDistance(userLat, userLng, lat, lng);
+              }
             }
 
             return (
@@ -1235,63 +1281,78 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                   </div>
 
                   {/* Write a review forms */}
-                  {currentUser.uid !== selectedProfile.uid && canUserReview(currentUser.role, selectedProfile.role) && (
-                    <form onSubmit={handleSubmitReview} className="bg-[#fcf9f2] border border-[#e3dec9] p-5 rounded-2xl space-y-4">
-                      <div className="text-xs font-black text-[#5a5a40] uppercase tracking-wider">Write client evaluation</div>
-                      
-                      {reviewError && (
-                        <div className="text-xs text-red-700 font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">
-                          ⚠️ {reviewError}
+                  {currentUser.uid !== selectedProfile.uid && canUserReview(currentUser.role, selectedProfile.role) && (() => {
+                    const existingReview = modalReviews.find(r => r.reviewerEmail === currentUser.email);
+                    return (
+                      <form onSubmit={handleSubmitReview} className="bg-[#fcf9f2] border border-[#e3dec9] p-5 rounded-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-black text-[#5a5a40] uppercase tracking-wider">
+                            {existingReview ? 'Update Your Evaluation' : 'Write client evaluation'}
+                          </div>
+                          {existingReview && (
+                            <span className="text-[9px] bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              Already Rated - Edit Mode
+                            </span>
+                          )}
                         </div>
-                      )}
+                        
+                        {reviewError && (
+                          <div className="text-xs text-red-700 font-bold bg-red-50 p-2.5 rounded-xl border border-red-200">
+                            ⚠️ {reviewError}
+                          </div>
+                        )}
 
-                      {/* Star selection */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#7a766f]">Star Rating Assessment:</span>
-                        <div className="flex gap-1 cursor-pointer">
-                          {Array.from({ length: 5 }).map((_, i) => {
-                            const val = i + 1;
-                            const isPurpleStar = val <= reviewRating;
-                            return (
-                              <button
-                                type="button"
-                                key={i}
-                                onClick={() => setReviewRating(val)}
-                                className={`bg-transparent border-none p-0 cursor-pointer text-2xl transition-all scale-100 hover:scale-125 ${
-                                  isPurpleStar ? 'text-[#f5a623]' : 'text-stone-300'
-                                }`}
-                              >
-                                ★
-                              </button>
-                            );
-                          })}
+                        {/* Star selection */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[#7a766f]">Star Rating Assessment:</span>
+                          <div className="flex gap-1 cursor-pointer">
+                            {Array.from({ length: 5 }).map((_, i) => {
+                              const val = i + 1;
+                              const isPurpleStar = val <= reviewRating;
+                              return (
+                                <button
+                                  type="button"
+                                  key={i}
+                                  onClick={() => setReviewRating(val)}
+                                  className={`bg-transparent border-none p-0 cursor-pointer text-2xl transition-all scale-100 hover:scale-125 ${
+                                    isPurpleStar ? 'text-[#f5a623]' : 'text-stone-300'
+                                  }`}
+                                >
+                                  ★
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
 
-                      <textarea
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value)}
-                        placeholder="Share your treatment experience with the community (max 200 words)…"
-                        rows={3}
-                        className="form-control text-xs bg-white"
-                        disabled={submitLoading}
-                        required
-                      />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-[#a49f92] font-semibold">
-                          {reviewComment.trim().split(/\s+/).filter(Boolean).length} / 200 words max
-                        </span>
-                        <button
-                          type="submit"
+                        <textarea
+                          value={reviewComment}
+                          onChange={(e) => setReviewComment(e.target.value)}
+                          placeholder="Share your treatment experience with the community (max 200 words)…"
+                          rows={3}
+                          className="form-control text-xs bg-white"
                           disabled={submitLoading}
-                          className="btn-tactile-3d-primary py-2 px-5 text-2xs"
-                        >
-                          {submitLoading ? 'Filing Audit…' : 'Submit Audit Record'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                          required
+                        />
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-[#a49f92] font-semibold">
+                            {reviewComment.trim().split(/\s+/).filter(Boolean).length} / 200 words max
+                          </span>
+                          <button
+                            type="submit"
+                            disabled={submitLoading}
+                            className="btn-tactile-3d-primary py-2 px-5 text-2xs"
+                          >
+                            {submitLoading 
+                              ? (existingReview ? 'Updating Audit…' : 'Filing Audit…') 
+                              : (existingReview ? 'Update Audit Record' : 'Submit Audit Record')
+                            }
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  })()}
 
                   {/* Review lists */}
                   <div className="space-y-3.5 max-h-60 overflow-y-auto pr-1">

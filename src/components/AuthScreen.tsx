@@ -3,6 +3,7 @@ import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
+import { LocationService } from '../lib/storage';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: any) => void;
@@ -87,19 +88,21 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
     setLoading(true);
     try {
       const extra: any = {};
+      const pendingUid = googlePendingInfo?.uid || 'temp_gen_uid_' + Date.now();
+
       if (selectedRole === 'doctor' || selectedRole === 'assistant' || selectedRole === 'user') {
         extra.expertise = expertise.trim() || (
           selectedRole === 'doctor' ? 'General Practitioner' :
           selectedRole === 'assistant' ? 'Clinic Assistant' :
           'Livestock Breeder / Pet Owner'
         );
-        const matchedCity = PAKISTAN_CITIES.find(c => c.name === doctorCity) || PAKISTAN_CITIES[0];
+        extra.address = doctorCity.trim() || 'Islamabad';
+        const coords = LocationService.resolveCoordinates(extra.address, pendingUid);
         extra.location = {
-          lat: matchedCity.lat,
-          lng: matchedCity.lng,
-          address: matchedCity.name
+          lat: coords.lat,
+          lng: coords.lng,
+          address: coords.address
         };
-        extra.address = doctorCity;
       }
       if (selectedRole === 'clinic') {
         extra.facilities = facilities.trim() || 'General Diagnostics & OPD';
@@ -109,6 +112,12 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
           setLoading(false);
           return;
         }
+        const coords = LocationService.resolveCoordinates(extra.address, pendingUid);
+        extra.location = {
+          lat: coords.lat,
+          lng: coords.lng,
+          address: coords.address
+        };
       }
 
       if (authService.registerGoogleUser) {
@@ -272,7 +281,7 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                 <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-1 block">Designate Your Platform Role *</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: 'doctor', icon: '🩺', title: 'Clinical Doctor', desc: 'Licensed practitioner portfolio' },
+                    { id: 'doctor', icon: '🩺', title: 'Doctor', desc: 'Licensed practitioner portfolio' },
                     { id: 'clinic', icon: '🏥', title: 'Clinic Facility', desc: 'Hospital register & profiles' },
                     { id: 'user', icon: '👨‍🌾', title: 'General User', desc: 'Farmer, breeder, or pet owner' },
                     { id: 'assistant', icon: '🧑‍⚕️', title: 'Vet Assistant', desc: 'Clinical assistant / technician' }
@@ -327,19 +336,16 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                       />
                     </div>
                     <div>
-                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Select Practice City / Town *</label>
-                      <select
-                        className="form-control bg-white cursor-pointer"
+                      <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Practice City / Town *</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-control bg-white font-serif text-xs"
+                        placeholder="e.g. Multan, Lahore, Islamabad, Pattoki"
                         value={doctorCity}
                         onChange={(e) => setDoctorCity(e.target.value)}
                         disabled={loading}
-                      >
-                        {PAKISTAN_CITIES.map((c) => (
-                          <option key={c.name} value={c.name}>
-                            🇵🇰 {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                       <span className="text-[9px] text-[#a49f92] font-semibold mt-1 block">Your clinic-independent practice city. This can be updated in your profile any time.</span>
                     </div>
                   </motion.div>
@@ -366,18 +372,15 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                     </div>
                     <div>
                       <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-2.5 block">Your Location City / District *</label>
-                      <select
-                        className="form-control bg-white cursor-pointer"
+                      <input
+                        type="text"
+                        required
+                        className="form-control bg-white font-serif text-xs"
+                        placeholder="e.g. Multan, Lahore, Islamabad"
                         value={doctorCity}
                         onChange={(e) => setDoctorCity(e.target.value)}
                         disabled={loading}
-                      >
-                        {PAKISTAN_CITIES.map((c) => (
-                          <option key={c.name} value={c.name}>
-                            🇵🇰 {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                       <span className="text-[9px] text-[#a49f92] font-semibold mt-1 block">Helps veterinarians and clinical centers find your breeder farm or pet clinic request.</span>
                     </div>
                   </motion.div>
