@@ -93,7 +93,13 @@ export function Navbar({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              onClick={() => {
+                const nextState = !isNotifOpen;
+                setIsNotifOpen(nextState);
+                if (nextState) {
+                  onMarkAllAsRead();
+                }
+              }}
               className={`relative flex items-center justify-center p-2.5 rounded-xl border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
                 isNotifOpen 
                   ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[#3e3e2b]' 
@@ -160,8 +166,9 @@ export function Navbar({
                             onClick={() => {
                               if (onNotificationClick) {
                                 onNotificationClick(n);
-                                setIsNotifOpen(false); // Auto collapse dropdown on click
                               }
+                              setIsNotifOpen(false); // Auto collapse dropdown on click
+                              onMarkAllAsRead();
                             }}
                             className={`flex items-start justify-between gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer hover:bg-stone-50/50 ${
                               n.read 

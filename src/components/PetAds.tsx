@@ -1,8 +1,8 @@
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import { UserProfile, PetAd } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle } from 'lucide-react';
+import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X } from 'lucide-react';
 
 interface PetAdsProps {
   currentUser: UserProfile;
@@ -38,6 +38,76 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [toast, setToast] = useState<string | null>(null);
   const [boostedPosts, setBoostedPosts] = useState<any[]>([]);
+
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('dismissed_emergency_alerts');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isCarouselDismissed, setIsCarouselDismissed] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('dismissed_emergency_carousel') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const dismissAlert = (id: string, e?: any) => {
+    if (e) e.stopPropagation();
+    const updated = [...dismissedAlertIds, id];
+    setDismissedAlertIds(updated);
+    try {
+      sessionStorage.setItem('dismissed_emergency_alerts', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const dismissCarousel = () => {
+    setIsCarouselDismissed(true);
+    try {
+      sessionStorage.setItem('dismissed_emergency_carousel', 'true');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const visibleBoostedPosts = boostedPosts.filter(p => !dismissedAlertIds.includes(p.id));
+
+  const storiesContainerRef = useRef<HTMLDivElement>(null);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+
+  const scrollStories = (direction: 'left' | 'right') => {
+    if (storiesContainerRef.current) {
+      const scrollAmount = 300;
+      storiesContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (visibleBoostedPosts.length <= 1 || isHovered) return;
+
+    const interval = setInterval(() => {
+      if (storiesContainerRef.current) {
+        const container = storiesContainerRef.current;
+        const maxScrollLeft = container.scrollWidth - container.clientWidth;
+        if (container.scrollLeft >= maxScrollLeft - 5) {
+          container.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          container.scrollBy({ left: 300, behavior: 'smooth' });
+        }
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [visibleBoostedPosts.length, isHovered]);
 
   const loadAds = async () => {
     setLoading(true);
@@ -220,6 +290,28 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
       
       {/* ACTIVE EMERGENCY LOST PET RADAR ALERTS */}
       {(() => {
+        // If the user dismissed the entire carousel, show a clean restore option
+        if (isCarouselDismissed) {
+          return (
+            <div className="flex justify-end pr-2 -mb-4">
+              <button
+                onClick={() => {
+                  setIsCarouselDismissed(false);
+                  setDismissedAlertIds([]);
+                  try {
+                    sessionStorage.removeItem('dismissed_emergency_carousel');
+                    sessionStorage.removeItem('dismissed_emergency_alerts');
+                  } catch {}
+                }}
+                className="text-[10px] font-mono font-bold text-red-650 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl border border-red-200 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3 h-3 animate-spin" /> Restore Dismissed Emergency Alerts
+              </button>
+            </div>
+          );
+        }
+
+        // Standard fallback if there are literally no boosted/emergency posts
         if (boostedPosts.length === 0) {
           return (
             <div className="relative bg-gradient-to-br from-red-50/20 via-stone-50 to-stone-100 border-2 border-dashed border-red-200 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 text-left overflow-hidden">
@@ -253,117 +345,252 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
           );
         }
 
+        // If some alerts exist but they are all dismissed one-by-one
+        if (visibleBoostedPosts.length === 0) {
+          return (
+            <div className="relative bg-gradient-to-br from-[#fcfbf9] via-[#f7f5ef] to-stone-100 border-2 border-dashed border-stone-300 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-left overflow-hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-stone-100 text-stone-500 flex items-center justify-center shrink-0">
+                  <Megaphone className="w-4 h-4 text-stone-400" />
+                </div>
+                <div>
+                  <h4 className="font-serif font-black text-stone-800 text-sm">All active alerts dismissed for this session</h4>
+                  <p className="text-[11px] text-stone-500 font-semibold">You've cleared all emergency posts. They will reappear in your next session.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setDismissedAlertIds([]);
+                  try {
+                    sessionStorage.removeItem('dismissed_emergency_alerts');
+                  } catch {}
+                }}
+                className="text-[10px] font-mono bg-stone-200 hover:bg-stone-300 text-stone-700 px-3 py-1.5 rounded-xl border-none font-bold cursor-pointer transition-colors animate-pulse"
+              >
+                Reset Alerts 🔄
+              </button>
+            </div>
+          );
+        }
+
+        // Active Emergency Carousel/Spotlight layout
         return (
-          <div className="bg-gradient-to-br from-red-50 via-rose-50 to-amber-50 border-2 border-red-500 border-b-[6px] border-b-red-600 rounded-3xl p-6 shadow-[0_15px_30px_rgba(239,68,68,0.12)] flex flex-col gap-4 text-left relative overflow-hidden">
-            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-red-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
+          <div 
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="bg-gradient-to-br from-red-50 via-rose-50/50 to-amber-50/30 border-2 border-red-400 border-b-[6px] border-b-red-500 rounded-3xl p-6 shadow-md flex flex-col gap-4 text-left relative overflow-hidden"
+          >
+            {/* Main dismissal button for the whole carousel */}
+            <button
+              onClick={dismissCarousel}
+              className="absolute right-4 top-4 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-red-500 text-red-700 hover:text-white border border-red-200 hover:border-transparent transition-all flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+              title="Dismiss Emergency Feed"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Decorative element */}
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-red-100/60 rounded-full blur-3xl opacity-60 pointer-events-none" />
             
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 pr-10">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg relative">
                   <span className="absolute inset-0 rounded-2xl bg-red-600 animate-ping opacity-25"></span>
-                  <span className="text-lg">📢</span>
+                  <span className="text-lg">🚨</span>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="bg-red-600 text-white font-mono text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest leading-none">
-                      PRIORITY EMERGENCY AD
+                      EMERGENCY STORIES
                     </span>
-                    <span className="text-[10px] text-zinc-500 font-bold">
-                      Active Broadcaster Signal
+                    <span className="text-[10px] text-red-900/80 font-bold">
+                      Active 30 Days Signal Life
                     </span>
                   </div>
-                  <h3 className="font-serif font-black text-red-950 text-xl leading-tight">
-                    Active Emergency Lost Pet Radar Alerts
+                  <h3 className="font-serif font-black text-red-950 text-lg leading-tight">
+                    {visibleBoostedPosts.length > 1 ? 'Recent Sliding Emergency Stories' : 'Active Emergency Spotlight'}
                   </h3>
                 </div>
               </div>
 
-              {onNavigate && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('community')}
-                  className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-xl border-none shadow-xs transition-colors cursor-pointer"
-                >
-                  Create Alert 🚨
-                </button>
+              {/* Slider Controls (Optimized for touch with minimum 44px targets) */}
+              {visibleBoostedPosts.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => scrollStories('left')}
+                    className="cursor-pointer w-11 h-11 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-red-100 border border-red-200 text-red-700 shadow-xs transition-colors flex items-center justify-center active:scale-95"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => scrollStories('right')}
+                    className="cursor-pointer w-11 h-11 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-red-100 border border-red-200 text-red-700 shadow-xs transition-colors flex items-center justify-center active:scale-95"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 z-10">
-              {boostedPosts.map((post) => (
-                <div 
-                  key={post.id}
-                  className="bg-white border border-red-100 hover:border-red-300 rounded-2xl p-5 space-y-4 shadow-xs transition-all hover:shadow-md relative overflow-hidden flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-amber-700 font-extrabold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-                        📍 Last Seen: {post.boostDetails?.lastSeenLoc?.address || 'Local Region'}
-                      </span>
-                      <span className="text-[9px] text-[#7a766f] font-mono">
-                        {new Date(post.ts).toLocaleDateString()}
-                      </span>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-serif font-bold text-[#3c3c2b] text-base leading-tight hover:text-red-700 transition-colors">
-                        {post.title || "Emergency Lost Pet Alert"}
-                      </h4>
-                      <p className="text-xs text-[#52523b] font-medium leading-relaxed mt-1.5 whitespace-pre-wrap">
-                        {post.text || post.description}
-                      </p>
-                    </div>
-
-                    {/* Pictures Preview */}
-                    {post.images && post.images.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        {post.images.map((imgSrc: string, imgIdx: number) => (
-                          <div key={imgIdx} className="relative aspect-video rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group shadow-inner">
-                            <img 
-                              src={imgSrc} 
-                              alt={`Emergency Preview ${imgIdx + 1}`} 
-                              className="w-full h-full object-cover select-none"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Notification System Signal Status */}
-                    <div className="bg-red-50/70 rounded-xl p-2.5 border border-red-100 text-[10px] space-y-1">
-                      <div className="flex items-center gap-1.5 text-red-800 font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
-                        <span>Broadcaster Dispatch System</span>
-                      </div>
-                      <p className="text-zinc-650 font-semibold">
-                        🔔 Sent high-priority sound alarm and push alerts to <strong className="font-sans font-extrabold text-red-700">{post.boostDetails?.notifiedCount || 12} matching users & veterinarians</strong> inside the {post.boostDetails?.radiusKm || 5}km secure perimeter.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-zinc-100 mt-2">
-                    <div className="flex items-center gap-1.5 text-[9px] text-red-700 font-black tracking-widest uppercase">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping"></span>
-                      <span>Radar {post.boostDetails?.radiusKm || 5}km Shield</span>
-                    </div>
-                    {onNavigate ? (
+            {/* Stories list rendering */}
+            {visibleBoostedPosts.length === 1 ? (
+              // Single post spotlight card (standard preview layout)
+              <div className="grid grid-cols-1 gap-4 mt-2 z-10 w-full relative">
+                {visibleBoostedPosts.map((post) => {
+                  const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
+                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const hasImage = post.images && post.images.length > 0;
+                  
+                  return (
+                    <div 
+                      key={post.id}
+                      className="bg-white border border-red-200 hover:border-red-350 rounded-2xl p-5 shadow-sm transition-all relative overflow-hidden flex flex-col md:flex-row gap-5 text-left"
+                    >
+                      {/* Individual dismiss button for single spotlight card */}
                       <button
-                        type="button"
-                        onClick={() => onNavigate('community')}
-                        className="text-[9px] font-mono cursor-pointer border-none bg-red-100 hover:bg-red-200 text-red-700 px-2 py-0.5 rounded font-black transition-colors"
+                        onClick={(e) => dismissAlert(post.id, e)}
+                        className="absolute right-3 top-3 z-30 w-7 h-7 rounded-full bg-stone-100/90 hover:bg-red-500 text-stone-600 hover:text-white border border-stone-200/50 hover:border-transparent transition-all flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                        title="Dismiss alert"
                       >
-                        Check Community Feed 💬
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                    ) : (
-                      <span className="text-[9px] font-mono bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-black">
-                        Please Check Community Feed 💬
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+
+                      {/* Media thumbnail */}
+                      {hasImage ? (
+                        <div className="w-full md:w-56 shrink-0 aspect-video md:aspect-[4/3] rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
+                          <img 
+                            src={post.images![0]} 
+                            className="w-full h-full object-cover"
+                            alt="Emergency cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full md:w-56 shrink-0 aspect-video md:aspect-[4/3] rounded-xl bg-red-50 border border-red-100 text-red-600 flex flex-col items-center justify-center p-4 text-center">
+                          <Megaphone className="w-8 h-8 animate-bounce mb-1.5" />
+                          <span className="text-[10px] uppercase font-black tracking-wider leading-none">Emergency Signal</span>
+                        </div>
+                      )}
+
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div className="space-y-3 text-left">
+                          <div className="flex items-center gap-2 flex-wrap text-stone-500 pr-8">
+                            <span className="text-[9px] text-red-700 font-black uppercase bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">
+                              🕒 {daysRemaining} days remaining
+                            </span>
+                            {(post.address || post.boostDetails?.lastSeenLoc?.address) && (
+                              <span className="text-[9.5px] text-stone-700 font-extrabold bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-red-500" />
+                                {post.address || post.boostDetails?.lastSeenLoc?.address}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-serif font-black text-[#2c2c1c] text-base leading-snug">
+                              {post.title || "Emergency Help Requested"}
+                            </h4>
+                            <p className="text-xs text-stone-600 font-medium leading-relaxed mt-1.5 line-clamp-3">
+                              {post.text || post.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-dashed border-red-100 mt-4">
+                          <span className="text-[9px] font-black tracking-wider uppercase text-red-600">
+                            🚨 Spotlight Feed Entry
+                          </span>
+                          {onNavigate && (
+                            <button
+                              onClick={() => onNavigate('community')}
+                              className="cursor-pointer bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-xl border-none shadow-xs transition-colors"
+                            >
+                              Check Community Feed 💬
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // sliding carousel stories view when length > 1
+              <div 
+                ref={storiesContainerRef}
+                className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth select-none max-w-full touch-pan-x"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {visibleBoostedPosts.map((post) => {
+                  const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
+                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const hasImage = post.images && post.images.length > 0;
+                  
+                  return (
+                    <div 
+                      key={post.id}
+                      onClick={() => onNavigate && onNavigate('community')}
+                      className="cursor-pointer snap-start shrink-0 w-[295px] xs:w-[325px] sm:w-[355px] h-[190px] bg-white hover:bg-stone-50 rounded-2xl p-4 transition-all relative flex gap-3.5 border-2 border-red-100 hover:border-red-350 hover:shadow-md text-left group"
+                    >
+                      {/* Individual dismiss button for slide card */}
+                      <button
+                        onClick={(e) => dismissAlert(post.id, e)}
+                        className="absolute right-3 top-3 z-30 w-7 h-7 rounded-full bg-stone-100/90 hover:bg-red-500 text-stone-600 hover:text-white border border-stone-200/50 hover:border-transparent transition-all flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                        title="Dismiss alert"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Left content column (flexible) */}
+                      <div className="flex-1 flex flex-col justify-between min-w-0 pr-6">
+                        <div className="space-y-1.5">
+                          {/* Card Author/Badge header */}
+                          <div className="flex items-center gap-2">
+                            <span className="bg-red-500 text-white font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                              🚨 EMERGENCY ({daysRemaining}d left)
+                            </span>
+                          </div>
+                          
+                          {/* Title */}
+                          <h4 className="font-serif font-black text-[#2c2c1c] text-xs leading-tight line-clamp-1 pr-2">
+                            {post.title || "Emergency Alert"}
+                          </h4>
+                          
+                          {/* Description text preview */}
+                          <p className="text-[10px] text-stone-600 font-semibold leading-snug line-clamp-4">
+                            {post.text || post.description}
+                          </p>
+                        </div>
+
+                        {/* Location */}
+                        <div className="flex items-center gap-1 text-[9px] text-red-700 font-extrabold truncate">
+                          <MapPin className="w-3 h-3 text-red-500 shrink-0" />
+                          <span className="truncate">{post.address || post.boostDetails?.lastSeenLoc?.address || post.city || 'Local Region'}</span>
+                        </div>
+                      </div>
+
+                      {/* Right image/thumbnail column */}
+                      <div className="w-24 h-full shrink-0 rounded-xl overflow-hidden bg-stone-50 border border-stone-100 flex items-center justify-center relative">
+                        {hasImage ? (
+                          <img 
+                            src={post.images![0]} 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 animate-fadeIn"
+                            alt="Story thumbnail"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-tr from-red-500 to-rose-400 text-white flex flex-col items-center justify-center p-2 text-center">
+                            <Megaphone className="w-5 h-5 animate-pulse" />
+                            <span className="text-[7.5px] uppercase font-black tracking-wider text-white/95 mt-1">SIGNAL</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}

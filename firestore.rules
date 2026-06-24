@@ -72,9 +72,17 @@ service cloud.firestore {
         (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
         (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
         (!('isVerified' in incoming()) || incoming().isVerified == false) && // Block self-verification during registration
-        (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum']) &&
-        (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number) &&
-        (!('emailVerified' in incoming()) || incoming().emailVerified is bool)
+        (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum'] || incoming().subscriptionTier == null) &&
+        (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number || incoming().subscriptionExpiresAt == null) &&
+        (!('emailVerified' in incoming()) || incoming().emailVerified is bool) &&
+        (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
+        (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
+        (!('location' in incoming()) || incoming().location == null || (
+          incoming().location is map &&
+          incoming().location.lat is number &&
+          incoming().location.lng is number &&
+          (!('address' in incoming().location) || incoming().location.address is string)
+        ))
       );
 
       // Protect against privilege escalation and role-switching attacks
@@ -84,8 +92,8 @@ service cloud.firestore {
           incoming().email == existing().email &&
           incoming().createdAt == existing().createdAt &&
           (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
-          (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum']) &&
-          (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number) &&
+          (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum'] || incoming().subscriptionTier == null) &&
+          (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number || incoming().subscriptionExpiresAt == null) &&
           (!('promoAdsUsed' in incoming()) || incoming().promoAdsUsed is number) &&
           (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
           incoming().name is string && incoming().name.size() <= 80 &&
@@ -93,7 +101,15 @@ service cloud.firestore {
           (!('expertise' in incoming()) || (incoming().expertise is string && incoming().expertise.size() <= 200)) &&
           (!('facilities' in incoming()) || (incoming().facilities is string && incoming().facilities.size() <= 200)) &&
           (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
-          (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024))
+          (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
+          (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
+          (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
+          (!('location' in incoming()) || incoming().location == null || (
+            incoming().location is map &&
+            incoming().location.lat is number &&
+            incoming().location.lng is number &&
+            (!('address' in incoming().location) || incoming().location.address is string)
+          ))
         )) || (
           // Allow any signed-in user to update only the cumulative ratings statistics of clinicians
           existing().role != 'user' &&

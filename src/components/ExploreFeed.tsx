@@ -381,6 +381,31 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     loadData();
   }, [activeTab]);
 
+  const handleResetAllFilters = async () => {
+    setSearchTerm('');
+    setCityFilterActive('');
+    setSortBy(SORT_TYPES.HIGHEST);
+    if (currentUser.location) {
+      setLocLoading(true);
+      try {
+        const freshUser = { ...currentUser, location: null };
+        onUpdateUser(freshUser);
+        localStorage.setItem('va_session', JSON.stringify(freshUser));
+        
+        const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
+        const idx = localUsers.findIndex((u: any) => u.uid === currentUser.uid);
+        if (idx !== -1) {
+          localUsers[idx].location = null;
+          localStorage.setItem('va_users', JSON.stringify(localUsers));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLocLoading(false);
+      }
+    }
+  };
+
   // Handle GPS location activation
   const handleLocateMe = async () => {
     if (currentUser.location) {
@@ -886,7 +911,60 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
 
       </div>
 
+      {/* ACTIVE FILTER BADGES */}
+      {(searchTerm || cityFilterActive || currentUser.location) && (
+        <div className="flex flex-wrap items-center gap-2 bg-[#fdfcf7] border border-[#e3dec9] p-3.5 rounded-2xl animate-fadeIn">
+          <span className="text-[10px] text-[#7a766f] font-black uppercase tracking-wider mr-1">Active Filters:</span>
+          
+          {searchTerm && (
+            <span className="inline-flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 text-[11px] font-bold px-3 py-1 rounded-xl border border-stone-300 transition-colors">
+              <span>Search: "{searchTerm}"</span>
+              <button 
+                onClick={() => setSearchTerm('')} 
+                className="hover:text-red-600 font-extrabold focus:outline-none cursor-pointer p-0 bg-transparent border-none text-[11px]"
+              >
+                ✕
+              </button>
+            </span>
+          )}
 
+          {cityFilterActive && (
+            <span className="inline-flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-800 text-[11px] font-bold px-3 py-1 rounded-xl border border-red-200 transition-colors">
+              <span>City: {cityFilterActive}</span>
+              <button 
+                onClick={() => {
+                  setCityFilterActive('');
+                  if (sortBy === SORT_TYPES.NEAREST) {
+                    setSortBy(SORT_TYPES.HIGHEST);
+                  }
+                }} 
+                className="hover:text-red-600 font-extrabold focus:outline-none cursor-pointer p-0 bg-transparent border-none text-[11px]"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
+          {currentUser.location && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold px-3 py-1 rounded-xl border border-amber-200 transition-colors">
+              <span>Location: {currentUser.location.address || 'GPS Coordinates'}</span>
+              <button 
+                onClick={handleLocateMe} 
+                className="hover:text-red-600 font-extrabold focus:outline-none cursor-pointer p-0 bg-transparent border-none text-[11px]"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
+          <button
+            onClick={handleResetAllFilters}
+            className="text-[10px] font-mono font-bold text-[#5a5a40] hover:text-red-600 hover:underline ml-auto focus:outline-none cursor-pointer bg-transparent border-none"
+          >
+            Clear All Filters ✕
+          </button>
+        </div>
+      )}
 
       {/* SPECIALIST GRID LIST */}
       {loading ? (
@@ -896,10 +974,20 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
           ))}
         </div>
       ) : filteredProfessionals.length === 0 ? (
-        <div className="text-center p-16 bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] shadow-sm">
-          <div className="text-5xl mb-3">🔍</div>
-          <h3 className="font-serif text-lg font-black text-[#373735]">No Verified Profiles Configured</h3>
-          <p className="text-sm text-[#7a766f] font-semibold mt-1">Try adjusting your search filters or clear location queries.</p>
+        <div className="text-center p-16 bg-white rounded-3xl border-2 border-dashed border-[#e3dec9] shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
+          <div className="text-5xl animate-bounce">🔍</div>
+          <h3 className="font-serif text-xl font-black text-[#373735]">No Directory Profiles Found</h3>
+          <p className="text-xs text-[#7a766f] font-semibold leading-relaxed max-w-md">
+            No medical centers or registered vet doctors were found matching your current filter set. Reset your query parameters to see all active practitioners.
+          </p>
+          <div className="pt-2">
+            <button
+              onClick={handleResetAllFilters}
+              className="btn-tactile-3d-secondary bg-[#5a5a40] text-white border-[#3c3c2b] hover:bg-[#4a4a34] px-6 py-2.5 text-xs font-black cursor-pointer transition-colors"
+            >
+              Reset All Filters & View All Cards 🔄
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
