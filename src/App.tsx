@@ -19,7 +19,6 @@ import { ProfilePage } from './components/ProfilePage';
 import { JobBoard } from './components/JobBoard';
 import LivestockManagement from './components/LivestockManagement';
 import { SubscriptionPortal } from './components/SubscriptionPortal';
-import { CheckoutPortal } from './components/CheckoutPortal';
 import { GuestAnimalViewer } from './components/GuestAnimalViewer';
 import { ClinicManagement } from './components/ClinicManagement';
 
@@ -38,22 +37,13 @@ export default function App() {
   const [highlightAppointmentId, setHighlightAppointmentId] = useState<string | null>(null);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
-  const [checkoutToken, setCheckoutToken] = useState<string | null>(null);
 
   // Unified dynamic QR code parameters scanner inside app boot
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const animalId = params.get('animalRecordId');
-    const payToken = params.get('token');
 
-    if (payToken) {
-      setCheckoutToken(payToken);
-      setActiveSection('checkout');
-      try {
-        const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-      } catch (err) {}
-    } else if (animalId) {
+    if (animalId) {
       setScannedAnimalRecordId(animalId);
       if (currentUser) {
         setActiveSection('livestock');
@@ -608,37 +598,6 @@ export default function App() {
                 currentUser={currentUser}
                 onUpdateUser={handleUpdateUserProfile}
                 onNavigateToSection={handleNavigate}
-                onStartGatewayCheckout={(token) => {
-                  setCheckoutToken(token);
-                  handleNavigate('checkout');
-                }}
-              />
-            )}
-
-            {activeSection === 'checkout' && checkoutToken && (
-              <CheckoutPortal
-                token={checkoutToken}
-                onCancel={() => handleNavigate('subscription')}
-                onSuccess={async () => {
-                  triggerLoading('Activating Premium Privileges...', 1500);
-                  try {
-                    const sessionRes = await fetch(`/api/payments/session/${checkoutToken}`);
-                    if (sessionRes.ok) {
-                      const sessionData = await sessionRes.json();
-                      const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
-                      const updated = await AuthService.updateProfile(currentUser!.uid, {
-                        subscriptionTier: sessionData.planId,
-                        subscriptionExpiresAt: newExpiry,
-                        isVerified: true
-                      });
-                      handleUpdateUserProfile(updated);
-                    }
-                  } catch (err) {
-                    console.error("Failed to verify subscription session:", err);
-                  }
-                  handleNavigate('subscription');
-                  alert('✓ Payment Processed! Secure checkout session signature validated successfully. Your practitioner privileges are now active!');
-                }}
               />
             )}
 

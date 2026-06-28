@@ -139,41 +139,6 @@ export function SubscriptionPortal({
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  // Gateway checkouts
-  const [gatewayLoading, setGatewayLoading] = useState(false);
-
-  const handleStartGatewayCheckout = async (tierId: 'Silver' | 'Gold' | 'Platinum') => {
-    setGatewayLoading(true);
-    setCheckoutError(null);
-    try {
-      const planPrice = PLANS.find(p => p.id === tierId)?.price || 2000;
-      const res = await fetch('/api/payments/create-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUser.uid,
-          planId: tierId,
-          price: planPrice
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to create payment gateway checkout session.');
-      }
-
-      const session = await res.json();
-      if (session.success && session.token && onStartGatewayCheckout) {
-        onStartGatewayCheckout(session.token);
-      } else {
-        throw new Error('Payment session generation was unsuccessful.');
-      }
-    } catch (err: any) {
-      setCheckoutError(err.message || 'Payment Gateway checkout failed.');
-    } finally {
-      setGatewayLoading(false);
-    }
-  };
-
   // Helper formatting for user input number
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value.replace(/\s?/g, '').replace(/[^0-9]/g, '');
