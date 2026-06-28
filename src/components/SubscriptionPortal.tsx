@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   CreditCard, Sparkles, CheckCircle2, Shield, Calendar, 
-  AlertTriangle, Award, Check, Zap, ShieldAlert, ArrowRight, X
+  AlertTriangle, Award, Check, Zap, ShieldAlert, ArrowRight, X, Loader2
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { AuthService, PromotionalAdsService } from '../lib/storage';
@@ -12,9 +12,15 @@ interface SubscriptionPortalProps {
   currentUser: UserProfile;
   onUpdateUser: (updated: UserProfile) => void;
   onNavigateToSection: (section: string) => void;
+  onStartGatewayCheckout?: (token: string) => void;
 }
 
-export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSection }: SubscriptionPortalProps) {
+export function SubscriptionPortal({ 
+  currentUser, 
+  onUpdateUser, 
+  onNavigateToSection,
+  onStartGatewayCheckout
+}: SubscriptionPortalProps) {
   // Plan Configurations
   const PLANS = [
     {
@@ -132,6 +138,41 @@ export function SubscriptionPortal({ currentUser, onUpdateUser, onNavigateToSect
   // Custom cancellation modal states
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+
+  // Gateway checkouts
+  const [gatewayLoading, setGatewayLoading] = useState(false);
+
+  const handleStartGatewayCheckout = async (tierId: 'Silver' | 'Gold' | 'Platinum') => {
+    setGatewayLoading(true);
+    setCheckoutError(null);
+    try {
+      const planPrice = PLANS.find(p => p.id === tierId)?.price || 2000;
+      const res = await fetch('/api/payments/create-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.uid,
+          planId: tierId,
+          price: planPrice
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to create payment gateway checkout session.');
+      }
+
+      const session = await res.json();
+      if (session.success && session.token && onStartGatewayCheckout) {
+        onStartGatewayCheckout(session.token);
+      } else {
+        throw new Error('Payment session generation was unsuccessful.');
+      }
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Payment Gateway checkout failed.');
+    } finally {
+      setGatewayLoading(false);
+    }
+  };
 
   // Helper formatting for user input number
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {

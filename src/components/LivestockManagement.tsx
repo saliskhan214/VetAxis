@@ -3628,7 +3628,7 @@ export default function LivestockManagement({
                   key={idx}
                   type="button"
                   onClick={() => setIndFormStep(idx)}
-                  className={`p-1.5 rounded border-none cursor-pointer ${indFormStep === idx ? 'bg-[#5a5a40] text-white' : 'bg-transparent text-gray-400'}`}
+                  className={`p-1.5 rounded border-none cursor-pointer shrink-0 whitespace-nowrap ${indFormStep === idx ? 'bg-[#5a5a40] text-white' : 'bg-transparent text-gray-400'}`}
                 >
                   {name}
                 </button>
@@ -3753,20 +3753,22 @@ export default function LivestockManagement({
                       <span className="font-bold text-gray-700">Checkups & Meds</span>
                       <button type="button" onClick={addHealthRecord} className="cursor-pointer bg-[#5a5a40] text-white text-[10px] px-2 py-0.5 rounded border-none">+ Add</button>
                     </div>
+                    <div className="space-y-2 max-w-full overflow-x-hidden">
                     {activeIndividualRecord.healthRecords?.map((h, i) => (
-                      <div key={i} className="flex gap-2 items-center bg-white p-2 border rounded">
+                      <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-center bg-white p-2.5 border rounded-lg">
                         <input type="date" value={h.date} onChange={(e) => {
                           const list = [...activeIndividualRecord.healthRecords!]; list[i].date = e.target.value; setActiveIndividualRecord({ ...activeIndividualRecord, healthRecords: list });
-                        }} className="border rounded p-1 text-[11px] w-28" />
+                        }} className="border rounded p-1 text-[11px] w-full sm:w-28 shrink-0" />
                         <input type="text" placeholder="Diagnosis" value={h.diagnosis} onChange={(e) => {
                           const list = [...activeIndividualRecord.healthRecords!]; list[i].diagnosis = e.target.value; setActiveIndividualRecord({ ...activeIndividualRecord, healthRecords: list });
-                        }} className="border rounded p-1 text-[11px] flex-1" />
+                        }} className="border rounded p-1 text-[11px] w-full sm:flex-1 min-w-0" />
                         <input type="text" placeholder="Treatment" value={h.treatment} onChange={(e) => {
                           const list = [...activeIndividualRecord.healthRecords!]; list[i].treatment = e.target.value; setActiveIndividualRecord({ ...activeIndividualRecord, healthRecords: list });
-                        }} className="border rounded p-1 text-[11px] flex-1" />
-                        <button type="button" onClick={() => removeHealthRecord(i)} className="text-red-600 border-none bg-transparent cursor-pointer">✕</button>
+                        }} className="border rounded p-1 text-[11px] w-full sm:flex-1 min-w-0" />
+                        <button type="button" onClick={() => removeHealthRecord(i)} className="text-red-600 border-none bg-transparent cursor-pointer self-end sm:self-auto p-1">✕</button>
                       </div>
                     ))}
+                    </div>
                   </div>
 
                   <div className="bg-[#fafbf9] p-3 rounded-xl border border-stone-150 space-y-2">
@@ -3790,9 +3792,9 @@ export default function LivestockManagement({
               )}
             </div>
 
-            <div className="pt-3 border-t border-[#f4f1e9] flex justify-between font-sans">
+            <div className="pt-3 border-t border-[#f4f1e9] flex flex-wrap gap-2 justify-between items-center font-sans">
               <button type="button" onClick={() => setShowIndividualRecordModal(false)} className="cursor-pointer bg-neutral-100 hover:bg-neutral-200 text-gray-600 py-2 px-4 rounded-xl text-xs border-none font-semibold">Cancel</button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {indFormStep > 0 && <button type="button" onClick={() => setIndFormStep(indFormStep - 1)} className="cursor-pointer bg-neutral-100 py-2 px-4 rounded-xl text-xs border-none font-semibold">Back</button>}
                 {indFormStep < 3 && (
                   <button type="button" onClick={() => setIndFormStep(indFormStep + 1)} className="cursor-pointer bg-[#5a5a40] text-white py-2 px-4 rounded-xl text-xs border-none font-semibold shadow-xs hover:bg-[#3e3e2b] active:scale-95 transition-all">Next</button>
@@ -3843,7 +3845,7 @@ export default function LivestockManagement({
                   key={idxAnswer}
                   type="button"
                   onClick={() => setHerdFormStep(idxAnswer)}
-                  className={`p-1.5 rounded border-none cursor-pointer ${herdFormStep === idxAnswer ? 'bg-[#5a5a40] text-white' : 'bg-transparent text-gray-400'}`}
+                  className={`p-1.5 rounded border-none cursor-pointer shrink-0 whitespace-nowrap ${herdFormStep === idxAnswer ? 'bg-[#5a5a40] text-white' : 'bg-transparent text-gray-400'}`}
                 >
                   {name}
                 </button>
@@ -3925,17 +3927,19 @@ export default function LivestockManagement({
                       <span className="font-bold text-gray-700">Dewormings Registry</span>
                       <button type="button" onClick={addHerdDeworming} className="cursor-pointer bg-[#5a5a40] text-white text-[10px] px-2 py-0.5 rounded border-none">+ Add Deworming</button>
                     </div>
+                    <div className="space-y-2 max-w-full overflow-x-hidden">
                     {activeHerdRecord.dewormings?.map((dw, i) => (
-                      <div key={i} className="flex gap-2 items-center bg-white p-2 border rounded">
+                      <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-center bg-white p-2.5 border rounded-lg">
                         <input type="text" placeholder="Drug Line" value={dw.drugUsed} onChange={(e) => {
                           const list = [...activeHerdRecord.dewormings!]; list[i].drugUsed = e.target.value; setActiveHerdRecord({ ...activeHerdRecord, dewormings: list });
-                        }} className="border rounded p-1 text-[11px] flex-1" />
+                        }} className="border rounded p-1 text-[11px] w-full sm:flex-1 min-w-0" />
                         <input type="date" value={dw.dateAdministered} onChange={(e) => {
                           const list = [...activeHerdRecord.dewormings!]; list[i].dateAdministered = e.target.value; setActiveHerdRecord({ ...activeHerdRecord, dewormings: list });
-                        }} className="border rounded p-1 text-[11px] w-28" />
-                        <button type="button" onClick={() => removeHerdDeworming(i)} className="text-red-600 border-none bg-transparent cursor-pointer">✕</button>
+                        }} className="border rounded p-1 text-[11px] w-full sm:w-28 shrink-0" />
+                        <button type="button" onClick={() => removeHerdDeworming(i)} className="text-red-600 border-none bg-transparent cursor-pointer self-end sm:self-auto p-1">✕</button>
                       </div>
                     ))}
+                    </div>
                   </div>
 
                   <div className="bg-[#fafbf9] p-3 rounded-xl border border-stone-150 space-y-2 font-sans">
@@ -3959,9 +3963,9 @@ export default function LivestockManagement({
               )}
             </div>
 
-            <div className="pt-3 border-t border-[#f4f1e9] flex justify-between font-sans">
+            <div className="pt-3 border-t border-[#f4f1e9] flex flex-wrap gap-2 justify-between items-center font-sans">
               <button type="button" onClick={() => setShowHerdRecordModal(false)} className="cursor-pointer bg-neutral-100 text-gray-600 py-2 px-4 rounded-xl text-xs border-none font-semibold">Cancel</button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {herdFormStep > 0 && <button type="button" onClick={() => setHerdFormStep(herdFormStep - 1)} className="cursor-pointer bg-neutral-100 py-2 px-4 rounded-xl text-xs border-none font-semibold">Back</button>}
                 {herdFormStep < 2 && (
                   <button type="button" onClick={() => setHerdFormStep(herdFormStep + 1)} className="cursor-pointer bg-[#5a5a40] text-white py-2 px-4 rounded-xl text-xs border-none font-semibold shadow-xs hover:bg-[#3e3e2b] active:scale-95 transition-all">Next</button>

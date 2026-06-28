@@ -20,7 +20,16 @@ export function OfflineModeIndicator({
   // Sync states
   const [isSyncActive, setIsSyncActive] = useState<boolean>(false);
   const [syncProgress, setSyncProgress] = useState<number>(0);
-  const [syncStatusText, setSyncStatusText] = useState<string>('Awaiting sync...');
+
+  const syncStatusText = syncProgress < 25
+    ? 'Ping stable. Establishing encrypted transaction handshake...'
+    : syncProgress < 55
+    ? 'Uploading cached veterinary records & immunizations...'
+    : syncProgress < 85
+    ? 'Reconciling agricultural ledger data nodes...'
+    : syncProgress < 100
+    ? 'Validating cryptographic integrity of synchronized tables...'
+    : 'Database synchronized successfully!';
 
   useEffect(() => {
     const handleOnline = () => {
@@ -69,37 +78,9 @@ export function OfflineModeIndicator({
     if (isSyncActive) {
       interval = setInterval(() => {
         setSyncProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval!);
-            setIsSyncActive(false);
-
-            // Execute actual data sync callback to reconcile memory
-            if (onSyncOfflineData) {
-              onSyncOfflineData().catch((err) => {
-                console.error("Synchronization error:", err);
-              });
-            }
-
-            return 100;
-          }
-
-          // Smooth randomly staggered progress steps
+          if (prev >= 100) return 100;
           const increment = Math.floor(Math.random() * 12) + 12; // 12-24%
-          const next = Math.min(prev + increment, 100);
-
-          if (next < 25) {
-            setSyncStatusText('Ping stable. Establishing encrypted transaction handshake...');
-          } else if (next < 55) {
-            setSyncStatusText('Uploading cached veterinary records & immunizations...');
-          } else if (next < 85) {
-            setSyncStatusText('Reconciling agricultural ledger data nodes...');
-          } else if (next < 100) {
-            setSyncStatusText('Validating cryptographic integrity of synchronized tables...');
-          } else {
-            setSyncStatusText('Database synchronized successfully!');
-          }
-
-          return next;
+          return Math.min(prev + increment, 100);
         });
       }, 250);
     }
@@ -107,7 +88,19 @@ export function OfflineModeIndicator({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isSyncActive, onSyncOfflineData]);
+  }, [isSyncActive]);
+
+  // Execute sync callback when progress reaches 100
+  useEffect(() => {
+    if (isSyncActive && syncProgress >= 100) {
+      setIsSyncActive(false);
+      if (onSyncOfflineData) {
+        onSyncOfflineData().catch((err) => {
+          console.error("Synchronization error:", err);
+        });
+      }
+    }
+  }, [isSyncActive, syncProgress, onSyncOfflineData]);
 
   // Auto-hide progress notice after completion
   useEffect(() => {
