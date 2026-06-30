@@ -13,6 +13,7 @@ import { Navbar } from './components/Navbar';
 import { AuthScreen } from './components/AuthScreen';
 import { ExploreFeed } from './components/ExploreFeed';
 import { CommunityFeed } from './components/CommunityFeed';
+import { AdminPanel } from './components/AdminPanel';
 import { Marketplace } from './components/Marketplace';
 import { PetAds } from './components/PetAds';
 import { ProfilePage } from './components/ProfilePage';
@@ -28,6 +29,18 @@ export default function App() {
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
+
+  const [dbQuotaExceeded, setDbQuotaExceeded] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleQuotaExceeded = () => {
+      setDbQuotaExceeded(true);
+    };
+    window.addEventListener('firestore-quota-exceeded', handleQuotaExceeded);
+    return () => {
+      window.removeEventListener('firestore-quota-exceeded', handleQuotaExceeded);
+    };
+  }, []);
 
   // Highlight states for redirects
   const [highlightPostId, setHighlightPostId] = useState<string | null>(null);
@@ -73,6 +86,11 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setNotifications([]);
+      return;
+    }
+
+    if (dbQuotaExceeded) {
+      console.warn('[VetAxis] Background notifications polling suspended due to database quota exhaustion.');
       return;
     }
 
@@ -177,7 +195,7 @@ export default function App() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, dbQuotaExceeded]);
 
   const handleMarkAllAsRead = async () => {
     if (!currentUser) return;
@@ -376,6 +394,7 @@ export default function App() {
   // Sync and validate that the stored session user profile still exists in Firestore or Fallback DB
   // Also runs a real-time periodic clock to guarantee user downgrades when subscription duration runs out
   useEffect(() => {
+    if (dbQuotaExceeded) return;
     let active = true;
 
     const validateSession = async () => {
@@ -424,11 +443,11 @@ export default function App() {
       active = false;
       clearInterval(pollId);
     };
-  }, [currentUser?.uid, currentUser?.subscriptionExpiresAt, currentUser?.subscriptionTier]);
+  }, [currentUser?.uid, currentUser?.subscriptionExpiresAt, currentUser?.subscriptionTier, dbQuotaExceeded]);
 
   // Real-time online presence heartbeat
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || dbQuotaExceeded) return;
 
     const performHeartbeat = async () => {
       try {
@@ -447,7 +466,7 @@ export default function App() {
     // Trigger heartbeat clock cycle every 30 seconds to be extremely precise
     const interval = setInterval(performHeartbeat, 30000);
     return () => clearInterval(interval);
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, dbQuotaExceeded]);
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
@@ -534,6 +553,24 @@ export default function App() {
         </div>
       )}
 
+      {dbQuotaExceeded && (
+        <div className="bg-red-50/95 border-b border-red-200 text-red-900 text-xs py-3 px-4 text-center font-medium flex items-center justify-center gap-3 animate-fadeIn shadow-inner">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-red-600 animate-ping" />
+            ⚠️ <strong>Cloud Connection Rate-Limited (Quota Exhausted):</strong> This limited sandbox database has reached its free-tier daily write limit of 20,000 units.
+          </span>
+          <p className="hidden md:inline text-red-700 font-normal">
+            We have safely switched your session to offline-caching mode. Your changes will automatically sync once limits reset or upon refresh later.
+          </p>
+          <button
+            onClick={() => setDbQuotaExceeded(false)}
+            className="ml-2 font-bold hover:text-red-700 bg-stone-200/50 hover:bg-stone-200 px-2 py-1 rounded transition-colors text-stone-800 text-[10px] cursor-pointer"
+          >
+            Acknowledge
+          </button>
+        </div>
+      )}
+
       {/* RENDERED FEED ROUTER BOX */}
       <main className="flex-1 container max-w-7xl mx-auto px-4 py-8 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -599,6 +636,10 @@ export default function App() {
                 onUpdateUser={handleUpdateUserProfile}
                 onNavigateToSection={handleNavigate}
               />
+            )}
+
+            {activeSection === 'admin' && currentUser && (currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
+              <AdminPanel currentUser={currentUser} />
             )}
 
             {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (

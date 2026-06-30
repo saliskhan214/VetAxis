@@ -66,6 +66,7 @@ export function Navbar({
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },
     { id: 'jobs', label: 'Job Board', icon: '💼' },
     { id: 'subscription', label: 'Subscription Portal', icon: '💳' },
+    { id: 'admin', label: 'Admin Panel', icon: '🛠️' },
   ];
 
   return (
@@ -306,6 +307,9 @@ export function Navbar({
                   
                   {navItems
                     .filter(item => {
+                      if (item.id === 'admin') {
+                        return user.email === 'saliskhan214@gmail.com' || user.isAdmin === true;
+                      }
                       if (item.id === 'subscription') {
                         return user.role === 'clinic' || user.role === 'doctor';
                       }

@@ -16,6 +16,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'saliskhan214@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true)
+      );
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -53,11 +61,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (
         isOwner(userId) ||
+        isAdmin() ||
         resource.data.role != 'user'
       );
       
       allow list: if isSignedIn() && (
-        resource.data.role != 'user'
+        isAdmin() || 
+        resource.data.role != 'user' ||
+        resource.data.uid == request.auth.uid
       );
 
       allow create: if isSignedIn() && isOwner(userId) && (
@@ -72,6 +83,7 @@ service cloud.firestore {
         (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
         (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
         (!('isVerified' in incoming()) || incoming().isVerified == false) && // Block self-verification during registration
+        (!('isAdmin' in incoming()) || incoming().isAdmin == false) && // Block self-admin status during registration
         (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum'] || incoming().subscriptionTier == null) &&
         (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number || incoming().subscriptionExpiresAt == null) &&
         (!('emailVerified' in incoming()) || incoming().emailVerified is bool) &&
@@ -87,13 +99,15 @@ service cloud.firestore {
 
       // Protect against privilege escalation and role-switching attacks
       allow update: if isSignedIn() && (
+        isAdmin() ||
         (isOwner(userId) && (
           incoming().role == existing().role &&
           incoming().email == existing().email &&
           incoming().createdAt == existing().createdAt &&
           (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
-          (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum'] || incoming().subscriptionTier == null) &&
-          (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number || incoming().subscriptionExpiresAt == null) &&
+          (!('subscriptionTier' in incoming()) || incoming().subscriptionTier == existing().get('subscriptionTier', null)) && // Guard: cannot self-upgrade tier
+          (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt == existing().get('subscriptionExpiresAt', null)) && // Guard: cannot self-extend subscription
+          (!('isAdmin' in incoming()) || incoming().isAdmin == existing().get('isAdmin', false)) && // Guard: cannot self-admin
           (!('promoAdsUsed' in incoming()) || incoming().promoAdsUsed is number) &&
           (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
           incoming().name is string && incoming().name.size() <= 80 &&
@@ -155,6 +169,22 @@ service cloud.firestore {
           existing().reviewerEmail == request.auth.token.email
         );
       }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PENDING MANUAL PAYMENTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /pending_manual_payments/{paymentId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CONNECTION METADATA TEST RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /test-metadata-connection/{docId} {
+      allow read: if true;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -493,43 +523,45 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
 
     match /clinic_appointments/{apptId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid));
-      allow list: if isSignedIn();
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && (request.resource.data.clinicId == request.auth.uid || ('userId' in request.resource.data && request.resource.data.userId == request.auth.uid));
-      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid));
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid) || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_soap_records/{soapId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.clinicId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.clinicId == request.auth.uid && request.resource.data.clinicId == request.auth.uid;
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_prescriptions/{prescId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.clinicId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.clinicId == request.auth.uid && request.resource.data.clinicId == request.auth.uid;
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_invoices/{invoiceId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.clinicId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.clinicId == request.auth.uid && request.resource.data.clinicId == request.auth.uid;
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_service_catalog/{serviceId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
     }
 
     match /clinic_drugs_inventory/{drugId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow write: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
     }
   }
 }

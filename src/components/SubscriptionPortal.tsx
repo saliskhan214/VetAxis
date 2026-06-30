@@ -5,7 +5,7 @@ import {
   AlertTriangle, Award, Check, Zap, ShieldAlert, ArrowRight, X, Loader2
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { AuthService, PromotionalAdsService } from '../lib/storage';
+import { AuthService, PromotionalAdsService, PaymentService } from '../lib/storage';
 import { LivestockService } from '../lib/livestockService';
 
 interface SubscriptionPortalProps {
@@ -138,6 +138,32 @@ export function SubscriptionPortal({
   // Custom cancellation modal states
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+
+  // Manual Payment states
+  const [manualPaymentId, setManualPaymentId] = useState('');
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  
+  const handleManualPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTier || !manualPaymentId) return;
+
+    setPaymentSubmitting(true);
+    setCheckoutError(null);
+    try {
+      await PaymentService.submitManualPayment({
+        userId: currentUser.uid,
+        userName: currentUser.name || currentUser.email,
+        userEmail: currentUser.email,
+        planId: selectedTier,
+        transactionId: manualPaymentId
+      });
+      setSuccessMode(true);
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Failed to submit payment details.');
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
 
   // Helper formatting for user input number
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -596,10 +622,10 @@ export function SubscriptionPortal({
                     ✓
                   </div>
                   <h4 className="font-serif text-xl font-black text-[#1b7c31]">
-                    Transaction Processed Successfully!
+                    Payment Submitted for Review!
                   </h4>
                   <p className="text-xs font-semibold text-emerald-800 leading-relaxed max-w-sm mx-auto">
-                    Excellent! Your profile is verified and upgraded to <strong className="font-black underline">{selectedTier} Master</strong> status instantly. Explore directories, ads, and product listings to view active premium privileges!
+                    Thank you! An admin is currently reviewing your transaction details. Your profile will be verified and upgraded to <strong className="font-black underline">{selectedTier}</strong> status as soon as possible.
                   </p>
                   <div className="pt-2 flex gap-3.5 justify-center">
                     <button
@@ -705,89 +731,43 @@ export function SubscriptionPortal({
                     </div>
                   </div>
 
-                  {/* RIGHT: CARD INPUT INPUT FLOW */}
-                  <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                  {/* RIGHT: MANUAL PAYMENT FORM */}
+                  <form onSubmit={handleManualPaymentSubmit} className="space-y-4">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                      <h4 className="font-bold text-amber-900">Manual Payment Instructions</h4>
+                      <p className="text-xs text-amber-800">Please transfer <strong>PKR {PLANS.find(p => p.id === selectedTier)?.price}</strong> to the following account:</p>
+                      <div className="text-xs font-mono bg-white p-2 rounded border border-amber-200">
+                        <p><strong>Easypaisa Digital Account:</strong> 92532839</p>
+                        <p><strong>IBAN:</strong> PK36TMFB0000000092532839</p>
+                        <p><strong>Receiver Name:</strong> Naseeb Ullah</p>
+                      </div>
+                    </div>
+
                     {checkoutError && (
                       <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold leading-relaxed">
                         ⚠️ Error: {checkoutError}
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Simulated Card Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={cardName}
-                          onChange={(e) => setCardName(e.target.value.toUpperCase())}
-                          placeholder="Dr. Muhammad Ali"
-                          className="form-control text-xs font-extrabold"
-                          onFocus={() => setCardFocus(false)}
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Simulated Card Number</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            required
-                            value={cardNumber}
-                            onChange={handleCardNumberChange}
-                            placeholder="4000 1234 5678 9010"
-                            className="form-control text-xs font-mono font-bold pl-10"
-                            onFocus={() => setCardFocus(false)}
-                          />
-                          <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 w-4.5 h-4.5" />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Expiration Date</label>
-                        <input
-                          type="text"
-                          required
-                          value={cardExpiry}
-                          onChange={handleExpiryChange}
-                          placeholder="12/28"
-                          className="form-control text-xs font-mono font-bold text-center"
-                          onFocus={() => setCardFocus(false)}
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">CVC / CVV</label>
-                        <input
-                          type="password"
-                          required
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                          placeholder="•••"
-                          className="form-control text-xs font-mono font-bold text-center"
-                          onFocus={() => setCardFocus(true)}
-                          onBlur={() => setCardFocus(false)}
-                        />
-                      </div>
-
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Transaction ID</label>
+                      <input
+                        type="text"
+                        required
+                        value={manualPaymentId}
+                        onChange={(e) => setManualPaymentId(e.target.value)}
+                        placeholder="Enter your transaction ID"
+                        className="form-control text-xs font-bold"
+                      />
                     </div>
 
                     <button
                       type="submit"
-                      disabled={checkoutLoading}
-                      className="w-full btn-tactile-3d py-3.5 mt-2 text-xs font-extrabold uppercase tracking-widest bg-emerald-700 text-white border-emerald-600 hover:bg-emerald-800 shrink-0"
+                      disabled={paymentSubmitting}
+                      className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50"
                     >
-                      {checkoutLoading ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
-                          <span>Authorizing Credentials...</span>
-                        </div>
-                      ) : (
-                        <span>Proceed Simulated Payment ➔</span>
-                      )}
+                      {paymentSubmitting ? 'Submitting...' : 'Submit Transaction ID'}
                     </button>
-                    
                   </form>
 
                 </div>

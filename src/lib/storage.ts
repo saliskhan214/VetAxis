@@ -25,7 +25,7 @@ import {
 } from 'firebase/auth';
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd } from '../types';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd, ManualPayment } from '../types';
 
 // ─────────────────────────────────────────────────────────────────
 // MOCK FALLBACK DATABASE ACTIONS (LocalStorage)
@@ -382,10 +382,130 @@ function populateInitialSeeds() {
 // Execute seeds init on import to guarantee user isn't greeting an empty screen
 populateInitialSeeds();
 
+export const PaymentService = {
+  submitManualPayment: async (payment: Omit<ManualPayment, 'id' | 'status' | 'createdAt'>) => {
+    try {
+      const docRef = await addDoc(collection(db, 'pending_manual_payments'), {
+        ...payment,
+        status: 'pending',
+        createdAt: Date.now()
+      });
+      return docRef.id;
+    } catch (err) {
+      console.error('Error submitting payment:', err);
+      handleFirestoreError(err, OperationType.WRITE, 'pending_manual_payments');
+    }
+  },
+  
+  getPendingPayments: async () => {
+    try {
+      const q = query(collection(db, 'pending_manual_payments'), where('status', '==', 'pending'));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ManualPayment));
+    } catch (err) {
+      console.error('Error fetching pending payments:', err);
+      handleFirestoreError(err, OperationType.LIST, 'pending_manual_payments');
+    }
+  },
+
+  approveManualPayment: async (paymentId: string, userId: string, planId: 'Silver' | 'Gold' | 'Platinum') => {
+    try {
+      // 1. Update payment status
+      await updateDoc(doc(db, 'pending_manual_payments', paymentId), { status: 'approved' });
+      
+      // 2. Update user subscription
+      const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
+      await updateDoc(doc(db, 'users', userId), {
+        subscriptionTier: planId,
+        subscriptionExpiresAt: newExpiry,
+        isVerified: true
+      });
+
+      // 3. Create notification
+      try {
+        await NotificationService.createNotification({
+          userId,
+          senderId: 'admin',
+          senderName: 'Admin Team',
+          type: 'status_change',
+          targetId: paymentId,
+          targetType: 'appointment',
+          message: `Your manual payment of subscription plan '${planId}' has been APPROVED. Your account has been upgraded!`
+        });
+      } catch (notifErr) {
+        console.error('Failed to create approval notification:', notifErr);
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Error approving payment:', err);
+      handleFirestoreError(err, OperationType.WRITE, `pending_manual_payments/${paymentId}`);
+    }
+  },
+
+  disapproveManualPayment: async (paymentId: string, userId: string, planId: 'Silver' | 'Gold' | 'Platinum') => {
+    try {
+      // 1. Update payment status
+      await updateDoc(doc(db, 'pending_manual_payments', paymentId), { status: 'rejected' });
+
+      // 2. Create notification
+      try {
+        await NotificationService.createNotification({
+          userId,
+          senderId: 'admin',
+          senderName: 'Admin Team',
+          type: 'status_change',
+          targetId: paymentId,
+          targetType: 'appointment',
+          message: `Your manual payment of subscription plan '${planId}' has been DISAPPROVED. Please review your Transaction ID and submit again.`
+        });
+      } catch (notifErr) {
+        console.error('Failed to create rejection notification:', notifErr);
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Error rejecting payment:', err);
+      handleFirestoreError(err, OperationType.WRITE, `pending_manual_payments/${paymentId}`);
+    }
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────
 // AUTH ENGINE (Live Firebase or LocalStorage Fallback)
 // ─────────────────────────────────────────────────────────────────
 export const AuthService = {
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      return snap.docs.map(doc => {
+        const data = doc.data() as UserProfile;
+        return {
+          ...data,
+          uid: data.uid || doc.id
+        };
+      });
+    } catch (err) {
+      console.error('Error fetching all users:', err);
+      handleFirestoreError(err, OperationType.LIST, 'users');
+    }
+  },
+
+  upgradeUserSubscription: async (userId: string, tier: 'Silver' | 'Gold' | 'Platinum') => {
+    try {
+      const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
+      await updateDoc(doc(db, 'users', userId), {
+        subscriptionTier: tier,
+        subscriptionExpiresAt: newExpiry,
+        isVerified: true
+      });
+      return true;
+    } catch (err) {
+      console.error('Error upgrading user subscription:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
+    }
+  },
+  
   async signUp(email: string, password: string, name: string, phone: string, role: string, extra: any): Promise<UserProfile> {
     const emailLower = email.toLowerCase().trim();
 
@@ -408,7 +528,8 @@ export const AuthService = {
           createdAt: Date.now(),
           location: extra.location || null,
           isVerified: false,
-          emailVerified: false
+          emailVerified: false,
+          isAdmin: emailLower === 'saliskhan214@gmail.com' ? true : undefined
         };
 
         await setDoc(doc(db, 'users', uid), cleanUndefined(profile));
@@ -689,6 +810,7 @@ export const AuthService = {
       createdAt: Date.now(),
       isVerified: false,
       emailVerified: pendingInfo.emailVerified,
+      isAdmin: pendingInfo.email.toLowerCase().trim() === 'saliskhan214@gmail.com' ? true : undefined,
       location: extra.location || null
     };
 

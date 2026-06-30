@@ -69,6 +69,16 @@ export { db, auth };
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
   const message = error instanceof Error ? error.message : String(error);
   
+  if (typeof window !== 'undefined') {
+    const isQuota = message.toLowerCase().includes('quota') || 
+                    message.toLowerCase().includes('resource-exhausted') || 
+                    message.toLowerCase().includes('resource_exhausted') ||
+                    message.toLowerCase().includes('exhausted');
+    if (isQuota) {
+      window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: { message } }));
+    }
+  }
+  
   const errInfo: FirestoreErrorInfo = {
     error: message,
     operationType,

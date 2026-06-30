@@ -42,6 +42,18 @@ export interface UserProfile {
   reviews?: Review[]; // For local schema backward compatibility
   isOnline?: boolean;
   lastSeen?: number; // timestamp in milliseconds
+  isAdmin?: boolean;
+}
+
+export interface ManualPayment {
+  id: string;
+  userId: string;
+  userName?: string;
+  userEmail: string;
+  planId: 'Silver' | 'Gold' | 'Platinum';
+  transactionId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
 }
 
 export interface PetAd {
