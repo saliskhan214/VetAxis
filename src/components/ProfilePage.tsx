@@ -71,6 +71,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   const [adIcon, setAdIcon] = useState<string>('🏥');
   const [adGradient, setAdGradient] = useState<string>('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
   const [adPaymentChoice, setAdPaymentChoice] = useState<'free_privilege' | 'pay_3_days' | 'pay_7_days'>('pay_3_days');
+  const [adPaymentMethod, setAdPaymentMethod] = useState<'card' | 'manual'>('manual');
+  const [adManualMethod, setAdManualMethod] = useState<'Easypaisa' | 'JazzCash' | 'Nayapay' | 'Bank Transfer'>('Easypaisa');
+  const [adTransactionId, setAdTransactionId] = useState<string>('');
   const [adCardName, setAdCardName] = useState<string>('');
   const [adCardNumber, setAdCardNumber] = useState<string>('');
   const [adCardExpiry, setAdCardExpiry] = useState<string>('');
@@ -85,7 +88,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
 
   const loadActiveAds = async () => {
     try {
-      const ads = await PromotionalAdsService.fetchActiveAds();
+      const ads = await PromotionalAdsService.fetchActiveAds(false);
       setActiveAds(ads.filter((ad: any) => ad.ownerUid === currentUser.uid));
     } catch (err) {
       console.error('Failed fetching active ads', err);
@@ -123,16 +126,23 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
     const durationDays = adPaymentChoice === 'pay_7_days' ? 7 : 3;
     const pricePaid = isAdFree ? 0 : (adPaymentChoice === 'pay_7_days' ? 1500 : 1000);
 
-    // Validate payment credentials if not free
+    // Validate payment credentials or transaction ID if not free
     if (!isAdFree) {
-      if (!adCardName.trim() || !adCardNumber.trim() || !adCardExpiry.trim() || !adCardCvv.trim()) {
-        setError('Please enter your card payment details to complete this purchase campaign.');
-        return;
-      }
-      const cleanNum = adCardNumber.replace(/\s+/g, '');
-      if (cleanNum.length < 15 || cleanNum.length > 16) {
-        setError('Invalid credit card number format for ad checkout. Must be 15 or 16 digits.');
-        return;
+      if (adPaymentMethod === 'card') {
+        if (!adCardName.trim() || !adCardNumber.trim() || !adCardExpiry.trim() || !adCardCvv.trim()) {
+          setError('Please enter your card payment details to complete this purchase campaign.');
+          return;
+        }
+        const cleanNum = adCardNumber.replace(/\s+/g, '');
+        if (cleanNum.length < 15 || cleanNum.length > 16) {
+          setError('Invalid credit card number format for ad checkout. Must be 15 or 16 digits.');
+          return;
+        }
+      } else {
+        if (!adTransactionId.trim()) {
+          setError('Please enter the Transaction ID for your manual payment to submit this ad campaign.');
+          return;
+        }
       }
     } else {
       // Re-verify they have credits
@@ -150,6 +160,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       // Simulate network processing delay (ad registration & payment clearance)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      const isApprovedImmediately = isAdFree || adPaymentMethod === 'card';
+
       await PromotionalAdsService.createAd({
         sponsorName: adSponsor,
         title: adTitle,
@@ -161,7 +173,11 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         icon: adIcon,
         ownerEmail: currentUser.email,
         ownerUid: currentUser.uid,
-        ownerRole: currentUser.role as 'doctor' | 'clinic'
+        ownerRole: currentUser.role as 'doctor' | 'clinic',
+        status: isApprovedImmediately ? 'approved' : 'pending',
+        approved: isApprovedImmediately,
+        paymentMethod: isAdFree ? 'Free Promo Credit' : (adPaymentMethod === 'card' ? 'Card' : adManualMethod),
+        transactionId: isAdFree ? '' : (adPaymentMethod === 'card' ? 'CardPayment' : adTransactionId)
       }, durationDays, pricePaid);
 
       // If they used a free privilege, we MUST increment promoAdsUsed in database & local state!
@@ -174,7 +190,11 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         onUpdateUser(updatedUser);
       }
 
-      triggerSuccess(`⚡ Congratulations! Your promotional campaign "${adTitle}" is now live on the VetAxis Billboard!`);
+      if (isApprovedImmediately) {
+        triggerSuccess(`⚡ Congratulations! Your promotional campaign "${adTitle}" is now live on the VetAxis Billboard!`);
+      } else {
+        triggerSuccess(`⚡ Congratulations! Your promotional campaign "${adTitle}" and payment transaction ID "${adTransactionId}" have been successfully submitted! It will appear on the VetAxis Billboard as soon as an Admin approves it.`);
+      }
       loadActiveAds();
       
       // Clean form fields
@@ -189,6 +209,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       setAdCardNumber('');
       setAdCardExpiry('');
       setAdCardCvv('');
+      setAdTransactionId('');
     } catch (err: any) {
       setError(err.message || 'An error occurred during campaign promotion processing.');
     } finally {
@@ -469,13 +490,14 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* LEFT PROFILE CARD COLUMN (3 Columns on medium+, 4 on large) */}
-        <div className="col-span-12 lg:col-span-4 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 shadow-md flex flex-col items-center text-center space-y-6">
+        <div className="col-span-1 lg:col-span-4 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 shadow-md flex flex-col items-center text-center space-y-6 w-full">
           
           <div className="relative group">
             {profilePic && profilePic !== 'default' ? (
               <img
                 src={profilePic}
                 alt={currentUser.name}
+                referrerPolicy="no-referrer"
                 className="w-28 h-28 rounded-2xl object-cover border-4 border-white shadow-xl bg-[#fcf9f2]"
               />
             ) : (
@@ -592,15 +614,15 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         </div>
 
         {/* RIGHT COLUMN DETAILS INPUTS (8 Columns) */}
-        <div className="col-span-12 lg:col-span-8 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 md:p-8 shadow-md space-y-6">
+        <div className="col-span-1 lg:col-span-8 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 md:p-8 shadow-md space-y-6 w-full">
           
-          <div className="flex items-center justify-between border-b border-[#f4f1e9] pb-4.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#f4f1e9] pb-4.5">
             <h3 className="font-serif text-lg font-black text-[#373735] flex items-center gap-2">
-              <User className="w-5 h-5 text-[#5a5a40]" />
+              <User className="w-5 h-5 text-[#5a5a40] shrink-0" />
               <span>Contact Credentials</span>
             </h3>
             
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
               {(currentUser.role === 'clinic' || currentUser.role === 'doctor') && !editing && (
                 <button
                   type="button"
@@ -1065,7 +1087,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               animate={{ opacity: 1, height: 'auto', y: 0 }}
               exit={{ opacity: 0, height: 0, y: 15 }}
               transition={{ duration: 0.3 }}
-              className="col-span-12 mt-8 bg-amber-50/15 border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 md:p-8 shadow-md overflow-hidden"
+              className="w-full mt-8 bg-amber-50/15 border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 md:p-8 shadow-md overflow-hidden"
             >
             <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#f4f1e9] pb-5 gap-3">
               <div className="space-y-1">
@@ -1082,9 +1104,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-8 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 mt-6">
               {/* Left Column: Form Parameters (7 Columns) */}
-              <form onSubmit={handleAdSubmit} className="col-span-12 lg:col-span-7 space-y-5">
+              <form onSubmit={handleAdSubmit} className="col-span-1 lg:col-span-7 space-y-5 w-full">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Sponsor Card Name Input */}
                   <div className="space-y-1">
@@ -1294,67 +1316,139 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-black text-[#5a5a40] uppercase">Billing Cardholder Name</span>
-                        <input
-                          type="text"
-                          placeholder="Owner Name"
-                          value={adCardName}
-                          onChange={(e) => setAdCardName(e.target.value)}
-                          className="form-control text-xs bg-white"
-                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-black text-[#5a5a40] uppercase">Credit Card Number</span>
-                        <input
-                          type="text"
-                          placeholder="4123 0000 8888 9912"
-                          value={adCardNumber}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').substring(0, 16);
-                            const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
-                            setAdCardNumber(formatted);
-                          }}
-                          className="form-control text-xs bg-white font-mono"
-                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-black text-[#5a5a40] uppercase">Expiration (MM/YY)</span>
-                        <input
-                          type="text"
-                          placeholder="12/28"
-                          value={adCardExpiry}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                            if (val.length >= 2) {
-                              setAdCardExpiry(val.substring(0, 2) + '/' + val.substring(2));
-                            } else {
-                              setAdCardExpiry(val);
-                            }
-                          }}
-                          className="form-control text-xs bg-white font-mono"
-                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-black text-[#5a5a40] uppercase">CVV Security</span>
-                        <input
-                          type="password"
-                          placeholder="∗∗∗"
-                          maxLength={3}
-                          value={adCardCvv}
-                          onChange={(e) => setAdCardCvv(e.target.value.replace(/\D/g, ''))}
-                          className="form-control text-xs bg-white font-mono"
-                          required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
-                        />
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-[#5a5a40] uppercase block mb-1">Select Payment Method</span>
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-[#e3dec9]/40 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setAdPaymentMethod('manual')}
+                          className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            adPaymentMethod === 'manual'
+                              ? 'bg-amber-800 text-white shadow-sm'
+                              : 'text-[#5a5a40] hover:bg-[#e3dec9]/50'
+                          }`}
+                        >
+                          Manual (Easypaisa/JazzCash)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAdPaymentMethod('card')}
+                          className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            adPaymentMethod === 'card'
+                              ? 'bg-amber-800 text-white shadow-sm'
+                              : 'text-[#5a5a40] hover:bg-[#e3dec9]/50'
+                          }`}
+                        >
+                          Credit Card (Simulated)
+                        </button>
                       </div>
                     </div>
+
+                    {adPaymentMethod === 'manual' ? (
+                      <div className="space-y-3.5 animate-fadeIn">
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                          <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wider">Manual Payment Instructions</h4>
+                          <p className="text-xs text-amber-800">
+                            Please transfer <strong>PKR {adPaymentChoice === 'pay_7_days' ? '1,500' : '1,000'}</strong> to the following account:
+                          </p>
+                          <div className="text-xs font-mono bg-white p-2.5 rounded border border-amber-200 space-y-0.5">
+                            <p><strong>Easypaisa Digital Account:</strong> 92532839</p>
+                            <p><strong>IBAN:</strong> PK36TMFB0000000092532839</p>
+                            <p><strong>Receiver Name:</strong> Naseeb Ullah</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Payment Method Applied</span>
+                            <select
+                              value={adManualMethod}
+                              onChange={(e: any) => setAdManualMethod(e.target.value)}
+                              className="form-control text-xs bg-white font-bold"
+                            >
+                              <option value="Easypaisa">Easypaisa</option>
+                              <option value="JazzCash">JazzCash</option>
+                              <option value="Nayapay">Nayapay</option>
+                              <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Transaction ID</span>
+                            <input
+                              type="text"
+                              placeholder="Enter your transaction ID"
+                              value={adTransactionId}
+                              onChange={(e) => setAdTransactionId(e.target.value)}
+                              className="form-control text-xs bg-white font-mono font-bold"
+                              required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'manual'}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 animate-fadeIn">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Billing Cardholder Name</span>
+                          <input
+                            type="text"
+                            placeholder="Owner Name"
+                            value={adCardName}
+                            onChange={(e) => setAdCardName(e.target.value)}
+                            className="form-control text-xs bg-white"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Credit Card Number</span>
+                          <input
+                            type="text"
+                            placeholder="4123 0000 8888 9912"
+                            value={adCardNumber}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').substring(0, 16);
+                              const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+                              setAdCardNumber(formatted);
+                            }}
+                            className="form-control text-xs bg-white font-mono"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Expiration (MM/YY)</span>
+                          <input
+                            type="text"
+                            placeholder="12/28"
+                            value={adCardExpiry}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                              if (val.length >= 2) {
+                                setAdCardExpiry(val.substring(0, 2) + '/' + val.substring(2));
+                              } else {
+                                setAdCardExpiry(val);
+                              }
+                            }}
+                            className="form-control text-xs bg-white font-mono"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">CVV Security</span>
+                          <input
+                            type="password"
+                            placeholder="∗∗∗"
+                            maxLength={3}
+                            value={adCardCvv}
+                            onChange={(e) => setAdCardCvv(e.target.value.replace(/\D/g, ''))}
+                            className="form-control text-xs bg-white font-mono"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1378,7 +1472,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               </form>
 
               {/* Right Column: Live Interactive Mockup Banner Preview (5 Columns) */}
-              <div className="col-span-12 lg:col-span-5 flex flex-col justify-start space-y-4">
+              <div className="col-span-1 lg:col-span-5 flex flex-col justify-start space-y-4 w-full">
                 <div className="border border-stone-200 bg-stone-50 rounded-2xl p-4 text-center">
                   <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest block">📻 Live Billboard Card Mockup Preview</span>
                   <p className="text-[9px] text-[#7a766f] font-semibold mt-0.5">As drafted by you, this displays on the top rotating index of feed listings!</p>
@@ -1444,15 +1538,33 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                             {!isDeletingThis ? (
                               <div className="flex items-center justify-between gap-2 w-full">
                                 <div className="text-left space-y-1">
-                                  <div className="font-serif font-black text-stone-850 flex items-center gap-1 leading-tight">
+                                  <div className="font-serif font-black text-stone-850 flex flex-wrap items-center gap-1.5 leading-tight">
                                     <span>{ad.icon || '🩺'}</span> <span>{ad.title}</span>
+                                    {ad.status === 'pending' ? (
+                                      <span className="bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                                        Pending Approval
+                                      </span>
+                                    ) : ad.status === 'rejected' ? (
+                                      <span className="bg-red-100 text-red-800 border border-red-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                                        Rejected
+                                      </span>
+                                    ) : (
+                                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                                        Approved
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className="text-[9px] text-[#7a766f] font-semibold flex items-center gap-2">
+                                  <div className="text-[9px] text-[#7a766f] font-semibold flex flex-wrap items-center gap-2">
                                     <span className="bg-[#5a5a40]/10 text-[#5a5a40] px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
                                       {ad.pricePaid === 0 ? 'Free Promo' : `Rs. ${ad.pricePaid}`}
                                     </span>
                                     <span>Expires: {new Date(ad.expiresAt).toLocaleDateString()}</span>
                                   </div>
+                                  {ad.transactionId && (
+                                    <div className="text-[8.5px] font-mono text-[#7a766f]/90 bg-stone-50 border border-stone-200 p-1 rounded-md">
+                                      Method: <span className="font-bold">{ad.paymentMethod}</span> | TxID: <span className="font-mono font-bold text-neutral-800">{ad.transactionId}</span>
+                                    </div>
+                                  )}
                                 </div>
                                 <button
                                   type="button"

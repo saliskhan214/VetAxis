@@ -30,7 +30,11 @@ export default function App() {
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
 
-  const [dbQuotaExceeded, setDbQuotaExceeded] = useState<boolean>(false);
+  const [dbQuotaExceeded, setDbQuotaExceeded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('firebase_quota_exceeded') === 'true' || 
+           localStorage.getItem('firebase_quota_exceeded') === 'true';
+  });
 
   useEffect(() => {
     const handleQuotaExceeded = () => {
@@ -58,7 +62,7 @@ export default function App() {
 
     if (animalId) {
       setScannedAnimalRecordId(animalId);
-      if (currentUser) {
+      if (currentUser?.uid) {
         setActiveSection('livestock');
       }
       try {
@@ -68,7 +72,7 @@ export default function App() {
         console.warn('Could not clean address bar parameters:', err);
       }
     }
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // Advanced Global Loading State
   const [isLoadingSystem, setIsLoadingSystem] = useState<boolean>(false);
@@ -186,10 +190,10 @@ export default function App() {
     // Run immediately first time
     checkNotifications(true);
 
-    // Polling interval every 6 seconds to capture likes, applications, and status updates instantly
+    // Polling interval throttled to every 25 seconds to respect Firestore free tier limits and prevent quota exhaustion
     const interval = setInterval(() => {
       checkNotifications(false);
-    }, 6000);
+    }, 25000);
 
     return () => {
       isMounted = false;
@@ -430,14 +434,14 @@ export default function App() {
 
     validateSession();
 
-    // Setup real-time poll clock checking every 2 seconds to instantly process expiration!
+    // Setup real-time poll clock checking every 30 seconds to efficiently check expiration without heavy overhead!
     const pollId = setInterval(() => {
       if (currentUser?.subscriptionTier && currentUser?.subscriptionExpiresAt) {
         if (Date.now() > currentUser.subscriptionExpiresAt) {
           validateSession();
         }
       }
-    }, 2000);
+    }, 30000);
 
     return () => {
       active = false;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, ManualPayment } from '../types';
-import { PaymentService, AuthService, NotificationService } from '../lib/storage';
+import { PaymentService, AuthService, NotificationService, PromotionalAdsService } from '../lib/storage';
 import { Loader2, CheckCircle, XCircle, Search } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -10,6 +10,7 @@ interface AdminPanelProps {
 export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [pendingPayments, setPendingPayments] = useState<ManualPayment[]>([]);
+  const [promotionalAds, setPromotionalAds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -48,12 +49,14 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [payments, allUsers] = await Promise.all([
+      const [payments, allUsers, ads] = await Promise.all([
         PaymentService.getPendingPayments(),
-        AuthService.getAllUsers()
+        AuthService.getAllUsers(),
+        PromotionalAdsService.fetchActiveAds(false)
       ]);
       setPendingPayments(payments);
       setUsers(allUsers);
+      setPromotionalAds(ads);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -154,6 +157,42 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     );
   };
 
+  const handleApproveAd = async (ad: any) => {
+    showConfirm(
+      'Approve Promotional Ad',
+      `Are you sure you want to APPROVE the promotional ad "${ad.title}" sponsored by ${ad.sponsorName}? This will make it live instantly on the billboard rotating feeds.`,
+      async () => {
+        try {
+          await PromotionalAdsService.approveAd(ad.id, ad.ownerUid, ad.title);
+          showNotification('Ad Approved', `The promotional ad "${ad.title}" has been successfully approved and is now live!`, 'success');
+          fetchData();
+        } catch (err) {
+          showNotification('Error', 'Failed to approve promotional ad.', 'error');
+        }
+      },
+      'Approve',
+      false
+    );
+  };
+
+  const handleRejectAd = async (ad: any) => {
+    showConfirm(
+      'Reject Promotional Ad',
+      `Are you sure you want to DISAPPROVE the promotional ad "${ad.title}" sponsored by ${ad.sponsorName}? This will mark it as rejected.`,
+      async () => {
+        try {
+          await PromotionalAdsService.rejectAd(ad.id, ad.ownerUid, ad.title);
+          showNotification('Ad Disapproved', `The promotional ad "${ad.title}" has been rejected.`, 'success');
+          fetchData();
+        } catch (err) {
+          showNotification('Error', 'Failed to reject promotional ad.', 'error');
+        }
+      },
+      'Disapprove',
+      true
+    );
+  };
+
   if (currentUser.email !== 'saliskhan214@gmail.com') return <div className="p-8 text-center text-red-600">Access Denied</div>;
 
   return (
@@ -162,12 +201,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
       
       <section>
         <h2 className="text-xl font-bold mb-4">Pending Manual Payments</h2>
-        <div className="bg-white border rounded-xl overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white border rounded-xl overflow-x-auto">
+          <table className="w-full min-w-[700px]">
             <thead className="bg-stone-50 border-b">
               <tr>
                 <th className="p-3 text-left">User</th>
                 <th className="p-3 text-left">Plan</th>
+                <th className="p-3 text-left">Payment Method</th>
                 <th className="p-3 text-left">Transaction ID</th>
                 <th className="p-3 text-left">Actions</th>
               </tr>
@@ -180,6 +220,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     <div className="text-xs text-stone-500">{p.userEmail}</div>
                   </td>
                   <td className="p-3 font-semibold">{p.planId}</td>
+                  <td className="p-3">
+                    <span className="bg-[#fcf9f2] text-amber-800 border border-amber-200 px-2.5 py-1 rounded text-xs font-bold font-mono">
+                      {p.paymentMethod || 'Card / Unknown'}
+                    </span>
+                  </td>
                   <td className="p-3 font-mono">{p.transactionId}</td>
                   <td className="p-3 flex items-center gap-2">
                     <button 
@@ -201,6 +246,93 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
           </table>
         </div>
       </section>
+
+      <section>
+        <h2 className="text-xl font-bold mb-4">Pending Promotional Billboard Ads</h2>
+        <div className="bg-white border rounded-xl overflow-x-auto">
+          <table className="w-full min-w-[900px]">
+            <thead className="bg-stone-50 border-b">
+              <tr>
+                <th className="p-3 text-left text-xs uppercase tracking-wider text-stone-500 font-extrabold">Sponsor & Campaign</th>
+                <th className="p-3 text-left text-xs uppercase tracking-wider text-stone-500 font-extrabold">Plan Details</th>
+                <th className="p-3 text-left text-xs uppercase tracking-wider text-stone-500 font-extrabold">Payment Applied</th>
+                <th className="p-3 text-left text-xs uppercase tracking-wider text-stone-500 font-extrabold">Transaction ID</th>
+                <th className="p-3 text-left text-xs uppercase tracking-wider text-stone-500 font-extrabold">Status</th>
+                <th className="p-3 text-left text-xs uppercase tracking-wider text-stone-500 font-extrabold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {promotionalAds.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-stone-400 text-xs font-bold uppercase">
+                    No billboard ad campaigns currently registered
+                  </td>
+                </tr>
+              ) : (
+                promotionalAds.map(ad => (
+                  <tr key={ad.id} className="border-b hover:bg-stone-50/50">
+                    <td className="p-3">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-2xl select-none p-1 bg-stone-100 rounded-lg">{ad.icon || '🏥'}</span>
+                        <div className="text-left">
+                          <div className="font-serif font-black text-stone-900 text-sm leading-tight">{ad.title}</div>
+                          <div className="text-xs text-stone-500 mt-0.5">By: <span className="font-bold">{ad.sponsorName}</span> ({ad.ownerEmail})</div>
+                          <div className="text-[10px] text-stone-600 max-w-sm mt-1.5 bg-stone-50/80 p-2 rounded-lg border border-stone-200 font-semibold">{ad.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="text-xs font-black text-stone-850">{ad.durationDays} Days Duration</div>
+                      <div className="text-[10px] text-stone-500 mt-0.5 font-bold">Rs. {ad.pricePaid} Paid</div>
+                    </td>
+                    <td className="p-3">
+                      <span className="bg-[#fcf9f2] text-amber-800 border border-amber-200 px-2.5 py-1 rounded-md text-xs font-bold font-mono shadow-xs">
+                        {ad.paymentMethod || 'Free Privilege'}
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono text-xs font-bold text-stone-800">{ad.transactionId || 'N/A'}</td>
+                    <td className="p-3">
+                      {ad.status === 'pending' || !ad.status ? (
+                        <span className="bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">
+                          Pending Approval
+                        </span>
+                      ) : ad.status === 'rejected' ? (
+                        <span className="bg-red-100 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">
+                          Rejected
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">
+                          Live & Active
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {(ad.status === 'pending' || !ad.status) ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleApproveAd(ad)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectAd(ad)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                          >
+                            Disapprove
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-stone-400 font-extrabold uppercase bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md">Processed</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
       
       <section>
         <h2 className="text-xl font-bold mb-4">Manage Users</h2>
@@ -209,10 +341,10 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             placeholder="Search by name" 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="p-2 border rounded mb-4"
+            className="w-full max-w-sm p-2 border border-stone-200 rounded-lg mb-4 text-sm bg-white"
         />
-        <div className="bg-white border rounded-xl overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white border rounded-xl overflow-x-auto">
+          <table className="w-full min-w-[700px]">
             <thead className="bg-stone-50 border-b">
               <tr>
                 <th className="p-3 text-left">Name</th>

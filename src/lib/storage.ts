@@ -1128,11 +1128,16 @@ export const ExploreService = {
         }
         return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'users');
+        try {
+          handleFirestoreError(err, OperationType.LIST, 'users');
+        } catch {
+          console.warn('[VetAxis] fetchProfessionals failed. Falling back to local storage.');
+        }
       }
-    } else {
-      // Local Fallback list
-      const users = getLocalUsers();
+    }
+
+    // Local Fallback list
+    const users = getLocalUsers();
       return users.filter(u => u.role === role).map(u => {
         const reviews = u.reviews || [];
         const filteredReviews = reviews.filter(rev => {
@@ -1150,7 +1155,6 @@ export const ExploreService = {
         }
         return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
       });
-    }
   },
 
   sortUsers(list: UserProfile[], sortType: SORT_TYPES, userLoc: GeoLocation | null): UserProfile[] {
@@ -2248,7 +2252,7 @@ export const NotificationService = {
 };
 
 export const PromotionalAdsService = {
-  async fetchActiveAds(): Promise<PromotionalAd[]> {
+  async fetchActiveAds(onlyApproved = true): Promise<PromotionalAd[]> {
     const now = Date.now();
     if (isFirebaseConfigured && db) {
       try {
@@ -2258,7 +2262,12 @@ export const PromotionalAdsService = {
         for (const d of snap.docs) {
           const data = d.data() as PromotionalAd;
           if (data && data.expiresAt > now) {
-            list.push({ ...data, id: d.id });
+            const ad = { ...data, id: d.id };
+            // Filter out unapproved ads if onlyApproved is true
+            const isApproved = ad.approved || ad.status === 'approved' || ad.approved === undefined;
+            if (!onlyApproved || isApproved) {
+              list.push(ad);
+            }
           } else {
             // Clean up expired ads asynchronously
             deleteDoc(doc(db, 'promotional_ads', d.id)).catch(err => {
@@ -2268,22 +2277,28 @@ export const PromotionalAdsService = {
         }
         return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'promotional_ads');
-        return [];
+        try {
+          handleFirestoreError(err, OperationType.LIST, 'promotional_ads');
+        } catch {
+          console.warn('[VetAxis] fetchActiveAds failed. Falling back to local storage.');
+        }
       }
-    } else {
-      let list: PromotionalAd[] = [];
-      try {
-        list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
-      } catch {
-        list = [];
-      }
-      const activeAds = list.filter(ad => ad.expiresAt > now);
-      if (activeAds.length !== list.length) {
-        localStorage.setItem('va_promotional_ads', JSON.stringify(activeAds));
-      }
-      return activeAds;
     }
+
+    let list: PromotionalAd[] = [];
+    try {
+      list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
+    } catch {
+      list = [];
+    }
+    const activeAds = list.filter(ad => ad.expiresAt > now);
+    if (activeAds.length !== list.length) {
+      localStorage.setItem('va_promotional_ads', JSON.stringify(activeAds));
+    }
+    if (onlyApproved) {
+      return activeAds.filter(ad => ad.approved || ad.status === 'approved' || ad.approved === undefined);
+    }
+    return activeAds;
   },
 
   async createAd(adData: Omit<PromotionalAd, 'id' | 'createdAt' | 'expiresAt' | 'durationDays' | 'pricePaid'>, durationDays: 3 | 7, pricePaid: number): Promise<PromotionalAd> {
@@ -2316,6 +2331,86 @@ export const PromotionalAdsService = {
       list.push(cleanAd);
       localStorage.setItem('va_promotional_ads', JSON.stringify(list));
       return cleanAd;
+    }
+  },
+
+  async approveAd(adId: string, ownerUid: string, adTitle: string): Promise<boolean> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, 'promotional_ads', adId), {
+          status: 'approved',
+          approved: true
+        });
+        
+        // Send approval notification
+        try {
+          await NotificationService.createNotification({
+            userId: ownerUid,
+            senderId: 'admin',
+            senderName: 'Admin Team',
+            type: 'status_change',
+            targetId: adId,
+            targetType: 'appointment',
+            message: `Your promotional ad campaign "${adTitle}" has been APPROVED by the admin and is now live on the VetAxis Billboard!`
+          });
+        } catch (notifErr) {
+          console.error('Failed sending ad approval notification:', notifErr);
+        }
+        return true;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `promotional_ads/${adId}`);
+        return false;
+      }
+    } else {
+      let list: PromotionalAd[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
+      } catch {
+        list = [];
+      }
+      const updated = list.map(ad => ad.id === adId ? { ...ad, status: 'approved' as const, approved: true } : ad);
+      localStorage.setItem('va_promotional_ads', JSON.stringify(updated));
+      return true;
+    }
+  },
+
+  async rejectAd(adId: string, ownerUid: string, adTitle: string): Promise<boolean> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, 'promotional_ads', adId), {
+          status: 'rejected',
+          approved: false
+        });
+
+        // Send disapproval notification
+        try {
+          await NotificationService.createNotification({
+            userId: ownerUid,
+            senderId: 'admin',
+            senderName: 'Admin Team',
+            type: 'status_change',
+            targetId: adId,
+            targetType: 'appointment',
+            message: `Your promotional ad campaign "${adTitle}" has been DISAPPROVED by the admin. Please check your payment details and resubmit.`
+          });
+        } catch (notifErr) {
+          console.error('Failed sending ad rejection notification:', notifErr);
+        }
+        return true;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `promotional_ads/${adId}`);
+        return false;
+      }
+    } else {
+      let list: PromotionalAd[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem('va_promotional_ads') || '[]');
+      } catch {
+        list = [];
+      }
+      const updated = list.map(ad => ad.id === adId ? { ...ad, status: 'rejected' as const, approved: false } : ad);
+      localStorage.setItem('va_promotional_ads', JSON.stringify(updated));
+      return true;
     }
   },
 

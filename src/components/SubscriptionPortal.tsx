@@ -141,6 +141,7 @@ export function SubscriptionPortal({
 
   // Manual Payment states
   const [manualPaymentId, setManualPaymentId] = useState('');
+  const [manualPaymentMethod, setManualPaymentMethod] = useState<'Easypaisa' | 'JazzCash' | 'Nayapay' | 'Bank Transfer'>('Easypaisa');
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   
   const handleManualPaymentSubmit = async (e: React.FormEvent) => {
@@ -155,7 +156,8 @@ export function SubscriptionPortal({
         userName: currentUser.name || currentUser.email,
         userEmail: currentUser.email,
         planId: selectedTier,
-        transactionId: manualPaymentId
+        transactionId: manualPaymentId,
+        paymentMethod: manualPaymentMethod
       });
       setSuccessMode(true);
     } catch (err: any) {
@@ -748,6 +750,20 @@ export function SubscriptionPortal({
                         ⚠️ Error: {checkoutError}
                       </div>
                     )}
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Payment Method Applied</label>
+                      <select
+                        value={manualPaymentMethod}
+                        onChange={(e: any) => setManualPaymentMethod(e.target.value)}
+                        className="form-control text-xs font-bold bg-white"
+                      >
+                        <option value="Easypaisa">Easypaisa</option>
+                        <option value="JazzCash">JazzCash</option>
+                        <option value="Nayapay">Nayapay</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                      </select>
+                    </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Transaction ID</label>

@@ -200,6 +200,7 @@ body {
   background: #a49f92;
 }
 
+
 /* Micro-animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(12px); }
@@ -228,3 +229,7 @@ body {
 .animate-glow {
   animation: softGlow 3s infinite ease-in-out;
 }
+
+
+
+

@@ -35,11 +35,18 @@ export interface FirestoreErrorInfo {
   };
 }
 
-// Check if these are active credentials or unconfigured placeholder keys
-export const isFirebaseConfigured =
+// Check if we previously encountered a quota limit error in this session/day to prevent loading crash loops
+const getQuotaExceeded = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem('firebase_quota_exceeded') === 'true' || 
+         localStorage.getItem('firebase_quota_exceeded') === 'true';
+};
+
+export let isFirebaseConfigured =
   firebaseConfig.apiKey &&
   !firebaseConfig.apiKey.includes('mock-api-key') &&
-  !firebaseConfig.apiKey.includes('PLACEHOLDER');
+  !firebaseConfig.apiKey.includes('PLACEHOLDER') &&
+  !getQuotaExceeded();
 
 let app;
 let db: any = null;
@@ -75,6 +82,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
                     message.toLowerCase().includes('resource_exhausted') ||
                     message.toLowerCase().includes('exhausted');
     if (isQuota) {
+      isFirebaseConfigured = false;
+      try {
+        sessionStorage.setItem('firebase_quota_exceeded', 'true');
+        localStorage.setItem('firebase_quota_exceeded', 'true');
+      } catch (e) {
+        console.warn('Storage saving failed:', e);
+      }
       window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: { message } }));
     }
   }

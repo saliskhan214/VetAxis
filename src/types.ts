@@ -52,6 +52,7 @@ export interface ManualPayment {
   userEmail: string;
   planId: 'Silver' | 'Gold' | 'Platinum';
   transactionId: string;
+  paymentMethod?: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: number;
 }
@@ -291,6 +292,10 @@ export interface PromotionalAd {
   durationDays: number;
   expiresAt: number; // millisecond timestamp
   createdAt: number; // millisecond timestamp
+  status?: 'pending' | 'approved' | 'rejected';
+  approved?: boolean;
+  paymentMethod?: string;
+  transactionId?: string;
 }
 
 

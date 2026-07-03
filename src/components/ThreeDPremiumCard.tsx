@@ -304,35 +304,13 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                   <div className={`truncate max-w-[280px] ${tier === 'Platinum' ? 'text-neutral-300' : 'text-[#373735]'}`}>{profile.address}</div>
                 </div>
               )}
+
             </div>
-
-            {/* Proximity indicator text */}
-            {distance !== null && (
-              <div className={`mt-3.5 p-2 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${
-                tier === 'Platinum' ? 'bg-neutral-800/80 border-[#3e4147] text-neutral-200' : 'bg-emerald-50/50 border-emerald-100 text-[#1b7c31]'
-              }`}>
-                <span>📍</span>
-                <span>This service is <span className="font-extrabold underline">{distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`}</span> far away from you.</span>
-              </div>
-            )}
-
-            {/* Location indicator metadata */}
           </div>
 
           {/* Footer segment */}
           <div className={`mt-5 pt-4 border-t flex items-center justify-between ${tier === 'Platinum' ? 'border-[#3e4147]' : 'border-neutral-100'}`}>
-            {distance !== null ? (
-              <span className={`px-2.5 py-1 text-[9px] font-black tracking-wider rounded-lg border uppercase font-mono ${
-                tier === 'Silver' ? 'bg-slate-100 border-slate-300 text-slate-700' :
-                tier === 'Gold' ? 'bg-[#fef3c7] border-amber-300 text-amber-800' :
-                tier === 'Platinum' ? 'bg-neutral-800 border-[#3e4147] text-neutral-300' :
-                'bg-[#edf6ef] border-emerald-200 text-emerald-700'
-              }`}>
-                📍 {distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`} distance
-              </span>
-            ) : (
-              <div />
-            )}
+            <div />
 
             <span className={`text-xs font-black flex items-center gap-1 transition-transform ${hovered ? 'translate-x-1' : ''} ${
               tier === 'Gold' ? 'text-amber-950' :

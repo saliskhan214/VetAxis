@@ -739,7 +739,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* LEFT COMPOSER & FEEDS (8 columns) */}
-        <div className="col-span-12 lg:col-span-8 space-y-6">
+        <div className="col-span-1 lg:col-span-8 space-y-6 w-full">
           
           {/* UPFRONT EMERGENCY TRIGGER CARD */}
           <div className="bg-gradient-to-r from-red-50 to-orange-50/80 border-2 border-dashed border-red-300 rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-sm text-left">
@@ -1205,7 +1205,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         </div>
 
         {/* RIGHT COLUMN SIDEBAR (4 columns) */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
+        <div className="col-span-1 lg:col-span-4 space-y-6 w-full">
           
           {/* ACTIVE ADVISORS */}
           <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 shadow-md space-y-4 text-left">

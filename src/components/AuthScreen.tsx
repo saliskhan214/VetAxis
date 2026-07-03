@@ -201,7 +201,7 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
       </div>
 
       {/* RIGHT REGISTRATION FORM - 7 Columns */}
-      <div className="col-span-12 lg:col-span-7 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 overflow-y-auto">
+      <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 overflow-y-auto w-full">
         
         {/* Brand Head for Mobile Views only */}
         <div className="lg:hidden text-center mb-8">

@@ -77,11 +77,11 @@ export function Navbar({
             whileHover={{ scale: 1.05, y: -1 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => onNavigate('explore')}
-            className="flex items-center gap-2 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none"
+            className="flex items-center gap-2 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none font-display"
           >
             <span className="text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">🐾</span>
             <span className="tracking-tight font-display text-2xl">
-              Vet<span className="text-[#a0522d] font-bold">Axis</span>
+              Vet<span className="text-[#a0522d] font-bold font-display">Axis</span>
             </span>
           </motion.button>
         </div>
