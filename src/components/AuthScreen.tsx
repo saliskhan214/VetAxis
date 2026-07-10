@@ -13,9 +13,10 @@ interface AuthScreenProps {
     signInWithGoogle: (roleForSignUp?: string) => Promise<any>;
     registerGoogleUser?: (pendingInfo: any, role: string, phone: string, extra: any) => Promise<any>;
   };
+  onOpenAboutUs?: () => void;
 }
 
-export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
+export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [googlePendingInfo, setGooglePendingInfo] = useState<any | null>(null);
@@ -496,6 +497,20 @@ export function AuthScreen({ onAuthSuccess, authService }: AuthScreenProps) {
                 )}
                 <span>{loading ? 'Opening Portal…' : 'Continue with Google'}</span>
               </motion.button>
+
+              {/* About Us / Platform Directory guide button */}
+              <div className="border-t border-[#e3dec9] pt-6 flex flex-col items-center">
+                <span className="text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Unsure what we offer?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenAboutUs) onOpenAboutUs();
+                  }}
+                  className="w-full py-3.5 bg-[#fdfbf7] hover:bg-[#fcf9f2] text-[#a0522d] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
+                >
+                  <span>ℹ️ Explore All Services & Directory</span>
+                </button>
+              </div>
             </div>
           )}
         </motion.div>

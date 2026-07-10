@@ -207,7 +207,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Chart A: Herd Distribution by Species */}
-        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between min-w-0">
           <div className="mb-4">
             <h4 className="font-serif font-black text-sm text-[#5a5a40] flex items-center gap-1.5">
               <span>🐑</span> Herd Distribution Categories
@@ -221,7 +221,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
                 No livestock records have been added to this farm yet.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240} minWidth={0}>
                 <PieChart>
                   <Pie
                     data={speciesData}
@@ -252,7 +252,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
         </div>
 
         {/* Chart B: Clinical Bio-Safety Health Matrix */}
-        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between min-w-0">
           <div className="mb-4">
             <h4 className="font-serif font-black text-sm text-[#5a5a40] flex items-center gap-1.5">
               <span>🩺</span> Health and Biosafety Isolation Matrix
@@ -266,7 +266,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
                 Track individual animals to see diagnostic statuses.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240} minWidth={0}>
                 <BarChart data={healthData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0efe6" />
                   <XAxis dataKey="status" tick={{ fontSize: 10, fontWeight: 'bold' }} axisLine={false} />
@@ -287,7 +287,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
         </div>
 
         {/* Chart C: Healthcare Tasks & Services Compliance */}
-        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between min-w-0">
           <div className="mb-4">
             <h4 className="font-serif font-black text-sm text-[#5a5a40] flex items-center gap-1.5">
               <span>🏥</span> Healthcare Tasks Compliance Rate
@@ -301,7 +301,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
                 No healthcare tasks logged yet. Schedule booster loops above.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240} minWidth={0}>
                 <BarChart data={clinicalActionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0efe6" />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 'bold' }} axisLine={false} />
@@ -317,7 +317,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
         </div>
 
         {/* Chart D: Average Weight (Growth Matrix) */}
-        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-[#e3dec9] rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between min-w-0">
           <div className="mb-4">
             <h4 className="font-serif font-black text-sm text-[#5a5a40] flex items-center gap-1.5">
               <span>📈</span> Average Weight (Growth Benchmark matrix)
@@ -331,7 +331,7 @@ export default function FarmAnalyticsDashboard({ animals, batches, tasks }: Farm
                 Assign weights in your Animal registration lists to visualize.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240} minWidth={0}>
                 <AreaChart data={weightData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">

@@ -1,0 +1,20 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /?tab=explore
+Allow: /?tab=jobs
+Allow: /?tab=pets
+Allow: /?tab=marketplace
+Allow: /?tab=community
+Allow: /?tab=news
+Allow: /?tab=livestock
+
+# Disallow private auth and sync/admin paths
+Disallow: /?tab=profile
+Disallow: /?tab=admin
+Disallow: /api/
+
+# Host and Sitemap locations
+Host: https://vetaxis.pk
+Sitemap: https://vetaxis.pk/sitemap.xml

@@ -2,11 +2,13 @@ import { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
 import { CommunityService, NotificationService, LocationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
+import VeterinaryNewsBrief from './VeterinaryNewsBrief';
+import { BlogSection } from './BlogSection';
 import { 
   Sparkles, MessageCircle, AlertCircle, Heart, ThumbsUp, AlertTriangle, 
   ShieldCheck, TrendingUp, Users, Megaphone, Navigation, CreditCard, 
   CheckCircle, DollarSign, MapPin, Zap, Radio, Send, X, HelpCircle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Newspaper
 } from 'lucide-react';
 
 const formatErrorMessage = (message: string): string => {
@@ -102,6 +104,8 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [payerName, setPayerName] = useState<string>('');
   const [payerCvvOrPin, setPayerCvvOrPin] = useState<string>('');
   const [nearbyEstimCount, setNearbyEstimCount] = useState<number>(0);
+  const [isNewsModalOpen, setIsNewsModalOpen] = useState<boolean>(false);
+  const [newsActiveTab, setNewsActiveTab] = useState<'guides' | 'news'>('guides');
 
   // Subscription Alert privilege evaluations
   const userTier = currentUser.subscriptionTier;
@@ -348,12 +352,6 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     if (!lastSeenAddress.trim()) {
       alert('Please state the last seen address/neighborhood.');
       return;
-    }
-    if (!isAlertFree) {
-      if (!payerAccount.trim() || !payerName.trim() || !payerCvvOrPin.trim()) {
-        alert('Please fill out all billing credentials for authentication.');
-        return;
-      }
     }
 
     setCheckoutStep('processing');
@@ -1207,6 +1205,40 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         {/* RIGHT COLUMN SIDEBAR (4 columns) */}
         <div className="col-span-1 lg:col-span-4 space-y-6 w-full">
           
+          {/* VETERINARY NEWS BRIEF TRIGGER CARD */}
+          <div className="bg-gradient-to-br from-[#fcfbf9] via-[#f7f5ef] to-stone-100 border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-5 shadow-sm space-y-3.5 text-left relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-[#5a5a40]/5 rounded-bl-full pointer-events-none" />
+            <div className="space-y-1">
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#a0522d] bg-[#a0522d]/10 px-2.5 py-0.5 rounded">📚 Academic & News</span>
+              <h4 className="font-serif font-black text-sm text-[#373735]">Knowledge & News Hub</h4>
+              <p className="text-[11px] font-medium text-[#7a766f] leading-relaxed">
+                Natively access peer-reviewed clinical guides, livestock health methodologies, global disease alerts, and small animal studies.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setNewsActiveTab('guides');
+                  setIsNewsModalOpen(true);
+                }}
+                className="cursor-pointer text-center bg-[#5a5a40] hover:bg-[#4a4a34] text-white py-2.5 px-2 rounded-xl font-bold text-[11px] border border-b-[3px] border-b-[#303022] transition-all flex items-center justify-center gap-1.5 shadow-xs"
+              >
+                <span>📚 Guides Hub</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setNewsActiveTab('news');
+                  setIsNewsModalOpen(true);
+                }}
+                className="cursor-pointer text-center bg-white hover:bg-stone-50 text-[#5a5a40] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] py-2.5 px-2 rounded-xl font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 shadow-xs"
+              >
+                <span>📰 News Briefs</span>
+              </button>
+            </div>
+          </div>
+
           {/* ACTIVE ADVISORS */}
           <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 shadow-md space-y-4 text-left">
             <div className="flex items-center gap-2 border-b border-[#f4f1e9] pb-3">
@@ -1236,6 +1268,62 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         </div>
 
       </div>
+
+      {/* VETERINARY NEWS BRIEF & KNOWLEDGE HUB MODAL */}
+      <AnimatePresence>
+        {isNewsModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-[#fcfbf9] border-2 border-[#e3dec9] rounded-3xl max-w-6xl w-full max-h-[92vh] overflow-y-auto shadow-2xl relative p-1"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setIsNewsModalOpen(false)}
+                className="absolute top-5 right-5 w-9 h-9 bg-white border border-[#e3dec9] hover:bg-stone-100 text-[#373735] font-black rounded-full flex items-center justify-center cursor-pointer transition-colors shadow-sm z-50 text-xs"
+              >
+                ✕
+              </button>
+
+              {/* Toggle Switcher Header */}
+              <div className="border-b border-[#e3dec9] px-6 pt-5 pb-0 flex gap-6">
+                <button
+                  onClick={() => setNewsActiveTab('guides')}
+                  className={`pb-3 text-sm font-black border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+                    newsActiveTab === 'guides'
+                      ? 'border-[#5a5a40] text-[#5a5a40]'
+                      : 'border-transparent text-stone-400 hover:text-stone-600'
+                  }`}
+                >
+                  <span>📚</span>
+                  <span>Educational Guides Hub</span>
+                </button>
+                <button
+                  onClick={() => setNewsActiveTab('news')}
+                  className={`pb-3 text-sm font-black border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+                    newsActiveTab === 'news'
+                      ? 'border-[#5a5a40] text-[#5a5a40]'
+                      : 'border-transparent text-stone-400 hover:text-stone-600'
+                  }`}
+                >
+                  <span>📰</span>
+                  <span>Veterinary News Briefs</span>
+                </button>
+              </div>
+
+              <div className="p-3">
+                {newsActiveTab === 'guides' ? (
+                  <BlogSection currentUser={currentUser} />
+                ) : (
+                  <VeterinaryNewsBrief />
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* EMERGENCY BOOST PAYMENT SIMULATION MODAL */}
       <AnimatePresence>
@@ -1375,123 +1463,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
                   <button
                     type="button"
-                    onClick={() => setCheckoutStep('payment')}
-                    className="w-full bg-[#5a5a40] text-white py-3 rounded-2xl font-serif font-black text-xs border border-[#4a4a34] border-b-[4px] border-b-[#323223]"
+                    onClick={handleProcessBoostPayment}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800 cursor-pointer shadow-md"
                   >
-                    Proceed to Simulated Checkout →
+                    Broadcast Urgent Rescue Boost 📢
                   </button>
-                </div>
-              )}
-
-              {/* STEP 2: Checkout Form */}
-              {checkoutStep === 'payment' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center bg-stone-50 border border-stone-100 p-3.5 rounded-2xl">
-                    <span className="text-xs font-black uppercase text-stone-500">Invoice Total:</span>
-                    <strong className="text-red-700 font-black text-sm font-serif">
-                      {isAlertFree ? 'Rs 0.00 PKR' : `₨ ${selectedRadius === 5 ? 300 : 500} PKR`}
-                    </strong>
-                  </div>
-
-                  {isAlertFree ? (
-                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 text-center space-y-2.5">
-                      <div className="w-9 h-9 bg-emerald-100/80 text-emerald-700 rounded-xl flex items-center justify-center text-lg mx-auto font-black select-none">✓</div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block mb-0.5">Subscription Benefit Applied</span>
-                        <h4 className="font-serif font-black text-emerald-950 text-xs">{userTier} Premium Free Alert</h4>
-                        <p className="text-[10px] text-emerald-800/80 mt-1 leading-relaxed max-w-xs mx-auto">
-                          Payment credentials waived. You have posted <strong>{myAlertsCount}</strong> / <strong>{maxFreeAlerts === Infinity ? 'Unlimited' : maxFreeAlerts}</strong> alerts under your current plan features.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-[#5a5a40] tracking-wider block">Select Sandbox Wallet / Gateway</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: 'easypaisa', label: '🟢 EasyPaisa' },
-                            { id: 'jazzcash', label: '🔴 JazzCash' },
-                            { id: 'card', label: '💳 Credit Card' }
-                          ].map((mw) => (
-                            <button
-                              key={mw.id}
-                              type="button"
-                              onClick={() => {
-                                setPaymentMethod(mw.id as any);
-                                setPayerAccount('');
-                              }}
-                              className={`py-2 px-1 rounded-xl text-[10px] border font-extrabold text-center transition-all ${
-                                paymentMethod === mw.id 
-                                  ? 'bg-[#5a5a40] text-white border-black border-b-[2px]' 
-                                  : 'bg-stone-50 border-stone-200 text-stone-600'
-                              }`}
-                            >
-                              {mw.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Pay fields */}
-                      <div className="space-y-3.5 pt-1 text-left">
-                        <div>
-                          <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
-                            {paymentMethod === 'card' ? 'Credit Card Number / Dummy IBAN' : 'Mobile Account Number (03xx-xxxxxxx)'}
-                          </span>
-                          <input
-                            type="text"
-                            value={payerAccount}
-                            onChange={(e) => setPayerAccount(e.target.value)}
-                            placeholder={paymentMethod === 'card' ? '4111 2222 3333 4444' : '0312 3456789'}
-                            className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3.5">
-                          <div>
-                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">Account holder name</span>
-                            <input
-                              type="text"
-                              value={payerName}
-                              onChange={(e) => setPayerName(e.target.value)}
-                              className="w-full text-xs font-sans font-extrabold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                            />
-                          </div>
-                          <div>
-                            <span className="text-[8px] font-black text-[#5a5a40] tracking-wider uppercase block mb-0.5">
-                              {paymentMethod === 'card' ? 'Security CV2' : 'E-PIN Code'}
-                            </span>
-                            <input
-                              type="password"
-                              value={payerCvvOrPin}
-                              onChange={(e) => setPayerCvvOrPin(e.target.value)}
-                              maxLength={paymentMethod === 'card' ? 3 : 5}
-                              placeholder="***"
-                              className="w-full text-xs font-mono font-bold bg-[#fcf9f2] border border-[#e3dec9] px-3.5 py-2.5 rounded-xl outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setCheckoutStep('details')}
-                      className="flex-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 py-3 rounded-2xl font-bold text-xs"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleProcessBoostPayment}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-2xl font-serif font-black text-xs border border-red-500 border-b-[4px] border-b-red-800"
-                    >
-                      {isAlertFree ? 'Confirm Free Urgent Boost' : `Confirm simulated Rs ${selectedRadius === 5 ? 300 : 500} payment`}
-                    </button>
-                  </div>
                 </div>
               )}
 

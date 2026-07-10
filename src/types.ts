@@ -636,6 +636,23 @@ export interface HerdLevelMasterRecord {
   kpis: HerdKpiTargetActual;
 }
 
+export interface BlogArticle {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  imageUrl?: string;
+  category: string;
+  authorName: string;
+  authorId: string;
+  createdAt: number; // timestamp ms
+  readTime: string;
+  tags?: string[];
+  views: number;
+}
+
+
 
 
 

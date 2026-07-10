@@ -12,6 +12,7 @@ interface NavbarProps {
   onMarkAllAsRead: () => void;
   onDeleteNotification: (id: string) => void;
   onNotificationClick?: (notif: VetNotification) => void;
+  onOpenAboutUs?: () => void;
 }
 
 export function Navbar({ 
@@ -22,7 +23,8 @@ export function Navbar({
   notifications,
   onMarkAllAsRead,
   onDeleteNotification,
-  onNotificationClick
+  onNotificationClick,
+  onOpenAboutUs
 }: NavbarProps) {
   if (!user) return null;
 
@@ -81,7 +83,7 @@ export function Navbar({
           >
             <span className="text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">🐾</span>
             <span className="tracking-tight font-display text-2xl">
-              Vet<span className="text-[#a0522d] font-bold font-display">Axis</span>
+              Vet<span className="text-[#a0522d] font-bold font-display">Axis</span> <span className="text-xs font-black px-1.5 py-0.5 rounded bg-[#a0522d] text-white align-super">360</span>
             </span>
           </motion.button>
         </div>
@@ -350,6 +352,23 @@ export function Navbar({
                         </motion.button>
                       );
                     })}
+
+                  {/* About Us / Platform Directory Button */}
+                  <div className="border-t border-[#e3dec9] my-2 pt-3">
+                    <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Platform Guide</p>
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        setIsSidebarOpen(false);
+                        if (onOpenAboutUs) onOpenAboutUs();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold text-[#a0522d] bg-[#fdfbf7] hover:bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] transition-all text-left cursor-pointer"
+                    >
+                      <span className="text-lg">ℹ️</span>
+                      <span className="flex-1">About Us (Directory)</span>
+                      <span className="text-[9px] bg-amber-500 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">NEW</span>
+                    </motion.button>
+                  </div>
                 </div>
               </div>
 

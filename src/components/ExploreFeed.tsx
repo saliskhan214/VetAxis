@@ -1,9 +1,9 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
-import { ExploreService, LocationService, PromotionalAdsService, NotificationService } from '../lib/storage';
+import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
-import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid } from 'lucide-react';
+import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 
 interface ExploreFeedProps {
@@ -93,31 +93,180 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
-  const [gpsPopupVisible, setGpsPopupVisible] = useState<boolean>(false);
-  const [gpsPopupMessage, setGpsPopupMessage] = useState<string>('');
-  const [userGpsCoords, setUserGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
-
-  // Automatically fetch exact user GPS coordinates on mount to enable precise distance calculations
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setUserGpsCoords({ lat: latitude, lng: longitude });
-          console.log("Automatically locked user GPS coordinates:", latitude, longitude);
-        },
-        (err) => {
-          console.warn("Unable to fetch high-precision user GPS coordinates automatically:", err);
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    }
-  }, []);
-
   // Nearest sorting & geographic filter popup states
   const [doctorLocationModalOpen, setDoctorLocationModalOpen] = useState<boolean>(false);
   const [popCityInput, setPopCityInput] = useState<string>('');
   const [cityFilterActive, setCityFilterActive] = useState<string>('');
+
+  // Billboard Promotional campaign states
+  const [adTitle, setAdTitle] = useState<string>('');
+  const [adDescription, setAdDescription] = useState<string>('');
+  const [adSponsor, setAdSponsor] = useState<string>('');
+  const [adCtaText, setAdCtaText] = useState<string>('Visit Clinic');
+  const [adCtaUrl, setAdCtaUrl] = useState<string>('');
+  const [adIcon, setAdIcon] = useState<string>('🏥');
+  const [adGradient, setAdGradient] = useState<string>('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
+  const [adPaymentChoice, setAdPaymentChoice] = useState<'free_privilege' | 'pay_3_days' | 'pay_7_days'>('pay_3_days');
+  const [adPaymentMethod, setAdPaymentMethod] = useState<'card' | 'manual'>('manual');
+  const [adManualMethod, setAdManualMethod] = useState<'Easypaisa' | 'JazzCash' | 'Nayapay' | 'Bank Transfer'>('Easypaisa');
+  const [adTransactionId, setAdTransactionId] = useState<string>('');
+  const [adCardName, setAdCardName] = useState<string>('');
+  const [adCardNumber, setAdCardNumber] = useState<string>('');
+  const [adCardExpiry, setAdCardExpiry] = useState<string>('');
+  const [adCardCvv, setAdCardCvv] = useState<string>('');
+  const [submittingAd, setSubmittingAd] = useState<boolean>(false);
+  const [showAdCreator, setShowAdCreator] = useState<boolean>(false);
+  const [adError, setAdError] = useState<string | null>(null);
+  const [adSuccess, setAdSuccess] = useState<string | null>(null);
+  const adCreatorRef = useRef<HTMLDivElement>(null);
+
+  const [activeAds, setActiveAds] = useState<any[]>([]);
+  const [deletingAdId, setDeletingAdId] = useState<string | null>(null);
+
+  const loadActiveAds = async () => {
+    if (!currentUser?.uid) return;
+    try {
+      const ads = await PromotionalAdsService.fetchActiveAds(false);
+      setActiveAds(ads.filter((ad: any) => ad.ownerUid === currentUser.uid));
+    } catch (err) {
+      console.error('Failed fetching active ads', err);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.uid) {
+      loadActiveAds();
+    }
+  }, [currentUser?.uid, currentUser?.promoAdsUsed]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const allowed = currentUser.subscriptionTier === 'Silver' ? 3 : currentUser.subscriptionTier === 'Gold' ? 5 : currentUser.subscriptionTier === 'Platinum' ? 10 : 0;
+    const remaining = Math.max(0, allowed - (currentUser.promoAdsUsed || 0));
+    if (remaining > 0) {
+      setAdPaymentChoice('free_privilege');
+    } else {
+      setAdPaymentChoice('pay_3_days');
+    }
+  }, [currentUser?.subscriptionTier, currentUser?.promoAdsUsed]);
+
+  useEffect(() => {
+    if (currentUser?.name && !adSponsor) {
+      setAdSponsor(currentUser.name);
+    }
+  }, [currentUser?.name]);
+
+  const maxAllowedPromo = currentUser?.subscriptionTier === 'Silver' ? 3 : currentUser?.subscriptionTier === 'Gold' ? 5 : currentUser?.subscriptionTier === 'Platinum' ? 10 : 0;
+  const remainingPromoSlots = Math.max(0, maxAllowedPromo - (currentUser?.promoAdsUsed || 0));
+  const hasRemainingPromo = currentUser?.subscriptionTier ? (remainingPromoSlots > 0) : false;
+
+  const triggerAdSuccess = (msg: string) => {
+    setAdSuccess(msg);
+    setTimeout(() => setAdSuccess(null), 8500);
+  };
+
+  const handleAdSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim() || !adCtaUrl.trim()) {
+      setAdError('Please fill in all the required campaign parameters.');
+      return;
+    }
+
+    const isAdFree = adPaymentChoice === 'free_privilege' || hasRemainingPromo;
+    const durationDays = adPaymentChoice === 'pay_7_days' ? 7 : 3;
+    const pricePaid = isAdFree ? 0 : (adPaymentChoice === 'pay_7_days' ? 1500 : 1000);
+
+    // Validate payment credentials or transaction ID if not free
+    if (!isAdFree) {
+      if (adPaymentMethod === 'card') {
+        if (!adCardName.trim() || !adCardNumber.trim() || !adCardExpiry.trim() || !adCardCvv.trim()) {
+          setAdError('Please enter your card payment details to complete this purchase campaign.');
+          return;
+        }
+        const cleanNum = adCardNumber.replace(/\s+/g, '');
+        if (cleanNum.length < 15 || cleanNum.length > 16) {
+          setAdError('Invalid credit card number format for ad checkout. Must be 15 or 16 digits.');
+          return;
+        }
+      } else {
+        if (!adTransactionId.trim()) {
+          setAdError('Please enter the Transaction ID for your manual payment to submit this ad campaign.');
+          return;
+        }
+      }
+    } else {
+      // Re-verify they have credits
+      if (remainingPromoSlots <= 0) {
+        setAdError('No free ad campaign privileges remaining under your current subscription.');
+        return;
+      }
+    }
+
+    try {
+      setSubmittingAd(true);
+      setAdError(null);
+      setAdSuccess(null);
+
+      // Simulate network processing delay (ad registration & payment clearance)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const isApprovedImmediately = isAdFree || adPaymentMethod === 'card';
+
+      await PromotionalAdsService.createAd({
+        sponsorName: adSponsor,
+        title: adTitle,
+        description: adDescription,
+        ctaText: adCtaText,
+        ctaUrl: adCtaUrl,
+        bgGradient: adGradient,
+        badge: isAdFree ? `${currentUser.subscriptionTier} Promo` : 'Premium Billboard Sponsor',
+        icon: adIcon,
+        ownerEmail: currentUser.email,
+        ownerUid: currentUser.uid,
+        ownerRole: currentUser.role as 'doctor' | 'clinic',
+        status: isApprovedImmediately ? 'approved' : 'pending',
+        approved: isApprovedImmediately,
+        paymentMethod: isAdFree ? 'Free Promo Credit' : (adPaymentMethod === 'card' ? 'Card' : adManualMethod),
+        transactionId: isAdFree ? '' : (adPaymentMethod === 'card' ? 'CardPayment' : adTransactionId)
+      }, durationDays, pricePaid);
+
+      // If they used a free privilege, we MUST increment promoAdsUsed in database & local state!
+      let updatedUser = currentUser;
+      if (isAdFree) {
+        const nextUsedCount = (currentUser.promoAdsUsed || 0) + 1;
+        updatedUser = await AuthService.updateProfile(currentUser.uid, {
+          promoAdsUsed: nextUsedCount
+        });
+        onUpdateUser(updatedUser);
+      }
+
+      if (isApprovedImmediately) {
+        triggerAdSuccess(`⚡ Congratulations! Your promotional campaign "${adTitle}" is now live on the VetAxis Billboard!`);
+      } else {
+        triggerAdSuccess(`⚡ Congratulations! Your promotional campaign "${adTitle}" and payment transaction ID "${adTransactionId}" have been successfully submitted! It will appear on the VetAxis Billboard as soon as an Admin approves it.`);
+      }
+      loadActiveAds();
+      
+      // Clean form fields
+      setAdTitle('');
+      setAdDescription('');
+      setAdSponsor(currentUser.name || '');
+      setAdCtaText('Visit Clinic');
+      setAdCtaUrl('');
+      setAdIcon('🏥');
+      setAdGradient('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
+      setAdCardName('');
+      setAdCardNumber('');
+      setAdCardExpiry('');
+      setAdCardCvv('');
+      setAdTransactionId('');
+    } catch (err: any) {
+      setAdError(err.message || 'An error occurred during campaign promotion processing.');
+    } finally {
+      setSubmittingAd(false);
+    }
+  };
 
   const handleSortChange = (newVal: SORT_TYPES) => {
     if (newVal === SORT_TYPES.NEAREST) {
@@ -153,41 +302,8 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     setDoctorLocationModalOpen(false);
   };
 
-  const handleUseCurrentGPS = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
-    }
-    setLocLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const updatedUser = {
-          ...currentUser,
-          location: {
-            lat: latitude,
-            lng: longitude,
-            address: 'My GPS Location'
-          }
-        };
-        onUpdateUser(updatedUser);
-        localStorage.setItem('va_session', JSON.stringify(updatedUser));
-
-        setCityFilterActive('');
-        setSortBy(SORT_TYPES.NEAREST);
-        setLocLoading(false);
-        setDoctorLocationModalOpen(false);
-      },
-      (err) => {
-        setLocLoading(false);
-        alert('Access denied/unavailable for GPS coordinate tracking on this device. Please use the fallback City search search fields instead.');
-      }
-    );
-  };
-  
   // Geolocation states
   const [locLoading, setLocLoading] = useState<boolean>(false);
-  const [gpsError, setGpsError] = useState<string | null>(null);
 
   // Detail Modal states
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
@@ -406,94 +522,6 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     }
   };
 
-  // Handle GPS location activation
-  const handleLocateMe = async () => {
-    if (currentUser.location) {
-      // Toggle off locations
-      setLocLoading(true);
-      try {
-        await ExploreService.sortUsers([], SORT_TYPES.HIGHEST, null); // resets
-        const freshUser = { ...currentUser, location: null };
-        onUpdateUser(freshUser);
-        localStorage.setItem('va_session', JSON.stringify(freshUser));
-        
-        // Remove from users list too
-        const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
-        const idx = localUsers.findIndex((u: any) => u.uid === currentUser.uid);
-        if (idx !== -1) {
-          localUsers[idx].location = null;
-          localStorage.setItem('va_users', JSON.stringify(localUsers));
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLocLoading(false);
-      }
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      setGpsError('Geolocation is not supported by your browser.');
-      return;
-    }
-
-    setLocLoading(true);
-    setGpsError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        try {
-          // Reverse geocode via OpenStreetMap public Nominatim
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          let addr = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-          if (res.ok) {
-            const data = await res.json();
-            const a = data.address || {};
-            const parts = [
-              a.neighbourhood || a.suburb || a.village || a.town || a.city,
-              a.state_district || a.county || a.state,
-              a.country
-            ].filter(Boolean);
-            if (parts.length > 0) addr = parts.join(', ');
-          }
-
-          const locationObj = { lat: latitude, lng: longitude, address: addr };
-          const freshUser = { ...currentUser, location: locationObj };
-          
-          // Save locally first
-          onUpdateUser(freshUser);
-          localStorage.setItem('va_session', JSON.stringify(freshUser));
-          setSortBy(SORT_TYPES.NEAREST);
-          
-          // Update in user collections too
-          const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
-          const idx = localUsers.findIndex((u: any) => u.uid === currentUser.uid);
-          if (idx !== -1) {
-            localUsers[idx].location = locationObj;
-            localStorage.setItem('va_users', JSON.stringify(localUsers));
-          }
-
-        } catch (err) {
-          console.error(err);
-          setGpsError('Failed to geocode location address.');
-        } finally {
-          setLocLoading(false);
-        }
-      },
-      (err) => {
-        setLocLoading(false);
-        if (err.code === 1) setGpsError('Location access was denied. Enable permission in settings.');
-        else if (err.code === 2) setGpsError('Position unavailable. Check your network.');
-        else setGpsError('GPS Request Timed out.');
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
-  };
-
   // Open detail panel
   const handleOpenDetails = (profile: UserProfile) => {
     setSelectedProfile(profile);
@@ -581,14 +609,12 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     }
   };
 
-  // Pass the browser GPS coordinates if we have them, otherwise fall back to saved address/coords
-  const resolvedUserLocForSort = userGpsCoords 
-    ? { lat: userGpsCoords.lat, lng: userGpsCoords.lng, address: 'Current GPS' }
-    : (currentUser.location || (currentUser.address ? { 
-        lat: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lat,
-        lng: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lng,
-        address: currentUser.address
-      } : null));
+  // Fall back to saved address/coords
+  const resolvedUserLocForSort = currentUser.location || (currentUser.address ? { 
+    lat: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lat,
+    lng: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lng,
+    address: currentUser.address
+  } : null);
 
   // Sorted and filtered list
   const filteredProfessionals = ExploreService.sortUsers(
@@ -701,7 +727,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                       style={{ transform: "translateZ(20px)" }}
                     >
                       <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Active GPS Base: {currentUser.location.address}</span>
+                      <span>Selected Location Base: {currentUser.location.address}</span>
                     </motion.div>
                   )}
                 </div>
@@ -820,7 +846,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
       {/* FILTER & OPTION CONTROLS BAR */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl shadow-sm text-left">
         
-        {/* Left tabs & GPS */}
+        {/* Directory Tabs */}
         <div className="flex flex-wrap items-center gap-3.5">
           <div className="bg-[#fcf9f2] border border-[#e3dec9] p-1.5 rounded-2xl flex gap-1 items-center relative">
             {[
@@ -852,32 +878,28 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
               );
             })}
           </div>
-
-          {activeTab === 'clinic' && (
-            <>
-              <motion.button
-                id="va-gps-btn"
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLocateMe}
-                disabled={locLoading}
-                className={`btn-tactile-3d-secondary py-2.5 px-4.5 text-xs inline-flex items-center gap-2 ${
-                  currentUser.location ? 'bg-[#5a5a40] text-white border-[#4a4a34]' : ''
-                }`}
-              >
-                {locLoading ? (
-                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <span className="w-2.5 h-2.5 bg-current rounded-full" />
-                )}
-                <span>{currentUser.location ? '📍 Distance Sort Active' : 'Enable My GPS'}</span>
-              </motion.button>
-
-              {gpsError && (
-                <span className="text-[10px] text-red-600 bg-red-150 py-1.5 px-3 rounded-xl border border-red-200 font-bold">
-                  ⚠️ {gpsError}
-                </span>
-              )}
-            </>
+          {(currentUser?.role === 'clinic' || currentUser?.role === 'doctor') && (
+            <button
+              type="button"
+              onClick={() => {
+                const nextVal = !showAdCreator;
+                setShowAdCreator(nextVal);
+                if (nextVal) {
+                  setTimeout(() => {
+                    adCreatorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 150);
+                }
+              }}
+              className={`btn-tactile-3d-secondary py-2.5 px-4 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                showAdCreator 
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 border-b-[#d97706]' 
+                  : 'bg-[#faf9f6] text-[#5a5a40] border-[#e3dec9] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
+              }`}
+              id="btn-create-ad-toggle"
+            >
+              <Megaphone className="w-3.5 h-3.5 animate-pulse text-amber-600" />
+              <span>{showAdCreator ? 'Hide Ad Creator' : 'Create an Ad'}</span>
+            </button>
           )}
         </div>
 
@@ -910,6 +932,562 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         </div>
 
       </div>
+
+      {/* PROFESSIONAL BILLBOARD AD CAMPAIGN CREATOR */}
+      <AnimatePresence>
+        {(currentUser?.role === 'clinic' || currentUser?.role === 'doctor') && showAdCreator && (
+          <motion.div
+            ref={adCreatorRef}
+            initial={{ opacity: 0, height: 0, y: 15 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: 15 }}
+            transition={{ duration: 0.3 }}
+            className="w-full mt-6 bg-amber-50/15 border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 md:p-8 shadow-md overflow-hidden text-left"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#f4f1e9] pb-5 gap-3">
+              <div className="space-y-1">
+                <span className="inline-flex px-2 py-0.5 bg-amber-100 border border-amber-200 text-amber-900 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                  🏥 Professional Self-Serve Panel
+                </span>
+                <h3 className="font-serif text-xl font-black text-[#373735] flex items-center gap-2">
+                  <Megaphone className="w-5 h-5 text-amber-600 animate-pulse" />
+                  <span>Promote Your Clinic on Billboard</span>
+                </h3>
+                <p className="text-xs text-[#7a766f] font-semibold leading-relaxed">
+                  Launch self-serve campaigns and instantly rotate onto the high-visibility billboard deck! Post for free with subscription privileges or buy individual spots.
+                </p>
+              </div>
+            </div>
+
+            {/* Error & Success Messages inside the ad panel */}
+            {adError && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 font-bold">
+                ⚠️ {adError}
+              </div>
+            )}
+            {adSuccess && (
+              <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-bold">
+                {adSuccess}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 mt-6">
+              {/* Left Column: Form Parameters (7 Columns) */}
+              <form onSubmit={handleAdSubmit} className="col-span-1 lg:col-span-7 space-y-5 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Sponsor Card Name Input */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Sponsor Display name</label>
+                    <input
+                      type="text"
+                      value={adSponsor}
+                      onChange={(e) => setAdSponsor(e.target.value)}
+                      placeholder="e.g. Hope Animal Hospital"
+                      className="form-control text-xs bg-white"
+                      maxLength={35}
+                      required
+                    />
+                    <p className="text-[9px] text-[#a49f92] font-semibold">Your hospital or doctor brand header.</p>
+                  </div>
+
+                  {/* Campaign Short Title */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Campaign Short Title</label>
+                    <input
+                      type="text"
+                      value={adTitle}
+                      onChange={(e) => setAdTitle(e.target.value)}
+                      placeholder="e.g. Free OPD Consult & Vaccinations!"
+                      className="form-control text-xs bg-white"
+                      maxLength={35}
+                      required
+                    />
+                    <p className="text-[9px] text-[#a49f92] font-semibold">A high-catch display slogan.</p>
+                  </div>
+                </div>
+
+                {/* Special Promotion Description */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Special Promotion Details & Offer Text</label>
+                  <textarea
+                    value={adDescription}
+                    onChange={(e) => setAdDescription(e.target.value)}
+                    placeholder="e.g. Modern diagnostic tools, dental scaling, 24/7 critical veterinary response. Claim 20% flat discount on vaccines this whole week!"
+                    className="form-control text-xs min-[#85px] leading-relaxed resize-none h-20 bg-white"
+                    maxLength={160}
+                    required
+                  />
+                  <p className="text-[9px] text-[#a49f92] font-semibold">Keep it high-value, crisp, and direct to the client's needs.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Button CTA text label */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">CTA Button Slogan</label>
+                    <select
+                      value={adCtaText}
+                      onChange={(e) => setAdCtaText(e.target.value)}
+                      className="form-control text-xs bg-white"
+                      required
+                    >
+                      <option value="Visit Clinic">Visit Clinic</option>
+                      <option value="WhatsApp Support">WhatsApp Support</option>
+                      <option value="Book Free Session">Book Free Session</option>
+                      <option value="Call Helpline">Call Helpline</option>
+                      <option value="Claim Discount">Claim Discount</option>
+                      <option value="Get Direction">Get Direction</option>
+                    </select>
+                  </div>
+
+                  {/* CTA URL destination or hotline number */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Destination URL or Hotline</label>
+                    <input
+                      type="text"
+                      value={adCtaUrl}
+                      onChange={(e) => setAdCtaUrl(e.target.value)}
+                      placeholder="e.g. tel:+923001234567 or vetaxis.pk/hopetal"
+                      className="form-control text-xs bg-white"
+                      maxLength={120}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Icon Choice Row */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Select Highlight Indicator Icon</label>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {['🏥', '🩺', '🐶', '🐱', '🔬', '❤️', '🐄', '🐴', '📢'].map(em => (
+                      <button
+                        type="button"
+                        key={em}
+                        onClick={() => setAdIcon(em)}
+                        className={`w-9 h-9 rounded-xl border flex items-center justify-center text-lg transition-all cursor-pointer ${
+                          adIcon === em ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-200' : 'bg-white border-[#e3dec9] hover:bg-stone-50'
+                        }`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gradient card style selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Sponsor Card Theme presets</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { name: 'Spruce Green', grad: 'from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]' },
+                      { name: 'Warm Amber', grad: 'from-[#4a2e1d] via-[#633e25] to-[#4a2e1d]' },
+                      { name: 'Midnight Navy', grad: 'from-[#19243a] via-[#243454] to-[#19243a]' },
+                      { name: 'Royal Crimson', grad: 'from-[#3b1216] via-[#591b22] to-[#3b1216]' },
+                    ].map(opt => (
+                      <button
+                        type="button"
+                        key={opt.name}
+                        onClick={() => setAdGradient(opt.grad)}
+                        className={`p-3 rounded-xl border text-[10px] font-black text-white bg-gradient-to-br ${opt.grad} flex flex-col justify-end tracking-wider transition-all cursor-pointer ${
+                          adGradient === opt.grad ? 'border-[#5a5a40] scale-102 ring-2 ring-[#a49f92]/40' : 'border-transparent opacity-80 hover:opacity-100 shadow-sm'
+                        }`}
+                      >
+                        <span>{opt.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* BUDGET PLAN SELECTOR */}
+                <div className="space-y-2 bg-[#fcf9f2] p-4.5 rounded-2xl border border-[#e3dec9] border-b-2">
+                  <label className="text-xs font-extrabold text-[#5a5a40] uppercase tracking-wider block mb-1">Select Advertising Campaign Plan</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Option 1: Privilege-based (only visible if premium subscriber and remaining credits) */}
+                    {currentUser.subscriptionTier && (
+                      <button
+                        type="button"
+                        onClick={() => setAdPaymentChoice('free_privilege')}
+                        disabled={Math.max(0, (currentUser.subscriptionTier === 'Silver' ? 3 : currentUser.subscriptionTier === 'Gold' ? 5 : 10) - (currentUser.promoAdsUsed || 0)) === 0}
+                        className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer bg-white ${
+                          adPaymentChoice === 'free_privilege' ? 'border-[#5a5a40] ring-2 ring-[#5a5a40]/25' : 'border-[#e3dec9] hover:bg-[#faf9f6]'
+                        } disabled:opacity-55 disabled:cursor-not-allowed`}
+                      >
+                        <div>
+                          <div className="flex justify-between items-start w-full">
+                            <h4 className="text-xs font-black text-emerald-800">✨ Sub Privilege Ad</h4>
+                            <span className="text-[8px] bg-emerald-100 text-emerald-900 font-extrabold px-1.5 py-0.5 rounded-lg">FREE</span>
+                          </div>
+                          <p className="text-[10px] text-[#7a766f] font-semibold mt-1 leading-relaxed">
+                            Post completely free under your {currentUser.subscriptionTier} Tier subscription! (3-day builtin timer).
+                          </p>
+                        </div>
+                        <div className="text-[10px] font-bold text-stone-600 mt-2.5 border-t border-[#f4f1e9] pt-2 w-full flex justify-between">
+                          <span>Remaining: {Math.max(0, (currentUser.subscriptionTier === 'Silver' ? 3 : currentUser.subscriptionTier === 'Gold' ? 5 : 10) - (currentUser.promoAdsUsed || 0))} Slots</span>
+                          <span>0 RS</span>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Option 2: Individual 3 Days pay */}
+                    <button
+                      type="button"
+                      onClick={() => setAdPaymentChoice('pay_3_days')}
+                      className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer bg-white ${
+                        adPaymentChoice === 'pay_3_days' ? 'border-[#5a5a40] ring-2 ring-[#5a5a40]/25' : 'border-[#e3dec9] hover:bg-[#faf9f6]'
+                      }`}
+                    >
+                      <div>
+                        <h4 className="text-xs font-black text-stone-800">🚀 Starter Booster Package</h4>
+                        <p className="text-[10px] text-[#7a766f] font-semibold mt-1 leading-relaxed">
+                          Broadcasting active live rotation for exactly 3 days (72 hours) of peak feed traffic.
+                        </p>
+                      </div>
+                      <div className="text-[10px] font-bold text-stone-600 mt-2.5 border-t border-[#f4f1e9] pt-2 w-full flex justify-between">
+                        <span>3 Days Duration</span>
+                        <span className="bg-[#f4f1e9] px-2 py-0.5 rounded text-neutral-800 font-black">
+                          {hasRemainingPromo ? 'FREE (Sub Benefit)' : '1,000 RS'}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Option 3: Individual 7 Days pay */}
+                    <button
+                      type="button"
+                      onClick={() => setAdPaymentChoice('pay_7_days')}
+                      className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer bg-white ${
+                        adPaymentChoice === 'pay_7_days' ? 'border-[#5a5a40] ring-2 ring-[#5a5a40]/25' : 'border-[#e3dec9] hover:bg-[#faf9f6]'
+                      }`}
+                    >
+                      <div>
+                        <h4 className="text-xs font-black text-stone-800">👑 Extreme Reach Outreach</h4>
+                        <p className="text-[10px] text-[#7a766f] font-semibold mt-1 leading-relaxed">
+                          Extended reach rotational campaign running active for 7 full calendar days!
+                        </p>
+                      </div>
+                      <div className="text-[10px] font-bold text-stone-600 mt-2.5 border-t border-[#f4f1e9] pt-2 w-full flex justify-between">
+                        <span>7 Days Duration</span>
+                        <span className="bg-[#f4f1e9] px-2 py-0.5 rounded text-neutral-800 font-black">
+                          {hasRemainingPromo ? 'FREE (Sub Benefit)' : '1,500 RS'}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* BILLING DISCHARGE PANEL (only shown if they pay) */}
+                {adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && (
+                  <div className="bg-[#f4f1e9]/65 p-5 rounded-2xl border border-[#e3dec9] space-y-4 text-left animate-fadeIn">
+                    <div className="flex items-center justify-between border-b border-[#e3dec9] pb-2">
+                      <span className="text-[10px] font-black uppercase text-[#5a5a40]">🔒 Secure Ad Checkout Terminal</span>
+                      <span className="font-mono text-xs font-black text-amber-900">
+                        Charge: {adPaymentChoice === 'pay_7_days' ? '1,500' : '1,000'} RS
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-[#5a5a40] uppercase block mb-1">Select Payment Method</span>
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-[#e3dec9]/40 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setAdPaymentMethod('manual')}
+                          className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            adPaymentMethod === 'manual'
+                              ? 'bg-amber-800 text-white shadow-sm'
+                              : 'text-[#5a5a40] hover:bg-[#e3dec9]/50'
+                          }`}
+                        >
+                          Manual (Easypaisa/JazzCash)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAdPaymentMethod('card')}
+                          className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            adPaymentMethod === 'card'
+                              ? 'bg-amber-800 text-white shadow-sm'
+                              : 'text-[#5a5a40] hover:bg-[#e3dec9]/50'
+                          }`}
+                        >
+                          Credit Card (Simulated)
+                        </button>
+                      </div>
+                    </div>
+
+                    {adPaymentMethod === 'manual' ? (
+                      <div className="space-y-3.5 animate-fadeIn">
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                          <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wider">Manual Payment Instructions</h4>
+                          <p className="text-xs text-amber-800">
+                            Please transfer <strong>PKR {adPaymentChoice === 'pay_7_days' ? '1,500' : '1,000'}</strong> to the following account:
+                          </p>
+                          <div className="text-xs font-mono bg-white p-2.5 rounded border border-amber-200 space-y-0.5">
+                            <p><strong>Easypaisa Digital Account:</strong> 92532839</p>
+                            <p><strong>IBAN:</strong> PK36TMFB0000000092532839</p>
+                            <p><strong>Receiver Name:</strong> Naseeb Ullah</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Payment Method Applied</span>
+                            <select
+                              value={adManualMethod}
+                              onChange={(e: any) => setAdManualMethod(e.target.value)}
+                              className="form-control text-xs bg-white font-bold"
+                            >
+                              <option value="Easypaisa">Easypaisa</option>
+                              <option value="JazzCash">JazzCash</option>
+                              <option value="Nayapay">Nayapay</option>
+                              <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Transaction ID</span>
+                            <input
+                              type="text"
+                              placeholder="Enter your transaction ID"
+                              value={adTransactionId}
+                              onChange={(e) => setAdTransactionId(e.target.value)}
+                              className="form-control text-xs bg-white font-mono font-bold"
+                              required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'manual'}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 animate-fadeIn">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Billing Cardholder Name</span>
+                          <input
+                            type="text"
+                            placeholder="Owner Name"
+                            value={adCardName}
+                            onChange={(e) => setAdCardName(e.target.value)}
+                            className="form-control text-xs bg-white"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Credit Card Number</span>
+                          <input
+                            type="text"
+                            placeholder="4123 0000 8888 9912"
+                            value={adCardNumber}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').substring(0, 16);
+                              const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+                              setAdCardNumber(formatted);
+                            }}
+                            className="form-control text-xs bg-white font-mono"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Expiration (MM/YY)</span>
+                          <input
+                            type="text"
+                            placeholder="12/28"
+                            value={adCardExpiry}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                              if (val.length >= 2) {
+                                setAdCardExpiry(val.substring(0, 2) + '/' + val.substring(2));
+                              } else {
+                                setAdCardExpiry(val);
+                              }
+                            }}
+                            className="form-control text-xs bg-white font-mono"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">CVV Security</span>
+                          <input
+                            type="password"
+                            placeholder="∗∗∗"
+                            maxLength={3}
+                            value={adCardCvv}
+                            onChange={(e) => setAdCardCvv(e.target.value.replace(/\D/g, ''))}
+                            className="form-control text-xs bg-white font-mono"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Campaign Deployment Submit button */}
+                <button
+                  type="submit"
+                  disabled={submittingAd}
+                  className="cursor-pointer w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 disabled:from-stone-300 disabled:to-stone-400 disabled:cursor-not-allowed text-white text-xs font-extrabold uppercase py-3.5 px-6 rounded-2xl transition-all border-b-[4px] border-b-amber-900 flex items-center justify-center gap-2 shadow-md active:translate-y-px"
+                >
+                  {submittingAd ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Clearing Gateway & Injecting campaign...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Publish Ad Billboard Campaign ⚡</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Right Column: Live Interactive Mockup Banner Preview (5 Columns) */}
+              <div className="col-span-1 lg:col-span-5 flex flex-col justify-start space-y-4 w-full">
+                <div className="border border-stone-200 bg-stone-50 rounded-2xl p-4 text-center">
+                  <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest block">📻 Live Billboard Card Mockup Preview</span>
+                  <p className="text-[9px] text-[#7a766f] font-semibold mt-0.5">As drafted by you, this displays on the top rotating index of feed listings!</p>
+                </div>
+
+                {/* Active Slide Mockup display */}
+                <div className={`relative text-white p-6 md:p-8 rounded-3xl flex flex-col justify-center bg-gradient-to-br ${adGradient} border border-b-[8px] border-black/30 shadow-xl overflow-hidden min-h-[220px] transition-all`}>
+                  <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
+                  
+                  <div className="space-y-3.5 relative z-10 text-left">
+                    <span className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[9px] font-black tracking-widest font-mono border border-white/20 uppercase">
+                      📌 {adPaymentChoice === 'free_privilege' ? `${currentUser.subscriptionTier || 'Sponsor'} Promo` : 'Sponsored Billboard'} • Campaign
+                    </span>
+
+                    <h2 className="text-xl md:text-2xl font-serif font-black tracking-tight leading-tight flex items-center gap-2">
+                      <span className="text-2xl shrink-0 select-none">{adIcon}</span>
+                      <span>{adTitle || 'Hospital Slogan Title'}</span>
+                    </h2>
+
+                    <p className="text-neutral-200 text-xs font-semibold leading-relaxed line-clamp-3">
+                      {adDescription || 'Your comprehensive, custom promotional outreach pitch copy will appear here live... Enter description details in the left form panel.'}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
+                        🏢 {adSponsor || 'Sponsor brand name'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CTA Link out mock up */}
+                  <div className="shrink-0 flex flex-col gap-2 mt-5 relative z-10">
+                    <div className="bg-white text-stone-900 border-b-4 border-b-stone-300 px-4 py-2 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center">
+                      <span>{adCtaText}</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Duration pill display info */}
+                <div className="bg-white border rounded-2xl p-3 flex justify-between text-[10px] font-bold text-[#5a5a40]">
+                  <span>Campaign Run Cycle:</span>
+                  <span className="text-amber-700 uppercase">
+                    ⏰ {adPaymentChoice === 'pay_7_days' ? '7 Days Out (Auto-Expires)' : '3 Days Out (Auto-Expires)'}
+                  </span>
+                </div>
+
+                {/* Active campaigns owned by current user */}
+                <div className="border border-[#e3dec9] bg-[#fdfbf7] rounded-2xl p-4.5 space-y-3 shadow-xs">
+                  <h4 className="text-xs font-serif font-black text-[#373735] flex items-center gap-1.5 border-b border-[#e3dec9] pb-2 uppercase tracking-tight">
+                    <span>📡</span> <span>Your Active Billboard Ads</span>
+                  </h4>
+                  {activeAds.length === 0 ? (
+                    <div className="text-[10px] uppercase font-black text-stone-400 p-6 border border-dashed border-[#e3dec9] rounded-xl text-center bg-stone-50/50">
+                      No live billboard campaigns found
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {activeAds.map(ad => {
+                        const isDeletingThis = deletingAdId === ad.id;
+                        return (
+                          <div key={ad.id} className="p-3 bg-white border border-[#e3dec9] rounded-xl flex flex-col justify-between gap-3 text-xs font-bold text-neutral-800 shadow-sm animate-none">
+                            {!isDeletingThis ? (
+                              <div className="flex items-center justify-between gap-2 w-full">
+                                <div className="text-left space-y-1">
+                                  <div className="font-serif font-black text-stone-850 flex flex-wrap items-center gap-1.5 leading-tight">
+                                    <span>{ad.icon || '🩺'}</span> <span>{ad.title}</span>
+                                    {ad.status === 'pending' ? (
+                                      <span className="bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                                        Pending Approval
+                                      </span>
+                                    ) : ad.status === 'rejected' ? (
+                                      <span className="bg-red-100 text-red-800 border border-red-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                                        Rejected
+                                      </span>
+                                    ) : (
+                                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded text-[7px] font-black uppercase">
+                                        Approved
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[9px] text-[#7a766f] font-semibold flex flex-wrap items-center gap-2">
+                                    <span className="bg-[#5a5a40]/10 text-[#5a5a40] px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
+                                      {ad.pricePaid === 0 ? 'Free Promo' : `Rs. ${ad.pricePaid}`}
+                                    </span>
+                                    <span>Expires: {new Date(ad.expiresAt).toLocaleDateString()}</span>
+                                  </div>
+                                  {ad.transactionId && (
+                                    <div className="text-[8.5px] font-mono text-[#7a766f]/90 bg-stone-50 border border-stone-200 p-1 rounded-md">
+                                      Method: <span className="font-bold">{ad.paymentMethod}</span> | TxID: <span className="font-mono font-bold text-neutral-800">{ad.transactionId}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingAdId(ad.id)}
+                                  className="bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-[10px] px-2.5 py-1.5 rounded-lg border border-red-200 transition-colors cursor-pointer shrink-0 ml-2 animate-none font-mono"
+                                >
+                                  Remove ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-full flex flex-col gap-2.5 bg-red-50/50 p-2.5 rounded-lg border border-red-200 animate-none">
+                                <div className="text-left space-y-1">
+                                  <p className="text-[10px] text-red-950 font-extrabold flex items-center gap-1 leading-tight">
+                                    <span>⚠️</span> <span>Are you absolutely sure you want to stop and delete your advertisement "{ad.title}" immediately?</span>
+                                  </p>
+                                  <p className="text-[8.5px] text-red-800/85 font-black uppercase tracking-wider leading-normal">
+                                    This action is final and irreversible.
+                                  </p>
+                                </div>
+                                <div className="flex gap-2 justify-end w-full">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await PromotionalAdsService.deleteAd(ad.id);
+                                        setDeletingAdId(null);
+                                        loadActiveAds();
+                                      } catch (err) {
+                                        console.error('Failed deletion', err);
+                                      }
+                                    }}
+                                    className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-[9.5px] px-3 py-1.5 rounded-lg border border-red-700 shadow-sm cursor-pointer transition-all uppercase tracking-wide"
+                                  >
+                                    Yes, Delete Ad
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeletingAdId(null)}
+                                    className="bg-white hover:bg-neutral-50 text-stone-700 font-bold text-[9.5px] px-3 py-1.5 rounded-lg border border-stone-200 shadow-sm cursor-pointer transition-all uppercase tracking-wide"
+                                  >
+                                    No, Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ACTIVE FILTER BADGES */}
       {(searchTerm || cityFilterActive || currentUser.location) && (
@@ -947,9 +1525,22 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
 
           {currentUser.location && (
             <span className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold px-3 py-1 rounded-xl border border-amber-200 transition-colors">
-              <span>Location: {currentUser.location.address || 'GPS Coordinates'}</span>
+              <span>Location: {currentUser.location.address || 'Hospital Center'}</span>
               <button 
-                onClick={handleLocateMe} 
+                onClick={() => {
+                  const freshUser = { ...currentUser, location: null };
+                  onUpdateUser(freshUser);
+                  localStorage.setItem('va_session', JSON.stringify(freshUser));
+                  const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
+                  const idx = localUsers.findIndex((u: any) => u.uid === currentUser.uid);
+                  if (idx !== -1) {
+                    localUsers[idx].location = null;
+                    localStorage.setItem('va_users', JSON.stringify(localUsers));
+                  }
+                  if (sortBy === SORT_TYPES.NEAREST) {
+                    setSortBy(SORT_TYPES.HIGHEST);
+                  }
+                }} 
                 className="hover:text-red-600 font-extrabold focus:outline-none cursor-pointer p-0 bg-transparent border-none text-[11px]"
               >
                 ✕
@@ -1000,8 +1591,8 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             // Calculate distance strictly for clinic profiles using getDistance
             let distance: number | null = null;
             if (prof.role === 'clinic') {
-              const userLat = userGpsCoords?.lat || currentUser.location?.lat;
-              const userLng = userGpsCoords?.lng || currentUser.location?.lng;
+              const userLat = currentUser.location?.lat;
+              const userLng = currentUser.location?.lng;
 
               const lat = (prof as any).lat || (prof.location && prof.location.lat);
               const lng = (prof as any).lng || (prof.location && prof.location.lng);
@@ -1487,38 +2078,6 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
 
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* Floating GPS activation warning toast */}
-      <AnimatePresence>
-        {gpsPopupVisible && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: 'spring', duration: 0.5 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 pointer-events-auto"
-          >
-            <div className="bg-[#fcf9f2] border-2 border-amber-900 rounded-2xl p-4.5 shadow-[0_12px_36px_rgba(0,0,0,0.15)] border-b-[5px] border-b-amber-950 flex items-start gap-3.5">
-              <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center text-lg border border-amber-300 shrink-0 select-none">
-                📍
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-[11px] font-black text-amber-950 uppercase tracking-wider">GPS Coordinates Required</h4>
-                <p className="text-[11px] text-amber-900 leading-normal font-semibold">
-                  Please turn on your location first. Taking you to the GPS connection setup button.
-                </p>
-                <div className="pt-1 flex items-center gap-1.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-[9px] text-amber-800 font-bold uppercase font-mono tracking-widest animate-pulse">Context shifting...</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
         )}
       </AnimatePresence>
 

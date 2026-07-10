@@ -122,15 +122,8 @@ export function SubscriptionPortal({
   const secondsRemaining = Math.floor((diffTime / 1000) % 60);
   const progressDays = diffTime / (1000 * 60 * 60 * 24);
 
-  // Checkout Interactive Simulator states
+  // Checkout Interactive states
   const [selectedTier, setSelectedTier] = useState<'Silver' | 'Gold' | 'Platinum' | null>(null);
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  
-  // Visual states
-  const [cardFocus, setCardFocus] = useState<boolean>(false); // CVV back flip
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [successMode, setSuccessMode] = useState(false);
@@ -139,94 +132,26 @@ export function SubscriptionPortal({
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  // Manual Payment states
-  const [manualPaymentId, setManualPaymentId] = useState('');
-  const [manualPaymentMethod, setManualPaymentMethod] = useState<'Easypaisa' | 'JazzCash' | 'Nayapay' | 'Bank Transfer'>('Easypaisa');
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
-  
-  const handleManualPaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTier || !manualPaymentId) return;
-
-    setPaymentSubmitting(true);
-    setCheckoutError(null);
-    try {
-      await PaymentService.submitManualPayment({
-        userId: currentUser.uid,
-        userName: currentUser.name || currentUser.email,
-        userEmail: currentUser.email,
-        planId: selectedTier,
-        transactionId: manualPaymentId,
-        paymentMethod: manualPaymentMethod
-      });
-      setSuccessMode(true);
-    } catch (err: any) {
-      setCheckoutError(err.message || 'Failed to submit payment details.');
-    } finally {
-      setPaymentSubmitting(false);
-    }
-  };
-
-  // Helper formatting for user input number
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/\s?/g, '').replace(/[^0-9]/g, '');
-    let formatted = raw.match(/.{1,4}/g)?.join(' ') || raw;
-    setCardNumber(formatted.slice(0, 19));
-  };
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/[^0-9]/g, '');
-    if (raw.length >= 2) {
-      setCardExpiry(raw.slice(0, 2) + '/' + raw.slice(2, 4));
-    } else {
-      setCardExpiry(raw);
-    }
-  };
-
-  // Submit checkout trigger
-  const handleCheckoutSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCheckoutError(null);
-
+  // Submit direct upgrade trigger
+  const handleDirectUpgrade = async () => {
     if (!selectedTier) return;
-    if (cardNumber.replace(/\s/g, '').length !== 16) {
-      setCheckoutError('Please enter a valid 16-digit credit card number.');
-      return;
-    }
-    if (!cardName.trim()) {
-      setCheckoutError('Please specify the card holder name.');
-      return;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-      setCheckoutError('Please enter card expiration in MM/YY format.');
-      return;
-    }
-    if (cardCvv.length < 3) {
-      setCheckoutError('Please specify the 3 or 4 digit CVV code.');
-      return;
-    }
-
     setCheckoutLoading(true);
+    setCheckoutError(null);
+
     try {
-      // Math: dynamic monthly lease cycle capped at maximum 30 days from today
       const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
 
       const updated = await AuthService.updateProfile(currentUser.uid, {
         subscriptionTier: selectedTier,
         subscriptionExpiresAt: newExpiry,
         promoAdsUsed: currentUser.promoAdsUsed || 0,
-        isVerified: true // verify automatically on active premium plan checkout
+        isVerified: true
       });
 
       onUpdateUser(updated);
       setSuccessMode(true);
-      // Reset variables
-      setCardNumber('');
-      setCardName('');
-      setCardExpiry('');
-      setCardCvv('');
     } catch (err: any) {
-      setCheckoutError(err.message || 'Payment simulation failed.');
+      setCheckoutError(err.message || 'Subscription activation failed.');
     } finally {
       setCheckoutLoading(false);
     }
@@ -576,7 +501,7 @@ export function SubscriptionPortal({
         </div>
       </div>
 
-      {/* SECURE CREDIT CARD SIMULATED CHECKOUT MODULE */}
+      {/* SECURE DIRECT ACTIVATION MODULE */}
       <AnimatePresence>
         {selectedTier && (
           <motion.div
@@ -590,18 +515,15 @@ export function SubscriptionPortal({
               
               <div className="flex items-center justify-between border-b border-[#f4f1e9] pb-4 mb-6">
                 <div className="space-y-1">
-                  <div className="text-[10px] font-black uppercase tracking-wider text-rose-600 flex items-center gap-1 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 w-fit">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit">
                     <Shield className="w-3.5 h-3.5" />
-                    <span>SIMULATION ACTIVE</span>
+                    <span>DIRECT ACTIVATION ACTIVE</span>
                   </div>
                   <h3 className="font-serif font-black text-xl text-black">
-                    Checkout: {selectedTier} Practitioner Monthly Plan
+                    Activate {selectedTier} Elite Tier Subscription
                   </h3>
                   <p className="text-xs font-semibold text-[#7a766f]">
-                    {shouldHidePricing 
-                      ? "Special Member Verification: PKR 0 (Covered under current subscription status limits)."
-                      : `PKR ${(PLANS.find(p => p.id === selectedTier)?.price || 0).toLocaleString()} will be billed to your simulated credit card. No actual money is spent.`
-                    }
+                    Instant upgrade without credit cards or transaction forms.
                   </p>
                 </div>
                 <button
@@ -614,7 +536,7 @@ export function SubscriptionPortal({
               </div>
 
               {successMode ? (
-                /* SUCCESS SCREEN ON CHECKOUT COMPLETE */
+                /* SUCCESS SCREEN ON ACTIVATION COMPLETE */
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -624,10 +546,10 @@ export function SubscriptionPortal({
                     ✓
                   </div>
                   <h4 className="font-serif text-xl font-black text-[#1b7c31]">
-                    Payment Submitted for Review!
+                    Plan Activated Successfully!
                   </h4>
                   <p className="text-xs font-semibold text-emerald-800 leading-relaxed max-w-sm mx-auto">
-                    Thank you! An admin is currently reviewing your transaction details. Your profile will be verified and upgraded to <strong className="font-black underline">{selectedTier}</strong> status as soon as possible.
+                    Your profile has been upgraded to <strong className="font-black underline">{selectedTier}</strong> status. You now have immediate access to priority directory sorting, unlimited pet ads, and billboard credits!
                   </p>
                   <div className="pt-2 flex gap-3.5 justify-center">
                     <button
@@ -645,147 +567,43 @@ export function SubscriptionPortal({
                       }}
                       className="px-4 py-2 bg-white text-[#373735] border border-[#e3dec9] text-xs font-black uppercase tracking-wider rounded-xl hover:bg-stone-50 transition-all border-b-[3px] border-b-stone-300 cursor-pointer"
                     >
-                      Dismiss Checkout
+                      Dismiss
                     </button>
                   </div>
                 </motion.div>
               ) : (
-                /* FULL CHECKOUT ROW CORES */
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                  
-                  {/* LEFT: INTERACTIVE 3D CREDIT CARD DISPLAY */}
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="perspective-1000 w-full max-w-[360px]" style={{ perspective: '1000px' }}>
-                      <motion.div
-                        animate={{ rotateY: cardFocus ? 180 : 0 }}
-                        transition={{ type: 'spring', stiffness: 100, damping: 15 }}
-                        style={{ transformStyle: 'preserve-3d' }}
-                        className="relative w-full aspect-[1.586] rounded-2xl p-6 text-white bg-gradient-to-br from-zinc-800 via-neutral-900 to-black border border-neutral-700/50 shadow-2xl overflow-hidden"
-                      >
-                        {/* Front of Card */}
-                        <div 
-                          style={{ backfaceVisibility: 'hidden' }}
-                          className="absolute inset-0 p-6 flex flex-col justify-between"
-                        >
-                          {/* Ambient micro-stripes overlay */}
-                          <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[repeating-linear-gradient(45deg,#fff,#fff_10px,transparent_10px,transparent_20px)]" />
+                /* DIRECT CONFIRM ACTION */
+                <div className="max-w-md mx-auto text-center space-y-5 py-2">
+                  <p className="text-sm font-semibold text-[#373735] leading-relaxed">
+                    Would you like to instantly upgrade your registered practitioner account to <strong className="font-extrabold text-[#5a5a40]">{selectedTier}</strong> for free? 
+                  </p>
+                  <p className="text-xs text-[#7a766f]">
+                    Upon clicking, your professional badge will update instantly in the public search directory.
+                  </p>
 
-                          {/* Brand Info */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                              <span className="text-[11px] font-black tracking-widest text-[#a49f92] uppercase leading-none">VETAXIS SECURE</span>
-                              <span className="text-[7px] font-mono text-zinc-400 mt-1 uppercase tracking-widest">Prepaid Authority Card</span>
-                            </div>
-                            <span className="text-xl">💳</span>
-                          </div>
-
-                          {/* Metallic Chip */}
-                          <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-200 to-amber-500 border border-amber-600/30 opacity-75 self-start mt-2 shadow-inner" />
-
-                          {/* Card Number display */}
-                          <div className="font-mono text-lg md:text-xl tracking-widest text-center py-2 text-zinc-100 font-extrabold select-all">
-                            {cardNumber || '•••• •••• •••• ••••'}
-                          </div>
-
-                          {/* Card Holder & Expiry display */}
-                          <div className="flex items-center justify-between pt-1">
-                            <div className="min-w-0 flex-1">
-                              <span className="text-[7px] text-zinc-400 uppercase tracking-widest block font-mono">Card Holder</span>
-                              <span className="text-xs font-black tracking-wider block truncate text-zinc-100 uppercase">{cardName || 'YOUR FULL NAME'}</span>
-                            </div>
-                            <div className="shrink-0 pl-4">
-                              <span className="text-[7px] text-zinc-400 uppercase tracking-widest block font-mono text-right">Expires</span>
-                              <span className="text-xs font-mono font-bold block text-zinc-100">{cardExpiry || 'MM/YY'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Back of Card (CVV) */}
-                        <div 
-                          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                          className="absolute inset-0 py-6 flex flex-col justify-between"
-                        >
-                          <div className="mt-2 w-full h-10 bg-black" />
-                          <div className="px-6 flex items-center justify-between">
-                            <div className="flex-1 pr-6">
-                              <span className="text-[6px] text-zinc-400 uppercase tracking-widest block font-mono">Signature Strip</span>
-                              <div className="w-full h-8 bg-zinc-200 rounded-sm italic font-serif text-sm text-black flex items-center px-2 select-none pointer-events-none line-through">
-                                VetAxis Practitioner Approved Code
-                              </div>
-                            </div>
-                            <div className="shrink-0 w-14">
-                              <span className="text-[6px] text-zinc-400 uppercase tracking-widest block font-mono text-right">CVV</span>
-                              <div className="w-full h-8 bg-white text-black font-mono font-black text-sm rounded-sm flex items-center justify-center border border-zinc-300">
-                                {cardCvv || '•••'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="px-6 pb-2 text-[6px] font-mono text-zinc-500 text-center uppercase tracking-widest leading-relaxed">
-                            Secured via simulated clinical cryptography.
-                          </div>
-                        </div>
-
-                      </motion.div>
+                  {checkoutError && (
+                    <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold leading-relaxed">
+                      ⚠️ Error: {checkoutError}
                     </div>
+                  )}
 
-                    <div className="mt-3.5 text-center text-xs text-[#7a766f] font-semibold">
-                      💳 Card renders details dynamically! Click CVV box to view flip transition.
-                    </div>
-                  </div>
-
-                  {/* RIGHT: MANUAL PAYMENT FORM */}
-                  <form onSubmit={handleManualPaymentSubmit} className="space-y-4">
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                      <h4 className="font-bold text-amber-900">Manual Payment Instructions</h4>
-                      <p className="text-xs text-amber-800">Please transfer <strong>PKR {PLANS.find(p => p.id === selectedTier)?.price}</strong> to the following account:</p>
-                      <div className="text-xs font-mono bg-white p-2 rounded border border-amber-200">
-                        <p><strong>Easypaisa Digital Account:</strong> 92532839</p>
-                        <p><strong>IBAN:</strong> PK36TMFB0000000092532839</p>
-                        <p><strong>Receiver Name:</strong> Naseeb Ullah</p>
-                      </div>
-                    </div>
-
-                    {checkoutError && (
-                      <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold leading-relaxed">
-                        ⚠️ Error: {checkoutError}
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Payment Method Applied</label>
-                      <select
-                        value={manualPaymentMethod}
-                        onChange={(e: any) => setManualPaymentMethod(e.target.value)}
-                        className="form-control text-xs font-bold bg-white"
-                      >
-                        <option value="Easypaisa">Easypaisa</option>
-                        <option value="JazzCash">JazzCash</option>
-                        <option value="Nayapay">Nayapay</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-[#373735] uppercase tracking-wider block">Transaction ID</label>
-                      <input
-                        type="text"
-                        required
-                        value={manualPaymentId}
-                        onChange={(e) => setManualPaymentId(e.target.value)}
-                        placeholder="Enter your transaction ID"
-                        className="form-control text-xs font-bold"
-                      />
-                    </div>
-
+                  <div className="flex gap-3 pt-2">
                     <button
-                      type="submit"
-                      disabled={paymentSubmitting}
-                      className="w-full py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                      type="button"
+                      onClick={() => setSelectedTier(null)}
+                      className="flex-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 py-3 rounded-2xl font-bold text-xs cursor-pointer"
                     >
-                      {paymentSubmitting ? 'Submitting...' : 'Submit Transaction ID'}
+                      No, Go Back
                     </button>
-                  </form>
-
+                    <button
+                      type="button"
+                      onClick={handleDirectUpgrade}
+                      disabled={checkoutLoading}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black text-xs border border-emerald-700 border-b-[4px] border-b-emerald-800 cursor-pointer"
+                    >
+                      {checkoutLoading ? 'Activating Tier...' : `Yes, Activate ${selectedTier}`}
+                    </button>
+                  </div>
                 </div>
               )}
 
