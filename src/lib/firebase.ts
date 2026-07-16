@@ -42,10 +42,22 @@ const getQuotaExceeded = (): boolean => {
          localStorage.getItem('firebase_quota_exceeded') === 'true';
 };
 
+// Resolve configuration dynamically prioritizing environment variables
+const resolvedConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseConfig.firestoreDatabaseId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseConfig.measurementId,
+};
+
 export let isFirebaseConfigured =
-  firebaseConfig.apiKey &&
-  !firebaseConfig.apiKey.includes('mock-api-key') &&
-  !firebaseConfig.apiKey.includes('PLACEHOLDER') &&
+  resolvedConfig.apiKey &&
+  !resolvedConfig.apiKey.includes('mock-api-key') &&
+  !resolvedConfig.apiKey.includes('PLACEHOLDER') &&
   !getQuotaExceeded();
 
 let app;
@@ -54,13 +66,13 @@ let auth: any = null;
 
 if (isFirebaseConfigured) {
   try {
-    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    app = getApps().length > 0 ? getApp() : initializeApp(resolvedConfig);
     db = initializeFirestore(app, {
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
       }),
       experimentalForceLongPolling: true,
-    }, firebaseConfig.firestoreDatabaseId);
+    }, resolvedConfig.firestoreDatabaseId);
     auth = getAuth(app);
   } catch (err) {
     console.error('[VetAxis] Failed to initialize live Firebase services. Falling back.', err);
@@ -99,13 +111,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path,
     authInfo: {
       userId: auth?.currentUser?.uid || null,
-      email: auth?.currentUser?.email || null,
+      email: auth?.currentUser?.email ? '[REDACTED]' : null,
       emailVerified: auth?.currentUser?.emailVerified || null,
       isAnonymous: auth?.currentUser?.isAnonymous || null,
       tenantId: auth?.currentUser?.tenantId || null,
       providerInfo: auth?.currentUser?.providerData?.map((provider) => ({
         providerId: provider.providerId,
-        email: provider.email,
+        email: provider.email ? '[REDACTED]' : null,
       })) || [],
     },
   };

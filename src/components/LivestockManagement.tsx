@@ -122,6 +122,13 @@ export default function LivestockManagement({
   const [isEditingHerd, setIsEditingHerd] = useState<boolean>(false);
   const [herdFormStep, setHerdFormStep] = useState<number>(0);
 
+  // States for Monthly Production Register entries
+  const [monthlyProdMonth, setMonthlyProdMonth] = useState('');
+  const [monthlyProdMilked, setMonthlyProdMilked] = useState<number>(0);
+  const [monthlyProdMilkVolume, setMonthlyProdMilkVolume] = useState<number>(0);
+  const [monthlyProdMeatStart, setMonthlyProdMeatStart] = useState<number>(0);
+  const [monthlyProdMeatEnd, setMonthlyProdMeatEnd] = useState<number>(0);
+
   const [recordDisplayTab, setRecordDisplayTab] = useState<'registry' | 'individualDetailed' | 'herdDetailed'>('registry');
   const stepContainerRef = useRef<HTMLDivElement>(null);
   const herdStepContainerRef = useRef<HTMLDivElement>(null);
@@ -1037,6 +1044,42 @@ export default function LivestockManagement({
     setActiveHerdRecord({ ...activeHerdRecord, dewormings: dewormings });
   };
 
+  const addHerdMonthlyProduction = () => {
+    if (!activeHerdRecord || !monthlyProdMonth) return;
+    const list = activeHerdRecord.monthlyProduction ? [...activeHerdRecord.monthlyProduction] : [];
+    
+    // Auto calculate average milk per day (volume / 30)
+    const avgMilk = monthlyProdMilked > 0 ? Number((monthlyProdMilkVolume / 30).toFixed(1)) : 0;
+    
+    // Calculate beef ADG (Average Daily Gain) based on starting vs ending weight: (End - Start) / 30 days
+    const gain = Number(((monthlyProdMeatEnd - monthlyProdMeatStart) / 30).toFixed(2));
+
+    list.push({
+      id: 'mp_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      month: monthlyProdMonth,
+      animalsMilked: monthlyProdMilked,
+      totalMilkVolume: monthlyProdMilkVolume,
+      averageMilkPerDay: avgMilk,
+      meatStartingWeight: monthlyProdMeatStart,
+      meatEndingWeight: monthlyProdMeatEnd,
+      meatAdg: gain
+    });
+    
+    setActiveHerdRecord({ ...activeHerdRecord, monthlyProduction: list });
+    // Reset temp inputs
+    setMonthlyProdMonth('');
+    setMonthlyProdMilked(0);
+    setMonthlyProdMilkVolume(0);
+    setMonthlyProdMeatStart(0);
+    setMonthlyProdMeatEnd(0);
+  };
+
+  const removeHerdMonthlyProduction = (idx: number) => {
+    if (!activeHerdRecord || !activeHerdRecord.monthlyProduction) return;
+    const list = activeHerdRecord.monthlyProduction.filter((_, i) => i !== idx);
+    setActiveHerdRecord({ ...activeHerdRecord, monthlyProduction: list });
+  };
+
   const handleCreateFarm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFarmName.trim() || !newFarmLocation.trim()) return;
@@ -1788,185 +1831,6 @@ export default function LivestockManagement({
             </motion.button>
           )}
         </div>
-      </div>
-
-      {/* 3D INTERACTIVE HERO & SPONSOR BILLBOARD */}
-      <div 
-        ref={billboardRef}
-        onMouseMove={handleBillboardMouseMove}
-        onMouseLeave={handleBillboardMouseLeave}
-        className="mb-8 relative w-full h-[360px] sm:h-[280px] md:h-[230px] lg:h-[210px] overflow-hidden rounded-3xl shrink-0 shadow-[0_15px_40px_rgba(90,90,64,0.18)] hover:shadow-[0_25px_50px_rgba(90,90,64,0.3)] transition-shadow duration-500 border border-[#cdc6ad]"
-        style={{ perspective: 1200 }}
-      >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentSlideIdx}
-            initial={{ rotateY: 90, opacity: 0 }}
-            animate={{ rotateY: 0, opacity: 1 }}
-            exit={{ rotateY: -90, opacity: 0 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-            style={{ 
-              transformStyle: "preserve-3d", 
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              rotateX: bspringX,
-              rotateY: bspringY,
-            }}
-            className={`absolute inset-0 text-white p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br ${activeSlides[currentSlideIdx].bgGradient} ${activeSlides[currentSlideIdx].borderColors} border border-b-[8px] transition-all duration-300`}
-          >
-            {/* Holographic grid wallpaper */}
-            <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.2px,transparent_1.2px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
-
-            {/* Premium 3D Metallic Gloss Glow Layer */}
-            <motion.div
-              style={{
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.18) 100%)',
-                x: bsheenX,
-                y: bsheenY,
-                pointerEvents: 'none',
-              }}
-              className="absolute inset-0 z-20 mix-blend-overlay pointer-events-none"
-            />
-
-            {activeSlides[currentSlideIdx].type === 'welcome' ? (
-              // WELCOME BANNER SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
-              <div className="w-full relative" style={{ transformStyle: "preserve-3d" }}>
-                <div 
-                  className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none hidden lg:block"
-                  style={{ transform: "translateZ(50px)" }}
-                >
-                  <span className="text-6xl animate-pulse inline-block">🐄</span>
-                </div>
-                
-                <div className="relative z-10 space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
-                  <span 
-                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
-                    style={{ transform: "translateZ(30px)" }}
-                  >
-                    🚜 Farm & Production Network
-                  </span>
-                  <h2 
-                    className="text-2.5xl md:text-3xl font-serif font-black tracking-tight leading-tight"
-                    style={{ transform: "translateZ(45px)" }}
-                  >
-                    Hello, {currentUser.name.split(' ')[0]} 👋
-                  </h2>
-                  <p 
-                    className="text-neutral-200 text-xs md:text-sm font-semibold leading-relaxed"
-                    style={{ transform: "translateZ(25px)" }}
-                  >
-                    Manage herd identification, schedule veterinary immunizations, link with professionals and track daily farm production records.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              // SPONSORED CAMPAIGN SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
-              <div className="w-full relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6" style={{ transformStyle: "preserve-3d" }}>
-                <div className="space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
-                  <span 
-                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
-                    style={{ transform: "translateZ(30px)" }}
-                  >
-                    📌 {activeSlides[currentSlideIdx].badge} • Sponsored Campaign
-                  </span>
-                  <h2 
-                    className="text-xl md:text-3xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
-                    style={{ transform: "translateZ(45px)" }}
-                  >
-                    <span className="text-2xl md:text-3.5xl shrink-0 select-none">{activeSlides[currentSlideIdx].icon}</span>
-                    <span>{activeSlides[currentSlideIdx].title}</span>
-                  </h2>
-                  <p 
-                    className="text-neutral-200 text-xs md:text-xs font-semibold leading-relaxed line-clamp-3"
-                    style={{ transform: "translateZ(20px)" }}
-                  >
-                    {activeSlides[currentSlideIdx].description}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
-                    <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
-                      {activeSlides[currentSlideIdx].sponsorName}
-                    </span>
-                    {activeSlides[currentSlideIdx].couponCode && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(activeSlides[currentSlideIdx].couponCode || '');
-                          alert(`📋 Copied coupon code "${activeSlides[currentSlideIdx].couponCode}" to clipboard!`);
-                        }}
-                        className="inline-flex items-center gap-2 px-2.5 py-1 bg-dashed border border-white/30 hover:border-white/50 bg-white/10 rounded-xl text-[9px] font-black tracking-wider text-amber-300 shadow-inner cursor-pointer transition-all"
-                        title="Click to copy coupon code"
-                      >
-                        <span>Code: {activeSlides[currentSlideIdx].couponCode}</span>
-                        <span className="text-white/60 font-normal text-[8px] pl-1">Copy 📋</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* CTA Link out (WITH COGNITIVE HEIGHT HIGHLIGHT) */}
-                <div className="shrink-0 flex flex-col gap-2 min-w-[180px] md:min-w-[200px]" style={{ transform: "translateZ(35px)" }}>
-                  <a
-                    href={activeSlides[currentSlideIdx].ctaUrl.startsWith('http') ? activeSlides[currentSlideIdx].ctaUrl : `https://${activeSlides[currentSlideIdx].ctaUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer decoration-none shadow-md"
-                  >
-                    <span>{activeSlides[currentSlideIdx].ctaText}</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* Carousel Navigation Toolbar */}
-            <div 
-              className="absolute bottom-4 right-6 flex items-center gap-3 bg-black/25 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-20 select-none"
-              style={{ transform: "translateZ(40px)" }}
-            >
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentSlideIdx((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
-                }}
-                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
-                title="Previous Slide"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              
-              <div className="flex gap-1.5">
-                {activeSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentSlideIdx(idx);
-                    }}
-                    className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all border-none ${
-                      idx === currentSlideIdx ? 'bg-amber-400 scale-120' : 'bg-white/40 hover:bg-white/60'
-                    }`}
-                  />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
-                }}
-                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
-                title="Next Slide"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </motion.div>
-        </AnimatePresence>
       </div>
 
       {/* Livestock Overview Content */}
@@ -3718,30 +3582,166 @@ export default function LivestockManagement({
               )}
 
               {indFormStep === 2 && (
-                <div className="grid grid-cols-2 gap-3 font-sans">
-                  <div>
-                    <label className="block text-gray-600 mb-1">Pregnancy Diagnosis Date</label>
-                    <input type="date" value={activeIndividualRecord.pregnancyDiagDate || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, pregnancyDiagDate: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+                <div className="space-y-4 font-sans">
+                  {/* Category 1: Breeding & Estrus Management */}
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      ❤️ Breeding, Estrus & Conception Records
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Puberty Onset Date</label>
+                        <input type="date" value={activeIndividualRecord.pubertyDate || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, pubertyDate: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Estrus/Heat Dates (comma-separated)</label>
+                        <input type="text" placeholder="e.g. 2026-04-01, 2026-04-22" value={activeIndividualRecord.estrusDates || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, estrusDates: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Last Service Date</label>
+                        <input type="date" value={activeIndividualRecord.serviceDate || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, serviceDate: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Service Method</label>
+                        <select value={activeIndividualRecord.aiOrNatural || 'Artificial Insemination'} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, aiOrNatural: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]">
+                          <option value="Artificial Insemination">Artificial Insemination (A.I.)</option>
+                          <option value="Natural Service">Natural Service</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Sire / Bull / Buck Used</label>
+                        <input type="text" placeholder="e.g. BULL-MASTER" value={activeIndividualRecord.bullOrBuckUsed || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, bullOrBuckUsed: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Pregnancy Diagnosis Date</label>
+                        <input type="date" value={activeIndividualRecord.pregnancyDiagDate || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, pregnancyDiagDate: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Services Per Conception</label>
+                        <input type="number" min="0" placeholder="e.g. 1" value={activeIndividualRecord.servicesPerConception || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, servicesPerConception: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Service Date</label>
-                    <input type="date" value={activeIndividualRecord.serviceDate || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, serviceDate: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+
+                  {/* Category 2: Calving & Parturition cycles */}
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      🍼 Calving & Parturition Cycles
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Expected Parturition Date</label>
+                        <input type="date" value={activeIndividualRecord.expectedParturition || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, expectedParturition: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Actual Parturition Date</label>
+                        <input type="date" value={activeIndividualRecord.actualParturition || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, actualParturition: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Type of Birth</label>
+                        <select value={activeIndividualRecord.typeOfBirth || 'Single'} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, typeOfBirth: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]">
+                          <option value="Single">Single</option>
+                          <option value="Twins">Twins</option>
+                          <option value="Triplets">Triplets</option>
+                          <option value="Stillborn">Stillborn</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Calving Difficulty</label>
+                        <select value={activeIndividualRecord.calvingDifficulty || 'Normal / Unassisted'} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, calvingDifficulty: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]">
+                          <option value="Normal / Unassisted">Normal / Unassisted</option>
+                          <option value="Mild Assistance">Mild Assistance</option>
+                          <option value="Surgical Assistance / Caesarean">Surgical Assistance / Caesarean</option>
+                          <option value="Severe Dystocia">Severe Dystocia</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Placenta Expulsion Time</label>
+                        <input type="text" placeholder="e.g. 4 hours" value={activeIndividualRecord.placentaExpulsionTime || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, placentaExpulsionTime: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Morning Milk (L/day)</label>
-                    <input type="number" step="0.1" value={activeIndividualRecord.morningMilk || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, morningMilk: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+
+                  {/* Category 3: Lactation & Daily Production records */}
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      🥛 Lactation Yield & Weight Records
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Morning Milk (Liters/day)</label>
+                        <input type="number" step="0.1" value={activeIndividualRecord.morningMilk || ''} onChange={(e) => {
+                          const mVal = Number(e.target.value) || null;
+                          const eVal = activeIndividualRecord.eveningMilk || 0;
+                          setActiveIndividualRecord({ 
+                            ...activeIndividualRecord, 
+                            morningMilk: mVal,
+                            totalMilk: mVal !== null ? mVal + eVal : eVal
+                          });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Evening Milk (Liters/day)</label>
+                        <input type="number" step="0.1" value={activeIndividualRecord.eveningMilk || ''} onChange={(e) => {
+                          const eVal = Number(e.target.value) || null;
+                          const mVal = activeIndividualRecord.morningMilk || 0;
+                          setActiveIndividualRecord({ 
+                            ...activeIndividualRecord, 
+                            eveningMilk: eVal,
+                            totalMilk: eVal !== null ? mVal + eVal : mVal
+                          });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Total Daily Yield (Computed)</label>
+                        <input type="text" readOnly disabled value={activeIndividualRecord.totalMilk ? `${activeIndividualRecord.totalMilk} Liters` : '0 Liters'} className="w-full bg-stone-100 border border-[#e3dec9] rounded-lg p-2 text-xs font-mono font-bold text-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Est. Daily Weight Gain (ADG - kg)</label>
+                        <input type="number" step="0.01" value={activeIndividualRecord.adg || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, adg: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Body Weight for Meat/Beef (kg)</label>
+                        <input type="number" value={activeIndividualRecord.bodyWeightMeat || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, bodyWeightMeat: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Offspring ID Tag</label>
+                        <input type="text" placeholder="e.g. CALF-102" value={activeIndividualRecord.offspringId || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, offspringId: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Offspring Birth Date</label>
+                        <input type="date" value={activeIndividualRecord.offspringBirthDate || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, offspringBirthDate: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Offspring Birth Weight (kg)</label>
+                        <input type="number" step="0.1" value={activeIndividualRecord.offspringBirthWeight || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, offspringBirthWeight: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Evening Milk (L/day)</label>
-                    <input type="number" step="0.1" value={activeIndividualRecord.eveningMilk || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, eveningMilk: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Est. Daily Gain (kg)</label>
-                    <input type="number" step="0.01" value={activeIndividualRecord.adg || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, adg: Number(e.target.value) || null })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Offspring ID Tag</label>
-                    <input type="text" placeholder="e.g. CALF-102" value={activeIndividualRecord.offspringId || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, offspringId: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+
+                  {/* Category 4: Performance indexes */}
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      📊 Performance Indices & Efficiency
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Age at First Service</label>
+                        <input type="text" placeholder="e.g. 15 months" value={activeIndividualRecord.ageAtFirstService || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, ageAtFirstService: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Age at First Calving/Parturition</label>
+                        <input type="text" placeholder="e.g. 24 months" value={activeIndividualRecord.ageAtFirstParturition || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, ageAtFirstParturition: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Calving Interval (days)</label>
+                        <input type="text" placeholder="e.g. 365 days" value={activeIndividualRecord.calvingInterval || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, calvingInterval: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1 font-semibold">Days Open</label>
+                        <input type="text" placeholder="e.g. 85 days" value={activeIndividualRecord.daysOpen || ''} onChange={(e) => setActiveIndividualRecord({ ...activeIndividualRecord, daysOpen: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -3840,7 +3840,7 @@ export default function LivestockManagement({
             </div>
 
             <div className="flex border-b border-[#fafaf7] pb-1 gap-2 overflow-x-auto text-xs font-bold leading-none">
-              {["1. Demographics & Inventory", "2. Reproduction Metrics", "3. Health Logs & Finances"].map((name, idxAnswer) => (
+              {["1. Demographics & Inventory", "2. Reproduction & Calving", "3. Monthly Production Records", "4. Health Logs & Finances"].map((name, idxAnswer) => (
                 <button
                   key={idxAnswer}
                   type="button"
@@ -3854,73 +3854,260 @@ export default function LivestockManagement({
 
             <div ref={herdStepContainerRef} className="max-h-[50vh] overflow-y-auto pr-1 space-y-3 text-xs leading-normal">
               {herdFormStep === 0 && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-gray-600 mb-1">Farm/Herd Name *</label>
-                    <input type="text" required value={activeHerdRecord.farmName || ''} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, farmName: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+                <div className="space-y-4 font-sans">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1 font-semibold">Farm/Herd Name *</label>
+                      <input type="text" required value={activeHerdRecord.farmName || ''} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, farmName: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1 font-semibold">Farm Manager</label>
+                      <input type="text" value={activeHerdRecord.farmManager || ''} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, farmManager: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1 font-semibold">Species *</label>
+                      <select value={activeHerdRecord.species || 'Cattle'} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, species: e.target.value as any })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]">
+                        <option value="Cattle">Cattle</option>
+                        <option value="Buffalo">Buffalo</option>
+                        <option value="Goat">Goat</option>
+                        <option value="Sheep">Sheep</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1 font-semibold">Total Herd Head Count *</label>
+                      <input type="number" required value={activeHerdRecord.totalHerdSize || ''} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, totalHerdSize: Number(e.target.value) || 0 })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1 font-sans">Farm Manager</label>
-                    <input type="text" value={activeHerdRecord.farmManager || ''} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, farmManager: e.target.value })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Species *</label>
-                    <select value={activeHerdRecord.species || 'Cattle'} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, species: e.target.value as any })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs">
-                      <option value="Cattle">Cattle</option>
-                      <option value="Buffalo">Buffalo</option>
-                      <option value="Goat">Goat</option>
-                      <option value="Sheep">Sheep</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Total Herd Head Count *</label>
-                    <input type="number" required value={activeHerdRecord.totalHerdSize || ''} onChange={(e) => setActiveHerdRecord({ ...activeHerdRecord, totalHerdSize: Number(e.target.value) || 0 })} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Pregnant Qty</label>
-                    <input type="number" value={activeHerdRecord.inventory?.pregnantQty ?? 0} onChange={(e) => {
-                      const inv = { ...(activeHerdRecord.inventory || {}) }; inv.pregnantQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
-                    }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Lactating Qty</label>
-                    <input type="number" value={activeHerdRecord.inventory?.lactatingQty ?? 0} onChange={(e) => {
-                      const inv = { ...(activeHerdRecord.inventory || {}) }; inv.lactatingQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
-                    }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+
+                  <div className="bg-[#fafbf9] border border-[#e3dec9] rounded-xl p-3 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      📊 Detailed Herd Stock Class Inventory
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Adult Males</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.adultMales ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.adultMales = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Adult Females</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.adultFemales ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.adultFemales = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Pregnant</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.pregnantQty ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.pregnantQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Lactating</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.lactatingQty ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.lactatingQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Dry Females</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.dryQty ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.dryQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Young Stock</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.youngQty ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.youngQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Replacements</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.replacementQty ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.replacementQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Sick / Isolated</label>
+                        <input type="number" min="0" value={activeHerdRecord.inventory?.sickQty ?? 0} onChange={(e) => {
+                          const inv = { ...(activeHerdRecord.inventory || {}) }; inv.sickQty = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, inventory: inv as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               {herdFormStep === 1 && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-gray-600 mb-1">Exposed Females</label>
-                    <input type="number" value={activeHerdRecord.reproductive?.exposed ?? 0} onChange={(e) => {
-                      const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.exposed = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
-                    }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+                <div className="space-y-4 font-sans">
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      ❤️ Herd Conception & Breeding Success
+                    </span>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-gray-600 mb-1">Exposed Females</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.exposed ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; 
+                          rep.exposed = Number(e.target.value) || 0; 
+                          rep.conceptionRate = Number(((rep.conceived / (rep.exposed || 1)) * 100).toFixed(1));
+                          setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1">Conceived Females</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.conceived ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; 
+                          rep.conceived = Number(e.target.value) || 0; 
+                          rep.conceptionRate = Number(((rep.conceived / (rep.exposed || 1)) * 100).toFixed(1));
+                          setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-1">Conception Rate (computed)</label>
+                        <input type="text" disabled readOnly value={activeHerdRecord.reproductive?.conceptionRate ? `${activeHerdRecord.reproductive.conceptionRate}%` : '0%'} className="w-full bg-stone-100 border border-[#e3dec9] rounded-lg p-2 text-xs font-bold font-mono text-[#5a5a40]" />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Conceived Females</label>
-                    <input type="number" value={activeHerdRecord.reproductive?.conceived ?? 0} onChange={(e) => {
-                      const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.conceived = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
-                    }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Live Births (Singles)</label>
-                    <input type="number" value={activeHerdRecord.reproductive?.singles ?? 0} onChange={(e) => {
-                      const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.singles = Number(e.target.value) || 0; rep.births = (rep.singles || 0) + (rep.twins || 0)*2; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
-                    }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-600 mb-1">Twins</label>
-                    <input type="number" value={activeHerdRecord.reproductive?.twins ?? 0} onChange={(e) => {
-                      const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.twins = Number(e.target.value) || 0; rep.births = (rep.singles || 0) + (rep.twins || 0)*2; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
-                    }} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs" />
+
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      🍼 Herd-Wide Calving, Parturition & Loss Registry
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Live Births (Singles)</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.singles ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; 
+                          rep.singles = Number(e.target.value) || 0; 
+                          rep.births = rep.singles + (rep.twins || 0) * 2 + (rep.triplets || 0) * 3; 
+                          setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Twins</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.twins ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; 
+                          rep.twins = Number(e.target.value) || 0; 
+                          rep.births = (rep.singles || 0) + rep.twins * 2 + (rep.triplets || 0) * 3; 
+                          setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Triplets</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.triplets ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; 
+                          rep.triplets = Number(e.target.value) || 0; 
+                          rep.births = (rep.singles || 0) + (rep.twins || 0) * 2 + rep.triplets * 3; 
+                          setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Total Born (calculated)</label>
+                        <input type="text" disabled readOnly value={activeHerdRecord.reproductive?.births ?? 0} className="w-full bg-stone-100 border border-[#e3dec9] rounded p-1 text-xs font-mono font-bold text-center" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Abortions</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.abortions ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.abortions = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Stillbirths</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.stillbirths ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.stillbirths = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-500 mb-0.5">Mortality at Birth</label>
+                        <input type="number" min="0" value={activeHerdRecord.reproductive?.mortalityAtBirth ?? 0} onChange={(e) => {
+                          const rep = { ...(activeHerdRecord.reproductive || {}) }; rep.mortalityAtBirth = Number(e.target.value) || 0; setActiveHerdRecord({ ...activeHerdRecord, reproductive: rep as any });
+                        }} className="w-full bg-white border border-[#e3dec9] rounded p-1 text-xs" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               {herdFormStep === 2 && (
+                <div className="space-y-4 font-sans">
+                  <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-[#5a5a40] tracking-wider block border-b border-[#f4f1e9] pb-1.5">
+                      🥛 Add New Monthly Performance Entry
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-gray-600 mb-0.5 font-semibold">Month</label>
+                        <input type="month" value={monthlyProdMonth} onChange={(e) => setMonthlyProdMonth(e.target.value)} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-0.5 font-semibold">Animals Milked</label>
+                        <input type="number" min="0" placeholder="e.g. 15" value={monthlyProdMilked || ''} onChange={(e) => setMonthlyProdMilked(Number(e.target.value) || 0)} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-0.5 font-semibold">Total Milk Volume (L/month)</label>
+                        <input type="number" min="0" placeholder="e.g. 4500" value={monthlyProdMilkVolume || ''} onChange={(e) => setMonthlyProdMilkVolume(Number(e.target.value) || 0)} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-0.5 font-semibold">Meat Start Avg Weight (kg)</label>
+                        <input type="number" min="0" placeholder="e.g. 250" value={monthlyProdMeatStart || ''} onChange={(e) => setMonthlyProdMeatStart(Number(e.target.value) || 0)} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 mb-0.5 font-semibold">Meat End Avg Weight (kg)</label>
+                        <input type="number" min="0" placeholder="e.g. 280" value={monthlyProdMeatEnd || ''} onChange={(e) => setMonthlyProdMeatEnd(Number(e.target.value) || 0)} className="w-full bg-white border border-[#e3dec9] rounded-lg p-2 text-xs focus:ring-1 focus:ring-[#5a5a40]" />
+                      </div>
+                      <div className="flex items-end">
+                        <button type="button" onClick={addHerdMonthlyProduction} className="w-full bg-[#5a5a40] text-white py-2 rounded-lg text-xs font-bold cursor-pointer hover:bg-[#3e3e2b] transition-all">
+                          + Add Production Entry
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-[#e3dec9] rounded-xl p-3 space-y-2">
+                    <span className="font-bold text-[#5a5a40] text-xs block border-b border-[#f4f1e9] pb-1.5">
+                      📅 Month-on-Month Production Register List
+                    </span>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[500px] text-left text-[11px]">
+                        <thead className="bg-[#fafbf9] border-b border-[#e3dec9]">
+                          <tr>
+                            <th className="p-2 font-extrabold text-stone-600">Month</th>
+                            <th className="p-2 font-extrabold text-stone-600">Milked</th>
+                            <th className="p-2 font-extrabold text-stone-600">Total Milk (L)</th>
+                            <th className="p-2 font-extrabold text-stone-600">Avg L/Day</th>
+                            <th className="p-2 font-extrabold text-stone-600">Weight Start/End</th>
+                            <th className="p-2 font-extrabold text-stone-600">Est. ADG (kg)</th>
+                            <th className="p-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {!activeHerdRecord.monthlyProduction || activeHerdRecord.monthlyProduction.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="p-4 text-center text-stone-400 font-semibold italic">No monthly production entries added yet</td>
+                            </tr>
+                          ) : (
+                            activeHerdRecord.monthlyProduction.map((mp, i) => (
+                              <tr key={mp.id || i} className="border-b hover:bg-stone-50/50">
+                                <td className="p-2 font-bold font-mono">{mp.month}</td>
+                                <td className="p-2">{mp.animalsMilked} head</td>
+                                <td className="p-2 font-bold">{mp.totalMilkVolume} L</td>
+                                <td className="p-2 font-semibold text-emerald-700">{mp.averageMilkPerDay} L/day</td>
+                                <td className="p-2 font-mono text-stone-600">{mp.meatStartingWeight} / {mp.meatEndingWeight} kg</td>
+                                <td className="p-2 font-bold text-indigo-700">+{mp.meatAdg} kg/day</td>
+                                <td className="p-2 text-right">
+                                  <button type="button" onClick={() => removeHerdMonthlyProduction(i)} className="text-red-500 hover:text-red-700 font-bold bg-transparent border-none cursor-pointer">✕</button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {herdFormStep === 3 && (
                 <div className="space-y-3 font-mono">
                   <div className="bg-[#fafbf9] p-3 rounded-xl border border-stone-150 space-y-2">
                     <div className="flex justify-between items-center bg-transparent">
@@ -3967,10 +4154,10 @@ export default function LivestockManagement({
               <button type="button" onClick={() => setShowHerdRecordModal(false)} className="cursor-pointer bg-neutral-100 text-gray-600 py-2 px-4 rounded-xl text-xs border-none font-semibold">Cancel</button>
               <div className="flex flex-wrap gap-2">
                 {herdFormStep > 0 && <button type="button" onClick={() => setHerdFormStep(herdFormStep - 1)} className="cursor-pointer bg-neutral-100 py-2 px-4 rounded-xl text-xs border-none font-semibold">Back</button>}
-                {herdFormStep < 2 && (
+                {herdFormStep < 3 && (
                   <button type="button" onClick={() => setHerdFormStep(herdFormStep + 1)} className="cursor-pointer bg-[#5a5a40] text-white py-2 px-4 rounded-xl text-xs border-none font-semibold shadow-xs hover:bg-[#3e3e2b] active:scale-95 transition-all">Next</button>
                 )}
-                {herdFormStep >= 1 && (
+                {herdFormStep >= 2 && (
                   <button
                     type="button"
                     onClick={(e) => handlePublishHerdConfirm(e)}

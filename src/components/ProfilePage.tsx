@@ -4,6 +4,8 @@ import { AuthService, PromotionalAdsService, LocationService } from '../lib/stor
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, User, MapPin, Mail, Sparkles, AlertTriangle, Trash2, Camera, RefreshCw, Megaphone, ChevronRight } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
+import { InteractiveClinicMap } from './InteractiveClinicMap';
+
 
 
 interface ProfileProps {
@@ -34,6 +36,13 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   const [facilities, setFacilities] = useState<string>(currentUser.facilities || '');
   const [address, setAddress] = useState<string>(currentUser.address || '');
   const [doctorCity, setDoctorCity] = useState<string>(currentUser.address || 'Islamabad');
+  const [latitudeStr, setLatitudeStr] = useState<string>(currentUser.location?.lat ? String(currentUser.location.lat) : '');
+  const [longitudeStr, setLongitudeStr] = useState<string>(currentUser.location?.lng ? String(currentUser.location.lng) : '');
+
+  const [mapPickerOpen, setMapPickerOpen] = useState<boolean>(false);
+  const [tempLat, setTempLat] = useState<number | null>(currentUser.location?.lat || null);
+  const [tempLng, setTempLng] = useState<number | null>(currentUser.location?.lng || null);
+  const [tempAddress, setTempAddress] = useState<string>(currentUser.location?.address || '');
 
   // Photo uploads
   const [profilePic, setProfilePic] = useState<string>(currentUser.profilePic || 'default');
@@ -344,6 +353,64 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
     reader.readAsDataURL(file);
   };
 
+  const handleGetGpsLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser. Please enter coordinates manually.");
+      return;
+    }
+
+    setLocationLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const latVal = latitude;
+          const lngVal = longitude;
+          
+          setLatitudeStr(String(latVal));
+          setLongitudeStr(String(lngVal));
+
+          const updatedLocation = {
+            lat: latVal,
+            lng: lngVal,
+            address: address.trim() || currentUser.address || 'Clinic GPS Coordinate Location'
+          };
+
+          const updatedUser = await AuthService.updateProfile(currentUser.uid, {
+            location: updatedLocation
+          });
+          onUpdateUser(updatedUser);
+
+          triggerSuccess(`📍 Location saved successfully with maximum accuracy! Precise GPS coordinates: Lat ${latVal.toFixed(6)}, Lng ${lngVal.toFixed(6)}.`);
+        } catch (err: any) {
+          setError(err.message || 'Failed to save acquired GPS coordinates.');
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (geoError) => {
+        let msg = "Failed to acquire location. Please ensure you allow location permission when prompted.";
+        if (geoError.code === geoError.PERMISSION_DENIED) {
+          msg = "Location permission was denied. Because this app runs inside an iframe preview, browsers often block location access. Please click the 'Open in new tab' button at the top-right of the screen to give direct permission, or type the coordinates manually below!";
+        } else if (geoError.code === geoError.POSITION_UNAVAILABLE) {
+          msg = "Position unavailable. Please try again or enter coordinates manually below.";
+        } else if (geoError.code === geoError.TIMEOUT) {
+          msg = "Location request timed out. Please try again or enter coordinates manually.";
+        }
+        setError(msg);
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
   const handleProfileSave = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -389,14 +456,17 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
           return;
         }
 
-        // Prefer keeping existing saved precise coordinates unless address changed
-        if (currentUser.address !== payload.address || !currentUser.location?.lat) {
-          const coords = LocationService.resolveCoordinates(payload.address, currentUser.uid);
+        const selectedLat = parseFloat(latitudeStr);
+        const selectedLng = parseFloat(longitudeStr);
+
+        if (!isNaN(selectedLat) && !isNaN(selectedLng)) {
           payload.location = {
-            lat: coords.lat,
-            lng: coords.lng,
-            address: coords.address
+            lat: selectedLat,
+            lng: selectedLng,
+            address: payload.address
           };
+        } else {
+          payload.location = null;
         }
       }
 
@@ -574,6 +644,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                       setFacilities(currentUser.facilities || '');
                       setAddress(currentUser.address || '');
                       setDoctorCity(currentUser.address || 'Islamabad');
+                      setLatitudeStr(currentUser.location?.lat ? String(currentUser.location.lat) : '');
+                      setLongitudeStr(currentUser.location?.lng ? String(currentUser.location.lng) : '');
                       setError(null);
                     }}
                     className="btn-tactile-3d-secondary py-2 px-4 text-2xs"
@@ -707,7 +779,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
 
                 {/* CONDITIONAL: Clinic Details */}
                 {currentUser.role === 'clinic' && (
-                  <div className="grid grid-cols-1 gap-4 bg-[#fcf9f2] p-5 rounded-2xl border border-[#e3dec9] border-b-[3px] space-y-1">
+                  <div className="grid grid-cols-1 gap-4 bg-[#fcf9f2] p-5 rounded-2xl border border-[#e3dec9] border-b-[3px] space-y-3">
                     <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wide block">Hospital Specifications</span>
                     
                     <div className="space-y-1">
@@ -731,6 +803,49 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                         onChange={(e) => setAddress(e.target.value)}
                         disabled={loading}
                       />
+                    </div>
+
+                    <div className="pt-3 border-t border-[#e3dec9]/40 space-y-3">
+                      <span className="text-xs font-bold text-[#373735] block">📍 Precise Google Maps Pinpoint Location</span>
+                      
+                      {latitudeStr && longitudeStr ? (
+                        <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wider block">Currently Pinpointed Location</span>
+                            <span className="text-xs font-mono font-bold text-emerald-900 block bg-white px-2.5 py-1.5 rounded-lg border border-emerald-100 shadow-2xs">
+                              Lat: {parseFloat(latitudeStr).toFixed(6)}, Lng: {parseFloat(longitudeStr).toFixed(6)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTempLat(parseFloat(latitudeStr) || 33.6844);
+                              setTempLng(parseFloat(longitudeStr) || 73.0479);
+                              setMapPickerOpen(true);
+                            }}
+                            className="cursor-pointer border border-emerald-300 border-b-[3px] border-b-emerald-800 bg-emerald-100 hover:bg-emerald-150 text-emerald-950 text-2xs font-extrabold py-2 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+                          >
+                            🗺️ Change Location Pin
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-stone-50 border border-[#e3dec9] rounded-2xl p-5 text-center space-y-3 shadow-inner">
+                          <p className="text-2xs text-[#7a766f] font-semibold leading-relaxed max-w-md mx-auto">
+                            No map location is currently saved. Add your clinic's precise location pinpoint on Google Maps so pet owners and veterinary doctors can navigate directly to your facility!
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTempLat(33.6844); // default Islamabad
+                              setTempLng(73.0479);
+                              setMapPickerOpen(true);
+                            }}
+                            className="cursor-pointer border border-[#cdc6ad] border-b-[3px] border-b-amber-900 bg-amber-150 hover:bg-amber-200 text-amber-950 font-black px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 mx-auto transition-all shadow-sm"
+                          >
+                            📍 Add Exact Map Pinpoint Location
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -905,6 +1020,36 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                       <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">Hospital Physical Address</span>
                       <span className="text-xs font-extrabold text-[#373735]">{currentUser.address || 'No Address Saved'}</span>
                     </div>
+
+                    {currentUser.location?.lat && currentUser.location?.lng && (
+                      <div className="space-y-3">
+                        <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200/60 flex items-center justify-between gap-3.5">
+                          <div className="space-y-0.5">
+                            <span className="text-[9px] font-black uppercase text-emerald-800 block tracking-wider leading-none mb-1">📍 Saved GPS Location</span>
+                            <span className="text-xs font-mono font-bold text-emerald-900 block">
+                              Lat: {currentUser.location.lat.toFixed(6)}, Lng: {currentUser.location.lng.toFixed(6)}
+                            </span>
+                          </div>
+                          <a
+                            href={`https://www.google.com/maps?q=${currentUser.location.lat},${currentUser.location.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="cursor-pointer border border-emerald-300 border-b-[3px] border-b-emerald-800 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-2xs font-extrabold py-1.5 px-3 rounded-xl transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+                          >
+                            🗺️ Show on Google Maps
+                          </a>
+                        </div>
+
+                        {/* Live Google Map preview */}
+                        <div className="border border-[#e3dec9] rounded-2xl overflow-hidden shadow-sm bg-white">
+                          <InteractiveClinicMap
+                            lat={currentUser.location.lat}
+                            lng={currentUser.location.lng}
+                            interactive={false}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1111,6 +1256,115 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Google Maps Pinpoint Selection Modal */}
+      <AnimatePresence>
+        {mapPickerOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#fcfaf2] rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-left"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-[#e3dec9]/60 flex items-center justify-between bg-stone-50">
+                <div>
+                  <h3 className="font-serif font-black text-lg text-[#373735] flex items-center gap-2">
+                    <span>🗺️ Pinpoint Clinic on Google Maps</span>
+                  </h3>
+                  <p className="text-[11px] text-[#7a766f] font-semibold mt-0.5">
+                    Search your clinical area or tap/click directly on the map to add your marker.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMapPickerOpen(false)}
+                  className="p-1 px-2.5 rounded-full hover:bg-stone-100 transition-all cursor-pointer border text-stone-500 font-bold bg-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Map Canvas & Controls */}
+              <div className="p-5 flex-1 overflow-y-auto space-y-4">
+                <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200/50 text-[11px] font-semibold text-stone-700 leading-relaxed flex items-center gap-2">
+                  <span className="text-amber-800 text-sm animate-bounce shrink-0">📍</span>
+                  <span>
+                    <strong>Instruction:</strong> Tap or click anywhere on the Google Map grid below to place your precise pinpoint marker. You can also search your neighborhood first.
+                  </span>
+                </div>
+
+                <div className="h-[320px] rounded-2xl overflow-hidden border border-[#e3dec9]">
+                  <InteractiveClinicMap
+                    lat={tempLat || undefined}
+                    lng={tempLng || undefined}
+                    cityName={address || 'Islamabad'}
+                    interactive={true}
+                    onLocationSelect={(latVal, lngVal, resolvedAddr) => {
+                      setTempLat(latVal);
+                      setTempLng(lngVal);
+                      if (resolvedAddr) {
+                        setTempAddress(resolvedAddr);
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Selected coordinates preview */}
+                <div className="bg-white p-3.5 rounded-2xl border border-[#e3dec9] grid grid-cols-1 sm:grid-cols-2 gap-3.5 shadow-inner">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-[#a49f92] block tracking-wider">Tapped Coordinates</span>
+                    <span className="text-xs font-mono font-bold text-stone-700 block">
+                      {tempLat && tempLng ? (
+                        <>Lat: {tempLat.toFixed(6)}, Lng: {tempLng.toFixed(6)}</>
+                      ) : (
+                        <em className="text-stone-400">No pinpoint placed yet</em>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-[#a49f92] block tracking-wider">Resolved Address Info</span>
+                    <span className="text-xs font-bold text-[#5a5a40] block truncate">
+                      {tempAddress || address || 'No address details yet'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="p-5 border-t border-[#e3dec9]/60 bg-stone-50 flex gap-3">
+                <button
+                  type="button"
+                  disabled={!tempLat || !tempLng}
+                  onClick={() => {
+                    if (tempLat && tempLng) {
+                      setLatitudeStr(String(tempLat));
+                      setLongitudeStr(String(tempLng));
+                      if (tempAddress) {
+                        setAddress(tempAddress);
+                      }
+                      setMapPickerOpen(false);
+                    }
+                  }}
+                  className="flex-grow flex-1 cursor-pointer border border-[#cdc6ad] border-b-[3px] border-b-emerald-900 bg-emerald-700 hover:bg-emerald-800 disabled:bg-stone-200 disabled:border-stone-300 disabled:text-stone-400 text-white text-xs font-extrabold py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <span>Confirm & Use This Location</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMapPickerOpen(false)}
+                  className="btn-tactile-3d-secondary py-2.5 px-5 text-xs font-bold shrink-0 bg-white"
+                >
+                  Cancel
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

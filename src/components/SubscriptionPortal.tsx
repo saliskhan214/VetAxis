@@ -5,7 +5,7 @@ import {
   AlertTriangle, Award, Check, Zap, ShieldAlert, ArrowRight, X, Loader2
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { AuthService, PromotionalAdsService, PaymentService } from '../lib/storage';
+import { AuthService, PromotionalAdsService, PaymentService, secureSetItem } from '../lib/storage';
 import { LivestockService } from '../lib/livestockService';
 
 interface SubscriptionPortalProps {
@@ -101,6 +101,7 @@ export function SubscriptionPortal({
 
   // Real-time ticking state for dynamic interactive countdown live updating
   const [nowState, setNowState] = useState<number>(Date.now());
+  const [portalMessage, setPortalMessage] = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -168,9 +169,15 @@ export function SubscriptionPortal({
       });
       onUpdateUser(updated);
       setCancelModalOpen(false);
-      alert('Your subscription has been cancelled successfully. You were downgraded as veterinary practitioner.');
+      setPortalMessage({
+        text: 'Your subscription has been cancelled successfully. You were downgraded to standard practitioner status.',
+        type: 'warning'
+      });
     } catch (err: any) {
-      alert('Cancellation failed: ' + err.message);
+      setPortalMessage({
+        text: 'Cancellation failed: ' + err.message,
+        type: 'error'
+      });
     } finally {
       setCancelLoading(false);
     }
@@ -237,6 +244,28 @@ export function SubscriptionPortal({
         </button>
       </div>
 
+      {/* PORTAL NOTIFICATION BANNER */}
+      {portalMessage && (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 shadow-sm animate-fadeIn ${
+          portalMessage.type === 'success' ? 'bg-[#f0fdf4] border-[#bbf7d0] text-[#166534]' :
+          portalMessage.type === 'warning' ? 'bg-[#fffbeb] border-[#fde68a] text-[#92400e]' :
+          'bg-[#fef2f2] border-[#fecaca] text-[#991b1b]'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-lg">
+              {portalMessage.type === 'success' ? '✅' : portalMessage.type === 'warning' ? '⚠️' : '❌'}
+            </span>
+            <p className="text-xs font-bold uppercase tracking-wider leading-tight">{portalMessage.text}</p>
+          </div>
+          <button 
+            onClick={() => setPortalMessage(null)}
+            className="text-xs font-black text-[#5a5a40] hover:text-black border-none bg-transparent cursor-pointer"
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
+
       {/* ACTIVE SUBSCRIPTION OVERVIEW MODULE */}
       {isPremium ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -296,7 +325,33 @@ export function SubscriptionPortal({
               <div className="text-[11px] text-neutral-400 font-semibold">
                 Your card on file will automatically renew the monthly cycle.
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                {currentUser.email?.toLowerCase().trim() === 'saliskhan214@gmail.com' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newExpiry = Date.now() + 5 * 60 * 1000;
+                      localStorage.setItem('va_salis_sub_expires', newExpiry.toString());
+                      
+                      // Inject local override immediately for this session
+                      const updated: UserProfile = {
+                        ...currentUser,
+                        subscriptionTier: 'Platinum',
+                        subscriptionExpiresAt: newExpiry,
+                        isVerified: true
+                      };
+                      onUpdateUser(updated);
+                      secureSetItem('va_session', JSON.stringify(updated));
+                      setPortalMessage({
+                        text: '🔄 5-Minute Platinum Trial has been successfully reset! Watch the countdown below.',
+                        type: 'success'
+                      });
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-purple-950 to-indigo-950 hover:from-purple-900 hover:to-indigo-900 border border-purple-500 text-xs font-black uppercase text-purple-200 tracking-wider rounded-xl transition-all cursor-pointer"
+                  >
+                    🔄 Reset 5-Min Trial
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -372,7 +427,14 @@ export function SubscriptionPortal({
               <span className="font-extrabold text-black block mb-1">Clinic Verifications:</span>
               <div className="flex items-center justify-between">
                 <span>Verification State</span>
-                <span className="text-[#1b7c31] font-bold uppercase">Verified Gold</span>
+                <span className={`font-bold uppercase ${
+                  currentUser.subscriptionTier === 'Silver' ? 'text-slate-500' :
+                  currentUser.subscriptionTier === 'Gold' ? 'text-amber-600' :
+                  currentUser.subscriptionTier === 'Platinum' ? 'text-purple-600' :
+                  'text-neutral-500'
+                }`}>
+                  {currentUser.subscriptionTier ? `Verified ${currentUser.subscriptionTier}` : 'Standard Profile'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Lease Cycle Type</span>

@@ -1,6 +1,6 @@
 {
   "name": "VetAxis 360",
   "description": "Pakistan's premium veterinary clinical community platform. Connect with qualified doctors, general hospitals, nurse assistant directories, and certified marketplace products.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

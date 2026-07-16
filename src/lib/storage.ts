@@ -26,6 +26,7 @@ import {
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd, ManualPayment } from '../types';
+import bcrypt from 'bcryptjs';
 
 // ─────────────────────────────────────────────────────────────────
 // MOCK FALLBACK DATABASE ACTIONS (LocalStorage)
@@ -39,13 +40,62 @@ const LOCAL_JOBS_KEY = 'va_job_posts';
 const LOCAL_APPLICATIONS_KEY = 'va_job_applications';
 const LOCAL_NOTIFICATIONS_KEY = 'va_notifications';
 
+function encryptPII(value: string): string {
+  try {
+    const raw = encodeURIComponent(value);
+    let result = '';
+    for (let i = 0; i < raw.length; i++) {
+      result += String.fromCharCode(raw.charCodeAt(i) ^ 0x4B); // XOR with key 75
+    }
+    return btoa(result);
+  } catch {
+    return value;
+  }
+}
+
+function decryptPII(value: string): string {
+  try {
+    const raw = atob(value);
+    let result = '';
+    for (let i = 0; i < raw.length; i++) {
+      result += String.fromCharCode(raw.charCodeAt(i) ^ 0x4B);
+    }
+    return decodeURIComponent(result);
+  } catch {
+    return value;
+  }
+}
+
+export function secureSetItem(key: string, value: string) {
+  try {
+    const encrypted = encryptPII(value);
+    localStorage.setItem(key, encrypted);
+  } catch {
+    localStorage.setItem(key, value);
+  }
+}
+
+export function secureGetItem(key: string): string | null {
+  const value = localStorage.getItem(key);
+  if (!value) return null;
+  try {
+    const decrypted = decryptPII(value);
+    if (decrypted && (decrypted.startsWith('{') || decrypted.startsWith('[') || decrypted === 'null')) {
+      return decrypted;
+    }
+    return value;
+  } catch {
+    return value;
+  }
+}
+
 export function injectPresence(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
 
   // Get active session UID
   let activeUid: string | null = null;
   try {
-    const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+    const raw = secureGetItem(LOCAL_SESSION_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.uid) {
@@ -81,7 +131,8 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
 
 function getLocalUsers(): UserProfile[] {
   try {
-    const list = JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || '[]');
+    const raw = secureGetItem(LOCAL_USERS_KEY);
+    const list = JSON.parse(raw || '[]');
     return list.map((u: any) => injectPresence(injectTemporaryPlatinum(u)) as UserProfile);
   } catch {
     return [];
@@ -90,43 +141,57 @@ function getLocalUsers(): UserProfile[] {
 
 function saveLocalUsers(list: UserProfile[]) {
   const mapped = list.map(u => injectPresence(injectTemporaryPlatinum(u)) as UserProfile);
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(mapped));
+  secureSetItem(LOCAL_USERS_KEY, JSON.stringify(mapped));
 }
 
 export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile | null {
   if (user && user.email) {
     const emailLower = user.email.toLowerCase().trim();
     if (emailLower === 'saliskhan214@gmail.com') {
-      user.subscriptionTier = 'Platinum';
-      user.isVerified = true;
-
       // Use a single stable localStorage key for Salis's subscription expiration
       let expiresStr = localStorage.getItem('va_salis_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
-      if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs) {
-        expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      if (!expiresMs || isNaN(expiresMs)) {
+        expiresMs = Date.now() + 5 * 60 * 1000; // 5-minute premium trial for testing auto-revert!
         localStorage.setItem('va_salis_sub_expires', expiresMs.toString());
       }
       
-      // Always enforce this stable expiration for Salis's temporary platinum/gold tier
-      if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now()) {
+      // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
+      if (Date.now() > expiresMs) {
+        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now()) {
+          // Keep active manual subscription tier and expiration
+        } else {
+          user.subscriptionTier = undefined;
+          user.subscriptionExpiresAt = undefined;
+        }
+      } else {
+        // Still within active trial period - FORCE Platinum so both home feed card and portal are Platinum
+        user.subscriptionTier = 'Platinum';
+        user.isVerified = true;
         user.subscriptionExpiresAt = expiresMs;
       }
     } else if (emailLower === 'bunnykhan329@gmail.com') {
-      user.subscriptionTier = 'Silver';
-      user.isVerified = true;
-
       let expiresStr = localStorage.getItem('va_bunny_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
-      // Enforce 1 month duration (30 days) and overwrite any old 365-day values
-      if (!expiresMs || isNaN(expiresMs) || Date.now() > expiresMs || expiresMs > Date.now() + 31 * 24 * 60 * 60 * 1000) {
+      if (!expiresMs || isNaN(expiresMs)) {
         expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
         localStorage.setItem('va_bunny_sub_expires', expiresMs.toString());
       }
       
-      if (!user.subscriptionExpiresAt || user.subscriptionExpiresAt < Date.now() || user.subscriptionExpiresAt > expiresMs) {
+      // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
+      if (Date.now() > expiresMs) {
+        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now()) {
+          // Keep active manual subscription tier and expiration
+        } else {
+          user.subscriptionTier = undefined;
+          user.subscriptionExpiresAt = undefined;
+        }
+      } else {
+        // Still within active trial period - FORCE Silver
+        user.subscriptionTier = 'Silver';
+        user.isVerified = true;
         user.subscriptionExpiresAt = expiresMs;
       }
     }
@@ -135,13 +200,31 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
     if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() + 30 * 24 * 60 * 60 * 1000) {
       user.subscriptionExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
     }
+
+    // General auto-expiry check for ALL users:
+    if (user.subscriptionExpiresAt && Date.now() > user.subscriptionExpiresAt) {
+      user.subscriptionTier = undefined;
+      user.subscriptionExpiresAt = undefined;
+      user.isVerified = false;
+      
+      // Asynchronously trigger Firestore update to clear it in the cloud!
+      if (isFirebaseConfigured && db && user.uid) {
+        const userId = user.uid;
+        updateDoc(doc(db, 'users', userId), {
+          subscriptionTier: null as any,
+          subscriptionExpiresAt: null as any,
+          isVerified: false
+        }).catch(err => console.error("Failed to auto-downgrade expired user in DB:", err));
+      }
+    }
   }
   return user;
 }
 
 export function getLocalSession(): UserProfile | null {
   try {
-    const u = JSON.parse(localStorage.getItem(LOCAL_SESSION_KEY) || 'null');
+    const raw = secureGetItem(LOCAL_SESSION_KEY);
+    const u = JSON.parse(raw || 'null');
     return injectPresence(injectTemporaryPlatinum(u));
   } catch {
     return null;
@@ -151,7 +234,7 @@ export function getLocalSession(): UserProfile | null {
 function saveLocalSession(user: UserProfile | null) {
   const finalUser = injectPresence(injectTemporaryPlatinum(user));
   if (finalUser) {
-    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(finalUser));
+    secureSetItem(LOCAL_SESSION_KEY, JSON.stringify(finalUser));
   } else {
     localStorage.removeItem(LOCAL_SESSION_KEY);
   }
@@ -480,10 +563,11 @@ export const AuthService = {
       const snap = await getDocs(collection(db, 'users'));
       return snap.docs.map(doc => {
         const data = doc.data() as UserProfile;
-        return {
+        const u = {
           ...data,
           uid: data.uid || doc.id
         };
+        return injectTemporaryPlatinum(u) as UserProfile;
       });
     } catch (err) {
       console.error('Error fetching all users:', err);
@@ -577,8 +661,8 @@ export const AuthService = {
         reviews: []
       };
 
-      // Also support mock password matching
-      (profile as any)._password = password;
+      // Support secure bcrypt password hashing
+      (profile as any)._password = bcrypt.hashSync(password, 10);
 
       users.push(profile);
       saveLocalUsers(users);
@@ -615,7 +699,26 @@ export const AuthService = {
       // Local Fallback Sign In
       const users = getLocalUsers();
       const user = users.find(u => u.email === emailLower);
-      if (!user || (user as any)._password !== password) {
+      if (!user) {
+        throw new Error('Incorrect email address or password.');
+      }
+
+      const savedPw = (user as any)._password || '';
+      let isMatch = false;
+      if (savedPw.startsWith('$2a$') || savedPw.startsWith('$2b$')) {
+        // bcrypt hash
+        isMatch = bcrypt.compareSync(password, savedPw);
+      } else {
+        // plaintext legacy check
+        isMatch = savedPw === password;
+        if (isMatch) {
+          // Upgrade legacy plaintext password to secure bcrypt hash
+          (user as any)._password = bcrypt.hashSync(password, 10);
+          saveLocalUsers(users);
+        }
+      }
+
+      if (!isMatch) {
         throw new Error('Incorrect email address or password.');
       }
 
@@ -678,7 +781,7 @@ export const AuthService = {
       const users = getLocalUsers();
       const idx = users.findIndex(u => u.email === session.email);
       if (idx !== -1) {
-        (users[idx] as any)._password = newPw;
+        (users[idx] as any)._password = bcrypt.hashSync(newPw, 10);
         saveLocalUsers(users);
       }
     }
@@ -695,7 +798,7 @@ export const AuthService = {
       // Local fallback
       const session = getLocalSession();
       if (!session) throw new Error('No active login session.');
-      console.log('Mocked resent verification email for', session.email);
+      console.log('Mocked resent verification email for', session.email ? session.email.replace(/(.{2})(.*)(@.*)/, '$1***$3') : '[REDACTED]');
     }
   },
 
@@ -1732,7 +1835,8 @@ export const PetAdsService = {
             });
           }
         } catch (notifErr) {
-          console.error(`Failed to send ad expiry notification to ${ad.ownerEmail}:`, notifErr);
+          const maskedEmail = ad.ownerEmail ? ad.ownerEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3') : '[REDACTED]';
+          console.error(`Failed to send ad expiry notification to ${maskedEmail}:`, notifErr);
         }
       }
     }
@@ -1865,7 +1969,8 @@ export const MarketplaceService = {
             });
           }
         } catch (notifErr) {
-          console.error(`Failed to send product expiry notification to ${p.ownerEmail}:`, notifErr);
+          const maskedEmail = p.ownerEmail ? p.ownerEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3') : '[REDACTED]';
+          console.error(`Failed to send product expiry notification to ${maskedEmail}:`, notifErr);
         }
       }
     }

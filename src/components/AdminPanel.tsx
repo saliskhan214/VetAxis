@@ -13,6 +13,32 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [promotionalAds, setPromotionalAds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [nowState, setNowState] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowState(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCountdown = (expiryTime: number, now: number) => {
+    const diffTime = expiryTime - now;
+    if (diffTime <= 0) return 'Expired';
+    
+    const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffTime / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((diffTime / (1000 * 60)) % 60);
+    const seconds = Math.floor((diffTime / 1000) % 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
+    parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
+  };
   
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -350,6 +376,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                 <th className="p-3 text-left">Name</th>
                 <th className="p-3 text-left">Email</th>
                 <th className="p-3 text-left">Current Tier</th>
+                <th className="p-3 text-left">Time Remaining</th>
                 <th className="p-3 text-left">Actions</th>
               </tr>
             </thead>
@@ -376,6 +403,21 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                         </span>
                       ) : (
                         <span className="text-xs font-semibold text-stone-400">None</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-xs font-mono font-bold text-stone-700">
+                      {u.subscriptionExpiresAt ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border ${
+                          u.subscriptionExpiresAt - nowState < 24 * 60 * 60 * 1000 
+                            ? 'bg-red-50 text-red-600 border-red-200 animate-pulse'
+                            : u.subscriptionExpiresAt - nowState < 7 * 24 * 60 * 60 * 1000
+                            ? 'bg-amber-50 text-amber-600 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                        }`}>
+                          ⏱️ {formatCountdown(u.subscriptionExpiresAt, nowState)}
+                        </span>
+                      ) : (
+                        <span className="text-stone-300">—</span>
                       )}
                     </td>
                     <td className="p-3">

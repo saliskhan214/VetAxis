@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
-import { CommunityService, NotificationService, LocationService } from '../lib/storage';
+import { CommunityService, NotificationService, LocationService, secureGetItem } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import VeterinaryNewsBrief from './VeterinaryNewsBrief';
 import { BlogSection } from './BlogSection';
@@ -223,7 +223,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       const profileList = await CommunityService.fetchPosts(); // placeholder to trigger local load check or look at storage
       // In local mode, we extract users
       let users: UserProfile[] = [];
-      const cached = localStorage.getItem('va_users'); // LOCAL_USERS_KEY
+      const cached = secureGetItem('va_users'); // LOCAL_USERS_KEY
       if (cached) {
         users = JSON.parse(cached);
       } else {

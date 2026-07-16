@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, VetNotification } from './types';
-import { getLocalSession, AuthService, NotificationService, injectTemporaryPlatinum } from './lib/storage';
+import { getLocalSession, AuthService, NotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -300,7 +300,7 @@ export default function App() {
                 const profile = userSnap.data() as UserProfile;
                 const finalized = injectTemporaryPlatinum(profile);
                 setCurrentUser(finalized);
-                localStorage.setItem('va_session', JSON.stringify(finalized));
+                secureSetItem('va_session', JSON.stringify(finalized));
               } else {
                 setCurrentUser(null);
                 localStorage.removeItem('va_session');
@@ -425,22 +425,6 @@ export default function App() {
             handleLogout();
             return;
           }
-
-          // Real-time automatic monthly subscription expiration check
-          if (currentUser.subscriptionTier && currentUser.subscriptionExpiresAt) {
-            if (Date.now() > currentUser.subscriptionExpiresAt) {
-              console.warn("User premium tier subscription has expired. Auto-downgrading privileges.");
-              const updated = await AuthService.updateProfile(currentUser.uid, {
-                subscriptionTier: null as any,
-                subscriptionExpiresAt: null as any,
-                isVerified: false
-              });
-              if (active) {
-                setCurrentUser(updated);
-                alert(`⚠️ Your VetAxis Premium ${currentUser.subscriptionTier} plan subscription has expired (validity exceeded its monthly cycle). Premium privileges have been removed. Please go to Settings > Subscription Portal to renew.`);
-              }
-            }
-          }
         } catch (e) {
           console.error("Error validating stored session:", e);
         }
@@ -449,20 +433,79 @@ export default function App() {
 
     validateSession();
 
-    // Setup real-time poll clock checking every 30 seconds to efficiently check expiration without heavy overhead!
-    const pollId = setInterval(() => {
-      if (currentUser?.subscriptionTier && currentUser?.subscriptionExpiresAt) {
-        if (Date.now() > currentUser.subscriptionExpiresAt) {
-          validateSession();
-        }
-      }
-    }, 30000);
-
     return () => {
       active = false;
-      clearInterval(pollId);
     };
-  }, [currentUser?.uid, currentUser?.subscriptionExpiresAt, currentUser?.subscriptionTier, dbQuotaExceeded]);
+  }, [currentUser?.uid, dbQuotaExceeded]);
+
+  // Real-time precise monthly/trial subscription expiration checker
+  useEffect(() => {
+    if (!currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || dbQuotaExceeded) return;
+    
+    let active = true;
+    const checkExpiry = async () => {
+      if (Date.now() > currentUser.subscriptionExpiresAt) {
+        const expiredTier = currentUser.subscriptionTier;
+        console.warn(`[VetAxis] Active premium ${expiredTier} subscription has ended. Auto-downgrading.`);
+        
+        try {
+          // 1. Create a beautiful persistent system notification in the DB
+          const newNotif = await NotificationService.createNotification({
+            userId: currentUser.uid,
+            senderId: 'admin',
+            senderName: 'VetAxis System',
+            type: 'status_change',
+            targetId: 'expiry',
+            targetType: 'appointment',
+            message: `⚠️ Your VetAxis Premium ${expiredTier} plan subscription has expired (validity exceeded its monthly cycle). Premium privileges have been removed. Please go to Settings > Subscription Portal to renew.`,
+            read: false
+          });
+
+          // 2. Immediately push a high-contrast toast popup into the active session
+          const toastId = 'toast_expiry_' + Date.now();
+          setToasts(prev => [...prev, {
+            id: toastId,
+            message: `⚠️ Your VetAxis Premium ${expiredTier} plan subscription has expired. Premium privileges have been removed.`,
+            type: 'status_change',
+            notif: newNotif
+          }]);
+          
+          // Auto-remove toast after 10 seconds
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== toastId));
+          }, 10000);
+        } catch (e) {
+          console.error("Failed to create expiry notification/toast:", e);
+        }
+
+        try {
+          // 3. Update the database profile to downgrade
+          const updated = await AuthService.updateProfile(currentUser.uid, {
+            subscriptionTier: null as any,
+            subscriptionExpiresAt: null as any,
+            isVerified: false
+          });
+          
+          if (active) {
+            setCurrentUser(updated);
+          }
+        } catch (e) {
+          console.error("Failed to downgrade profile on expiry:", e);
+        }
+      }
+    };
+
+    // Check instantly on mount or tier update
+    checkExpiry();
+
+    // Check memory every 1000ms to catch the exact moment of expiry (e.g. for counting down trials)
+    const timerId = setInterval(checkExpiry, 1000);
+    
+    return () => {
+      active = false;
+      clearInterval(timerId);
+    };
+  }, [currentUser?.uid, currentUser?.subscriptionTier, currentUser?.subscriptionExpiresAt, dbQuotaExceeded]);
 
   // Real-time online presence heartbeat
   useEffect(() => {

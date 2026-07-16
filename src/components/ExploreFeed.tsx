@@ -1,10 +1,12 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
-import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService } from '../lib/storage';
+import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
+import { InteractiveClinicMap } from './InteractiveClinicMap';
+
 
 interface ExploreFeedProps {
   currentUser: UserProfile;
@@ -179,21 +181,9 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
 
     // Validate payment credentials or transaction ID if not free
     if (!isAdFree) {
-      if (adPaymentMethod === 'card') {
-        if (!adCardName.trim() || !adCardNumber.trim() || !adCardExpiry.trim() || !adCardCvv.trim()) {
-          setAdError('Please enter your card payment details to complete this purchase campaign.');
-          return;
-        }
-        const cleanNum = adCardNumber.replace(/\s+/g, '');
-        if (cleanNum.length < 15 || cleanNum.length > 16) {
-          setAdError('Invalid credit card number format for ad checkout. Must be 15 or 16 digits.');
-          return;
-        }
-      } else {
-        if (!adTransactionId.trim()) {
-          setAdError('Please enter the Transaction ID for your manual payment to submit this ad campaign.');
-          return;
-        }
+      if (!adTransactionId.trim()) {
+        setAdError('Please enter the Transaction ID for your manual payment to submit this ad campaign.');
+        return;
       }
     } else {
       // Re-verify they have credits
@@ -211,7 +201,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
       // Simulate network processing delay (ad registration & payment clearance)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const isApprovedImmediately = isAdFree || adPaymentMethod === 'card';
+      const isApprovedImmediately = isAdFree;
 
       await PromotionalAdsService.createAd({
         sponsorName: adSponsor,
@@ -227,8 +217,8 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         ownerRole: currentUser.role as 'doctor' | 'clinic',
         status: isApprovedImmediately ? 'approved' : 'pending',
         approved: isApprovedImmediately,
-        paymentMethod: isAdFree ? 'Free Promo Credit' : (adPaymentMethod === 'card' ? 'Card' : adManualMethod),
-        transactionId: isAdFree ? '' : (adPaymentMethod === 'card' ? 'CardPayment' : adTransactionId)
+        paymentMethod: isAdFree ? 'Free Promo Credit' : adManualMethod,
+        transactionId: isAdFree ? '' : adTransactionId
       }, durationDays, pricePaid);
 
       // If they used a free privilege, we MUST increment promoAdsUsed in database & local state!
@@ -295,7 +285,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     };
 
     onUpdateUser(updatedUser);
-    localStorage.setItem('va_session', JSON.stringify(updatedUser));
+    secureSetItem('va_session', JSON.stringify(updatedUser));
 
     setCityFilterActive(term);
     setSortBy(SORT_TYPES.NEAREST);
@@ -506,13 +496,14 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
       try {
         const freshUser = { ...currentUser, location: null };
         onUpdateUser(freshUser);
-        localStorage.setItem('va_session', JSON.stringify(freshUser));
+        secureSetItem('va_session', JSON.stringify(freshUser));
         
-        const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
+        const rawUsers = secureGetItem('va_users');
+        const localUsers = JSON.parse(rawUsers || '[]');
         const idx = localUsers.findIndex((u: any) => u.uid === currentUser.uid);
         if (idx !== -1) {
           localUsers[idx].location = null;
-          localStorage.setItem('va_users', JSON.stringify(localUsers));
+          secureSetItem('va_users', JSON.stringify(localUsers));
         }
       } catch (err) {
         console.error(err);
@@ -663,10 +654,10 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlideIdx}
-            initial={{ rotateY: 90, opacity: 0 }}
-            animate={{ rotateY: 0, opacity: 1 }}
-            exit={{ rotateY: -90, opacity: 0 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
+            initial={{ x: "100%", opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "-100%", opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
             style={{ 
               transformStyle: "preserve-3d", 
               backfaceVisibility: "hidden",
@@ -882,13 +873,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
             <button
               type="button"
               onClick={() => {
-                const nextVal = !showAdCreator;
-                setShowAdCreator(nextVal);
-                if (nextVal) {
-                  setTimeout(() => {
-                    adCreatorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }, 150);
-                }
+                setShowAdCreator(!showAdCreator);
               }}
               className={`btn-tactile-3d-secondary py-2.5 px-4 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 showAdCreator 
@@ -1177,145 +1162,50 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                 {adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && (
                   <div className="bg-[#f4f1e9]/65 p-5 rounded-2xl border border-[#e3dec9] space-y-4 text-left animate-fadeIn">
                     <div className="flex items-center justify-between border-b border-[#e3dec9] pb-2">
-                      <span className="text-[10px] font-black uppercase text-[#5a5a40]">🔒 Secure Ad Checkout Terminal</span>
+                      <span className="text-[10px] font-black uppercase text-[#5a5a40]">🔒 Secure Easypaisa Checkout Terminal</span>
                       <span className="font-mono text-xs font-black text-amber-900">
                         Charge: {adPaymentChoice === 'pay_7_days' ? '1,500' : '1,000'} RS
                       </span>
                     </div>
 
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-black text-[#5a5a40] uppercase block mb-1">Select Payment Method</span>
-                      <div className="grid grid-cols-2 gap-2 p-1 bg-[#e3dec9]/40 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => setAdPaymentMethod('manual')}
-                          className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                            adPaymentMethod === 'manual'
-                              ? 'bg-amber-800 text-white shadow-sm'
-                              : 'text-[#5a5a40] hover:bg-[#e3dec9]/50'
-                          }`}
-                        >
-                          Manual (Easypaisa/JazzCash)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAdPaymentMethod('card')}
-                          className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                            adPaymentMethod === 'card'
-                              ? 'bg-amber-800 text-white shadow-sm'
-                              : 'text-[#5a5a40] hover:bg-[#e3dec9]/50'
-                          }`}
-                        >
-                          Credit Card (Simulated)
-                        </button>
-                      </div>
-                    </div>
-
-                    {adPaymentMethod === 'manual' ? (
-                      <div className="space-y-3.5 animate-fadeIn">
-                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                          <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wider">Manual Payment Instructions</h4>
-                          <p className="text-xs text-amber-800">
-                            Please transfer <strong>PKR {adPaymentChoice === 'pay_7_days' ? '1,500' : '1,000'}</strong> to the following account:
-                          </p>
-                          <div className="text-xs font-mono bg-white p-2.5 rounded border border-amber-200 space-y-0.5">
-                            <p><strong>Easypaisa Digital Account:</strong> 92532839</p>
-                            <p><strong>IBAN:</strong> PK36TMFB0000000092532839</p>
-                            <p><strong>Receiver Name:</strong> Naseeb Ullah</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Payment Method Applied</span>
-                            <select
-                              value={adManualMethod}
-                              onChange={(e: any) => setAdManualMethod(e.target.value)}
-                              className="form-control text-xs bg-white font-bold"
-                            >
-                              <option value="Easypaisa">Easypaisa</option>
-                              <option value="JazzCash">JazzCash</option>
-                              <option value="Nayapay">Nayapay</option>
-                              <option value="Bank Transfer">Bank Transfer</option>
-                            </select>
-                          </div>
-
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Transaction ID</span>
-                            <input
-                              type="text"
-                              placeholder="Enter your transaction ID"
-                              value={adTransactionId}
-                              onChange={(e) => setAdTransactionId(e.target.value)}
-                              className="form-control text-xs bg-white font-mono font-bold"
-                              required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'manual'}
-                            />
-                          </div>
+                    <div className="space-y-3.5 animate-fadeIn">
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                        <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wider">Easypaisa Payment Instructions</h4>
+                        <p className="text-xs text-amber-800">
+                          Please transfer <strong>PKR {adPaymentChoice === 'pay_7_days' ? '1,500' : '1,000'}</strong> to the following account:
+                        </p>
+                        <div className="text-xs font-mono bg-white p-2.5 rounded border border-amber-200 space-y-0.5">
+                          <p><strong>Easypaisa Digital Account:</strong> 92532839</p>
+                          <p><strong>IBAN:</strong> PK36TMFB0000000092532839</p>
+                          <p><strong>Receiver Name:</strong> Naseeb Ullah</p>
                         </div>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 animate-fadeIn">
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Billing Cardholder Name</span>
-                          <input
-                            type="text"
-                            placeholder="Owner Name"
-                            value={adCardName}
-                            onChange={(e) => setAdCardName(e.target.value)}
-                            className="form-control text-xs bg-white"
-                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
-                          />
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Payment Method Applied</span>
+                          <select
+                            value={adManualMethod}
+                            onChange={(e: any) => setAdManualMethod(e.target.value)}
+                            className="form-control text-xs bg-white font-bold"
+                          >
+                            <option value="Easypaisa">Easypaisa</option>
+                          </select>
                         </div>
 
                         <div className="space-y-1">
-                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Credit Card Number</span>
+                          <span className="text-[9px] font-black text-[#5a5a40] uppercase block">Transaction ID</span>
                           <input
                             type="text"
-                            placeholder="4123 0000 8888 9912"
-                            value={adCardNumber}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').substring(0, 16);
-                              const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
-                              setAdCardNumber(formatted);
-                            }}
-                            className="form-control text-xs bg-white font-mono"
-                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">Expiration (MM/YY)</span>
-                          <input
-                            type="text"
-                            placeholder="12/28"
-                            value={adCardExpiry}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                              if (val.length >= 2) {
-                                setAdCardExpiry(val.substring(0, 2) + '/' + val.substring(2));
-                              } else {
-                                setAdCardExpiry(val);
-                              }
-                            }}
-                            className="form-control text-xs bg-white font-mono"
-                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black text-[#5a5a40] uppercase">CVV Security</span>
-                          <input
-                            type="password"
-                            placeholder="∗∗∗"
-                            maxLength={3}
-                            value={adCardCvv}
-                            onChange={(e) => setAdCardCvv(e.target.value.replace(/\D/g, ''))}
-                            className="form-control text-xs bg-white font-mono"
-                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo && adPaymentMethod === 'card'}
+                            placeholder="Enter your transaction ID"
+                            value={adTransactionId}
+                            onChange={(e) => setAdTransactionId(e.target.value)}
+                            className="form-control text-xs bg-white font-mono font-bold"
+                            required={adPaymentChoice !== 'free_privilege' && !hasRemainingPromo}
                           />
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -1530,12 +1420,13 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                 onClick={() => {
                   const freshUser = { ...currentUser, location: null };
                   onUpdateUser(freshUser);
-                  localStorage.setItem('va_session', JSON.stringify(freshUser));
-                  const localUsers = JSON.parse(localStorage.getItem('va_users') || '[]');
+                  secureSetItem('va_session', JSON.stringify(freshUser));
+                  const rawUsers = secureGetItem('va_users');
+                  const localUsers = JSON.parse(rawUsers || '[]');
                   const idx = localUsers.findIndex((u: any) => u.uid === currentUser.uid);
                   if (idx !== -1) {
                     localUsers[idx].location = null;
-                    localStorage.setItem('va_users', JSON.stringify(localUsers));
+                    secureSetItem('va_users', JSON.stringify(localUsers));
                   }
                   if (sortBy === SORT_TYPES.NEAREST) {
                     setSortBy(SORT_TYPES.HIGHEST);
@@ -1726,14 +1617,14 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                     </>
                   )}
 
-                  {selectedProfile.location && selectedProfile.role !== 'doctor' && (
+                  {selectedProfile.location?.lat && selectedProfile.location?.lng && (
                     <a
                       href={`https://www.google.com/maps?q=${selectedProfile.location.lat},${selectedProfile.location.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn-tactile-3d-secondary py-2 px-5 text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-150 border-emerald-300"
+                      className="btn-tactile-3d-secondary py-2 px-5 text-xs text-emerald-800 bg-emerald-100 hover:bg-emerald-150 border-emerald-300 inline-flex items-center gap-1.5"
                     >
-                      🗺️ Show on Map
+                      🗺️ Show on Google Maps
                     </a>
                   )}
 
@@ -1919,6 +1810,21 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                       <div className="p-3 bg-[#fcf9f2] rounded-2xl border border-[#e3dec9] border-b-[2px] sm:col-span-2">
                         <div className="font-extrabold text-[#a49f92] uppercase text-[9px] tracking-widest">Physical Address</div>
                         <div className="mt-1.5 font-bold text-[#373735]">{selectedProfile.address}</div>
+                      </div>
+                    )}
+
+                    {selectedProfile.location?.lat && selectedProfile.location?.lng && (
+                      <div className="p-3 bg-[#edf6ef]/40 rounded-2xl border border-emerald-100/50 sm:col-span-2 space-y-2">
+                        <div className="font-extrabold text-emerald-800 uppercase text-[9px] tracking-widest flex items-center gap-1">
+                          <span>📍 Exact Google Map Pinpoint</span>
+                        </div>
+                        <div className="border border-emerald-200 rounded-xl overflow-hidden shadow-2xs bg-white">
+                          <InteractiveClinicMap
+                            lat={selectedProfile.location.lat}
+                            lng={selectedProfile.location.lng}
+                            interactive={false}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
