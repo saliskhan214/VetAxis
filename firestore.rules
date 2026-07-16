@@ -51,6 +51,12 @@ service cloud.firestore {
         );
     }
 
+    function isClinician() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic', 'assistant'];
+    }
+
     function canUserReview(reviewerRole, targetRole) {
       return true;
     }
@@ -175,7 +181,7 @@ service cloud.firestore {
     // PENDING MANUAL PAYMENTS RULES
     // ─────────────────────────────────────────────────────────────────
     match /pending_manual_payments/{paymentId} {
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
     }
@@ -495,7 +501,20 @@ service cloud.firestore {
         existing().ownerUid == request.auth.uid
       );
 
-      allow update: if isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid);
+      allow update: if isAdmin() || (
+        isSignedIn() && existing().ownerUid == request.auth.uid &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().ownerRole == existing().ownerRole &&
+        incoming().pricePaid == existing().pricePaid &&
+        incoming().durationDays == existing().durationDays &&
+        incoming().expiresAt == existing().expiresAt &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().title is string && incoming().title.size() <= 155 &&
+        incoming().description is string && incoming().description.size() <= 1000 &&
+        incoming().ctaText is string && incoming().ctaText.size() <= 100 &&
+        incoming().ctaUrl is string && incoming().ctaUrl.size() <= 550
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -535,35 +554,35 @@ service cloud.firestore {
     match /clinic_soap_records/{soapId} {
       allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow create: if isClinician() && request.resource.data.clinicId == request.auth.uid;
+      allow update: if isClinician() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow delete: if isClinician() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_prescriptions/{prescId} {
       allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow create: if isClinician() && request.resource.data.clinicId == request.auth.uid;
+      allow update: if isClinician() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow delete: if isClinician() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_invoices/{invoiceId} {
       allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow create: if isClinician() && request.resource.data.clinicId == request.auth.uid;
+      allow update: if isClinician() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow delete: if isClinician() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
     }
 
     match /clinic_service_catalog/{serviceId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow write: if isClinician() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
     }
 
     match /clinic_drugs_inventory/{drugId} {
       allow read: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow write: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+      allow write: if isClinician() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
     }
   }
 }

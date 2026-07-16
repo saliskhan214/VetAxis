@@ -575,6 +575,34 @@ export const AuthService = {
     }
   },
 
+  getPublicClinicians: async (): Promise<UserProfile[]> => {
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'users'), where('role', 'in', ['doctor', 'clinic', 'assistant']));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => {
+          const data = doc.data() as UserProfile;
+          const u = {
+            ...data,
+            uid: data.uid || doc.id
+          };
+          return injectTemporaryPlatinum(u) as UserProfile;
+        });
+      } catch (err) {
+        console.warn('Error fetching public clinicians from Firestore, using local fallback:', err);
+      }
+    }
+    // Local storage fallback
+    try {
+      const local = localStorage.getItem('va_users') || localStorage.getItem('users');
+      if (local) {
+        const parsed = JSON.parse(local) as UserProfile[];
+        return parsed.filter(u => ['doctor', 'clinic', 'assistant'].includes(u.role));
+      }
+    } catch {}
+    return [];
+  },
+
   upgradeUserSubscription: async (userId: string, tier: 'Silver' | 'Gold' | 'Platinum') => {
     try {
       const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);

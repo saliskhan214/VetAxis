@@ -39,6 +39,12 @@ function isCloud() {
   return isFirebaseConfigured && db && !offlineOverride;
 }
 
+function isPermissionError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || String(err)).toLowerCase();
+  return err.code === 'permission-denied' || msg.includes('permission') || msg.includes('insufficient');
+}
+
 function cleanUndefined<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {
     return obj;
@@ -173,7 +179,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_FARMS_KEY, list);
         return list;
       } catch (err) {
-        console.warn("Offline fallback triggered for fetchFarms. Using local storage cache:", err);
+        if (!isPermissionError(err)) {
+          console.warn("Offline fallback triggered for fetchFarms. Using local storage cache:", err);
+        }
         try {
           return JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
         } catch {
@@ -200,7 +208,9 @@ export const LivestockService = {
         }
         return null;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchFarmById(${farmId}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchFarmById(${farmId}). Using local storage cache:`, err);
+        }
         const list = await this.fetchFarms();
         return list.find(f => f.id === farmId) || null;
       }
@@ -321,7 +331,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_ANIMALS_KEY, list);
         return list;
       } catch (err) {
-        console.warn("Offline fallback triggered for fetchAllAnimals. Using local storage cache:", err);
+        if (!isPermissionError(err)) {
+          console.warn("Offline fallback triggered for fetchAllAnimals. Using local storage cache:", err);
+        }
         try {
           return JSON.parse(localStorage.getItem(LOCAL_ANIMALS_KEY) || '[]');
         } catch {
@@ -346,7 +358,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_ANIMALS_KEY, list);
         return list;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchAnimals(${farmId}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchAnimals(${farmId}). Using local storage cache:`, err);
+        }
         const all = await this.fetchAllAnimals();
         return all.filter(a => a.farmId === farmId);
       }
@@ -498,7 +512,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_BATCHES_KEY, list);
         return list;
       } catch (err) {
-        console.warn("Offline fallback triggered for fetchAllBatches. Using local storage cache:", err);
+        if (!isPermissionError(err)) {
+          console.warn("Offline fallback triggered for fetchAllBatches. Using local storage cache:", err);
+        }
         try {
           return JSON.parse(localStorage.getItem(LOCAL_BATCHES_KEY) || '[]');
         } catch {
@@ -523,7 +539,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_BATCHES_KEY, list);
         return list;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchBatches(${farmId}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchBatches(${farmId}). Using local storage cache:`, err);
+        }
         const all = await this.fetchAllBatches();
         return all.filter(b => b.farmId === farmId);
       }
@@ -658,7 +676,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_TASKS_KEY, list);
         return list;
       } catch (err) {
-        console.warn("Offline fallback triggered for fetchAllTasks. Using local storage cache:", err);
+        if (!isPermissionError(err)) {
+          console.warn("Offline fallback triggered for fetchAllTasks. Using local storage cache:", err);
+        }
         try {
           return JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]');
         } catch {
@@ -683,7 +703,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_TASKS_KEY, list);
         return list;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchTasks(${farmId}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchTasks(${farmId}). Using local storage cache:`, err);
+        }
         const all = await this.fetchAllTasks();
         return all.filter(t => t.farmId === farmId);
       }
@@ -804,7 +826,9 @@ export const LivestockService = {
         }
         return null;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchIndividualRecordById(${id}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchIndividualRecordById(${id}). Using local storage cache:`, err);
+        }
         const all = await this.fetchAllIndividualRecords();
         return all.find(r => r.id === id) || null;
       }
@@ -822,7 +846,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_INDIVIDUAL_RECORDS_KEY, list);
         return list;
       } catch (err) {
-        console.warn("Offline fallback triggered for fetchAllIndividualRecords. Using local storage cache:", err);
+        if (!isPermissionError(err)) {
+          console.warn("Offline fallback triggered for fetchAllIndividualRecords. Using local storage cache:", err);
+        }
         try {
           return JSON.parse(localStorage.getItem(LOCAL_INDIVIDUAL_RECORDS_KEY) || '[]');
         } catch {
@@ -847,7 +873,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_INDIVIDUAL_RECORDS_KEY, list);
         return list;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchIndividualRecords(${farmId}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchIndividualRecords(${farmId}). Using local storage cache:`, err);
+        }
         const all = await this.fetchAllIndividualRecords();
         return all.filter(r => r.farmId === farmId);
       }
@@ -1011,7 +1039,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_HERD_RECORDS_KEY, list);
         return list;
       } catch (err) {
-        console.warn("Offline fallback triggered for fetchAllHerdRecords. Using local storage cache:", err);
+        if (!isPermissionError(err)) {
+          console.warn("Offline fallback triggered for fetchAllHerdRecords. Using local storage cache:", err);
+        }
         try {
           return JSON.parse(localStorage.getItem(LOCAL_HERD_RECORDS_KEY) || '[]');
         } catch {
@@ -1036,7 +1066,9 @@ export const LivestockService = {
         mergeCachedItems(LOCAL_HERD_RECORDS_KEY, list);
         return list;
       } catch (err) {
-        console.warn(`Offline fallback triggered for fetchHerdRecords(${farmId}). Using local storage cache:`, err);
+        if (!isPermissionError(err)) {
+          console.warn(`Offline fallback triggered for fetchHerdRecords(${farmId}). Using local storage cache:`, err);
+        }
         const all = await this.fetchAllHerdRecords();
         return all.filter(r => r.farmId === farmId);
       }

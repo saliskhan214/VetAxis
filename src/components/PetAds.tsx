@@ -683,7 +683,7 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
       </AnimatePresence>
 
       {/* NEW POST ACTIONS */}
-      <div className="text-left">
+      <div className="text-left" data-no-scroll="true">
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => setFormOpen(!formOpen)}

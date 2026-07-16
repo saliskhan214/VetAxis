@@ -359,6 +359,12 @@ export default function App() {
 
     const isModalElement = (node: Node): node is HTMLElement => {
       if (!(node instanceof HTMLElement)) return false;
+      
+      // If the node or any parent/ancestor has data-no-scroll="true", do not treat as a modal to prevent unwanted scrolling
+      if (node.closest('[data-no-scroll="true"]') || node.querySelector('[data-no-scroll="true"]')) {
+        return false;
+      }
+
       const cn = node.className;
       if (typeof cn !== 'string') return false;
       
