@@ -147,6 +147,7 @@ function saveLocalUsers(list: UserProfile[]) {
 export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile | null {
   if (user && user.email) {
     const emailLower = user.email.toLowerCase().trim();
+    
     if (emailLower === 'saliskhan214@gmail.com') {
       // Use a single stable localStorage key for Salis's subscription expiration
       let expiresStr = localStorage.getItem('va_salis_sub_expires');
@@ -159,7 +160,7 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
       
       // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
       if (Date.now() > expiresMs) {
-        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now()) {
+        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
           // Keep active manual subscription tier and expiration
         } else {
           user.subscriptionTier = undefined;
@@ -167,22 +168,26 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
         }
       } else {
         // Still within active trial period - FORCE Platinum so both home feed card and portal are Platinum
-        user.subscriptionTier = 'Platinum';
-        user.isVerified = true;
-        user.subscriptionExpiresAt = expiresMs;
+        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
+          // Respect their manual subscription!
+        } else {
+          user.subscriptionTier = 'Platinum';
+          user.isVerified = true;
+          user.subscriptionExpiresAt = expiresMs;
+        }
       }
     } else if (emailLower === 'bunnykhan329@gmail.com') {
       let expiresStr = localStorage.getItem('va_bunny_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
       if (!expiresMs || isNaN(expiresMs)) {
-        expiresMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        expiresMs = Date.now() + 5 * 60 * 1000; // 5-minute premium trial for testing auto-revert!
         localStorage.setItem('va_bunny_sub_expires', expiresMs.toString());
       }
       
       // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
       if (Date.now() > expiresMs) {
-        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now()) {
+        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
           // Keep active manual subscription tier and expiration
         } else {
           user.subscriptionTier = undefined;
@@ -190,9 +195,13 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
         }
       } else {
         // Still within active trial period - FORCE Silver
-        user.subscriptionTier = 'Silver';
-        user.isVerified = true;
-        user.subscriptionExpiresAt = expiresMs;
+        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
+          // Respect their manual subscription!
+        } else {
+          user.subscriptionTier = 'Silver';
+          user.isVerified = true;
+          user.subscriptionExpiresAt = expiresMs;
+        }
       }
     }
 
@@ -209,12 +218,44 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
       
       // Asynchronously trigger Firestore update to clear it in the cloud!
       if (isFirebaseConfigured && db && user.uid) {
-        const userId = user.uid;
-        updateDoc(doc(db, 'users', userId), {
-          subscriptionTier: null as any,
-          subscriptionExpiresAt: null as any,
-          isVerified: false
-        }).catch(err => console.error("Failed to auto-downgrade expired user in DB:", err));
+        let isAdmin = false;
+        let isSelf = false;
+        try {
+          const rawSess = secureGetItem(LOCAL_SESSION_KEY);
+          if (rawSess) {
+            const parsedSess = JSON.parse(rawSess);
+            if (parsedSess) {
+              isAdmin = parsedSess.isAdmin === true || parsedSess.email === 'saliskhan214@gmail.com';
+              isSelf = parsedSess.uid === user.uid;
+            }
+          }
+        } catch {}
+
+        if (isSelf || isAdmin) {
+          const userId = user.uid;
+          updateDoc(doc(db, 'users', userId), {
+            subscriptionTier: null as any,
+            subscriptionExpiresAt: null as any,
+            isVerified: false
+          }).catch(err => console.error("Failed to auto-downgrade expired user in DB:", err));
+        }
+      }
+
+      // Also update local storage va_users if present there
+      try {
+        const local = secureGetItem(LOCAL_USERS_KEY);
+        if (local) {
+          const parsed = JSON.parse(local) as UserProfile[];
+          const idx = parsed.findIndex(u => u.uid === user.uid);
+          if (idx !== -1) {
+            parsed[idx].subscriptionTier = undefined;
+            parsed[idx].subscriptionExpiresAt = undefined;
+            parsed[idx].isVerified = false;
+            secureSetItem(LOCAL_USERS_KEY, JSON.stringify(parsed));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to update local storage on auto-downgrade:", err);
       }
     }
   }
@@ -603,19 +644,59 @@ export const AuthService = {
     return [];
   },
 
-  upgradeUserSubscription: async (userId: string, tier: 'Silver' | 'Gold' | 'Platinum') => {
+  upgradeUserSubscription: async (userId: string, tier: 'Silver' | 'Gold' | 'Platinum' | 'General') => {
     try {
-      const newExpiry = Date.now() + (30 * 24 * 60 * 60 * 1000);
-      await updateDoc(doc(db, 'users', userId), {
-        subscriptionTier: tier,
-        subscriptionExpiresAt: newExpiry,
-        isVerified: true
-      });
-      return true;
+      const isGeneral = tier === 'General';
+      const newExpiry = isGeneral ? null : Date.now() + (30 * 24 * 60 * 60 * 1000);
+      const isVerifiedVal = isGeneral ? false : true;
+      const tierVal = isGeneral ? null : tier;
+
+      // Update locally in users
+      try {
+        const local = secureGetItem(LOCAL_USERS_KEY);
+        if (local) {
+          const parsed = JSON.parse(local) as UserProfile[];
+          const idx = parsed.findIndex(u => u.uid === userId);
+          if (idx !== -1) {
+            parsed[idx].subscriptionTier = tierVal as any;
+            parsed[idx].subscriptionExpiresAt = newExpiry as any;
+            parsed[idx].isVerified = isVerifiedVal;
+            secureSetItem(LOCAL_USERS_KEY, JSON.stringify(parsed));
+          }
+        }
+      } catch (err) {
+        console.error('Error updating local users in upgradeUserSubscription:', err);
+      }
+
+      // Update local session if this is the current user
+      const session = getLocalSession();
+      if (session && session.uid === userId) {
+        session.subscriptionTier = tierVal as any;
+        session.subscriptionExpiresAt = newExpiry as any;
+        session.isVerified = isVerifiedVal;
+        saveLocalSession(session);
+      }
+
+      if (isFirebaseConfigured && db) {
+        const currentSession = getLocalSession();
+        const isAdmin = currentSession?.isAdmin === true || currentSession?.email === 'saliskhan214@gmail.com';
+
+        if (!auth?.currentUser || (auth.currentUser.uid !== userId && !isAdmin)) {
+          console.warn(`[storage] Cannot upgrade subscription in Firestore for ${userId} as Firebase Auth/admin privilege is not resolved.`);
+          return false;
+        }
+        await updateDoc(doc(db, 'users', userId), {
+          subscriptionTier: tierVal as any,
+          subscriptionExpiresAt: newExpiry as any,
+          isVerified: isVerifiedVal
+        });
+        return true;
+      }
     } catch (err) {
       console.error('Error upgrading user subscription:', err);
       handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
     }
+    return false;
   },
   
   async signUp(email: string, password: string, name: string, phone: string, role: string, extra: any): Promise<UserProfile> {
@@ -768,6 +849,25 @@ export const AuthService = {
 
   async updateProfile(uid: string, fields: Partial<UserProfile>): Promise<UserProfile> {
     if (isFirebaseConfigured && db) {
+      if (!auth?.currentUser || auth.currentUser.uid !== uid) {
+        console.warn(`[storage] Postponing Firestore updateProfile for ${uid} as Firebase Auth is not yet resolved or matches.`);
+        const users = getLocalUsers();
+        const idx = users.findIndex(u => u.uid === uid);
+        if (idx !== -1) {
+          users[idx] = { ...users[idx], ...fields };
+          saveLocalUsers(users);
+          saveLocalSession(users[idx]);
+          return users[idx];
+        }
+        const sess = getLocalSession();
+        if (sess && sess.uid === uid) {
+          const updatedSess = { ...sess, ...fields };
+          saveLocalSession(updatedSess);
+          return updatedSess;
+        }
+        return { uid, ...fields } as any;
+      }
+
       try {
         const userRef = doc(db, 'users', uid);
         await updateDoc(userRef, cleanUndefined(fields));
@@ -780,18 +880,18 @@ export const AuthService = {
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `users/${uid}`);
       }
-    } else {
-      // Local fallback
-      const users = getLocalUsers();
-      const idx = users.findIndex(u => u.uid === uid);
-      if (idx !== -1) {
-        users[idx] = { ...users[idx], ...fields };
-        saveLocalUsers(users);
-        saveLocalSession(users[idx]);
-        return users[idx];
-      }
-      throw new Error('User not found.');
     }
+    
+    // Local fallback when firebase not configured or auth/db unavailable
+    const users = getLocalUsers();
+    const idx = users.findIndex(u => u.uid === uid);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...fields };
+      saveLocalUsers(users);
+      saveLocalSession(users[idx]);
+      return users[idx];
+    }
+    throw new Error('User not found.');
   },
 
   async changePassword(newPw: string): Promise<void> {

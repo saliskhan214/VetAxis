@@ -648,6 +648,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         ref={billboardRef}
         onMouseMove={handleBillboardMouseMove}
         onMouseLeave={handleBillboardMouseLeave}
+        data-no-scroll="true"
         className="relative w-full h-[360px] sm:h-[280px] md:h-[230px] lg:h-[210px] overflow-hidden rounded-3xl shrink-0 shadow-[0_15px_40px_rgba(90,90,64,0.18)] hover:shadow-[0_25px_50px_rgba(90,90,64,0.3)] transition-shadow duration-500 border border-[#cdc6ad]"
         style={{ perspective: 1200 }}
       >
@@ -1617,7 +1618,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                     </>
                   )}
 
-                  {selectedProfile.location?.lat && selectedProfile.location?.lng && (
+                  {selectedProfile.role === 'clinic' && selectedProfile.location?.lat && selectedProfile.location?.lng && (
                     <a
                       href={`https://www.google.com/maps?q=${selectedProfile.location.lat},${selectedProfile.location.lng}`}
                       target="_blank"
@@ -1813,7 +1814,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                       </div>
                     )}
 
-                    {selectedProfile.location?.lat && selectedProfile.location?.lng && (
+                    {selectedProfile.role === 'clinic' && selectedProfile.location?.lat && selectedProfile.location?.lng && (
                       <div className="p-3 bg-[#edf6ef]/40 rounded-2xl border border-emerald-100/50 sm:col-span-2 space-y-2">
                         <div className="font-extrabold text-emerald-800 uppercase text-[9px] tracking-widest flex items-center gap-1">
                           <span>📍 Exact Google Map Pinpoint</span>

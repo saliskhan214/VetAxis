@@ -149,10 +149,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     );
   };
   
-  const handleUpgrade = async (user: UserProfile, tier: 'Silver' | 'Gold' | 'Platinum') => {
+  const handleUpgrade = async (user: UserProfile, tier: 'Silver' | 'Gold' | 'Platinum' | 'General') => {
+    const isGeneral = tier === 'General';
     showConfirm(
-      'Upgrade User Subscription',
-      `Are you sure you want to upgrade ${user.name} to the ${tier} Tier? This will extend their premium benefits for 30 days.`,
+      isGeneral ? 'Downgrade User Subscription' : 'Upgrade User Subscription',
+      isGeneral
+        ? `Are you sure you want to downgrade ${user.name} to General / Not Subscribed status? This will immediately remove their premium privileges.`
+        : `Are you sure you want to upgrade ${user.name} to the ${tier} Tier? This will extend their premium benefits for 30 days.`,
       async () => {
         try {
           await AuthService.upgradeUserSubscription(user.uid, tier);
@@ -166,20 +169,28 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
               type: 'status_change',
               targetId: user.uid,
               targetType: 'appointment',
-              message: `Your VetAxis subscription has been upgraded to ${tier} Tier by the admin! Your premium privileges are now fully active.`
+              message: isGeneral
+                ? `Your VetAxis subscription has been set to General (Not Subscribed) by the admin. Please renew your plan in Settings > Subscription Portal.`
+                : `Your VetAxis subscription has been upgraded to ${tier} Tier by the admin! Your premium privileges are now fully active.`
             });
           } catch (notifErr) {
             console.error('Failed to send notification for manual upgrade:', notifErr);
           }
 
-          showNotification('User Upgraded', `${user.name} has been successfully upgraded to ${tier} Tier!`, 'success');
+          showNotification(
+            isGeneral ? 'User Downgraded' : 'User Upgraded',
+            isGeneral
+              ? `${user.name} has been set to General status.`
+              : `${user.name} has been successfully upgraded to ${tier} Tier!`,
+            'success'
+          );
           fetchData();
         } catch (err) {
-          showNotification('Error', 'Failed to upgrade user subscription.', 'error');
+          showNotification('Error', 'Failed to update user subscription.', 'error');
         }
       },
-      'Upgrade',
-      false
+      isGeneral ? 'Downgrade' : 'Upgrade',
+      isGeneral ? true : false
     );
   };
 
@@ -402,7 +413,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                           ⭐ {u.subscriptionTier}
                         </span>
                       ) : (
-                        <span className="text-xs font-semibold text-stone-400">None</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border border-stone-200 bg-stone-50 text-stone-500">
+                          General / Not Subscribed
+                        </span>
                       )}
                     </td>
                     <td className="p-3 text-xs font-mono font-bold text-stone-700">
@@ -421,7 +434,17 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                       )}
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button 
+                          onClick={() => handleUpgrade(u, 'General')} 
+                          className={`text-xs px-2.5 py-1 rounded-md font-extrabold transition-all border ${
+                            !u.subscriptionTier 
+                              ? 'bg-stone-500 text-white border-stone-600 shadow-sm font-black' 
+                              : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100 hover:border-stone-300'
+                          }`}
+                        >
+                          General
+                        </button>
                         <button 
                           onClick={() => handleUpgrade(u, 'Silver')} 
                           className={`text-xs px-2.5 py-1 rounded-md font-extrabold transition-all border ${

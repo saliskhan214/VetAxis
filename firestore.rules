@@ -544,44 +544,39 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
 
     match /clinic_appointments/{apptId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && (request.resource.data.clinicId == request.auth.uid || ('userId' in request.resource.data && request.resource.data.userId == request.auth.uid));
-      allow update: if isSignedIn() && (resource.data.clinicId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid) || isAdmin());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isSignedIn() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid || isClinician());
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
     }
 
     match /clinic_soap_records/{soapId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow create: if isClinician() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isClinician() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-      allow delete: if isClinician() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
     }
 
     match /clinic_prescriptions/{prescId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow create: if isClinician() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isClinician() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-      allow delete: if isClinician() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
     }
 
     match /clinic_invoices/{invoiceId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.clinicId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
-      allow create: if isClinician() && request.resource.data.clinicId == request.auth.uid;
-      allow update: if isClinician() && (resource.data.clinicId == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-      allow delete: if isClinician() && (resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
     }
 
     match /clinic_service_catalog/{serviceId} {
       allow read: if isSignedIn();
-      allow write: if isClinician() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
-    }
-
-    match /clinic_drugs_inventory/{drugId} {
-      allow read: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin());
       allow write: if isClinician() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
     }
   }

@@ -4,6 +4,31 @@ import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
 
+// Suppress benign Vite WebSocket HMR errors in AI Studio sandboxed environment
+if (typeof window !== 'undefined') {
+  const isWebSocketError = (err: any) => {
+    if (!err) return false;
+    const msg = err.message || String(err);
+    return msg.includes('websocket') || 
+           msg.includes('WebSocket') || 
+           msg.includes('WebSocket closed');
+  };
+
+  window.addEventListener('unhandledrejection', (event) => {
+    if (isWebSocketError(event.reason)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+
+  window.addEventListener('error', (event) => {
+    if (isWebSocketError(event.error) || isWebSocketError(event.message)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+}
+
 // Register the Service Worker for remote/offline rural usage
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

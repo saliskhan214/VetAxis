@@ -128,10 +128,44 @@ export function SubscriptionPortal({
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [successMode, setSuccessMode] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'EasyPaisa' | 'JazzCash' | 'Bank Transfer'>('EasyPaisa');
+  const [transactionId, setTransactionId] = useState('');
   
   // Custom cancellation modal states
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+
+  // Submit manual payment verification request
+  const handleManualPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTier) return;
+    if (!transactionId.trim()) {
+      setCheckoutError('Please enter the reference Transaction ID from your payment receipt.');
+      return;
+    }
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+
+    try {
+      await PaymentService.submitManualPayment({
+        userId: currentUser.uid,
+        userName: currentUser.name || 'Practitioner',
+        userEmail: currentUser.email || '',
+        planId: selectedTier,
+        transactionId: transactionId.trim(),
+        paymentMethod: paymentMethod
+      });
+      setSuccessMode(true);
+      setPortalMessage({
+        text: `💳 Your PKR ${PLANS.find(p => p.id === selectedTier)?.price.toLocaleString()} payment has been submitted! An admin will verify the Transaction ID (${transactionId.trim()}) and approve your subscription shortly.`,
+        type: 'success'
+      });
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Payment submission failed.');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   // Submit direct upgrade trigger
   const handleDirectUpgrade = async () => {
@@ -326,24 +360,25 @@ export function SubscriptionPortal({
                 Your card on file will automatically renew the monthly cycle.
               </div>
               <div className="flex items-center gap-3 flex-wrap">
-                {currentUser.email?.toLowerCase().trim() === 'saliskhan214@gmail.com' && (
+                {(currentUser.email?.toLowerCase().trim() === 'saliskhan214@gmail.com' || currentUser.email?.toLowerCase().trim() === 'bunnykhan329@gmail.com') && (
                   <button
                     type="button"
                     onClick={() => {
+                      const isBunny = currentUser.email?.toLowerCase().trim() === 'bunnykhan329@gmail.com';
                       const newExpiry = Date.now() + 5 * 60 * 1000;
-                      localStorage.setItem('va_salis_sub_expires', newExpiry.toString());
+                      localStorage.setItem(isBunny ? 'va_bunny_sub_expires' : 'va_salis_sub_expires', newExpiry.toString());
                       
                       // Inject local override immediately for this session
                       const updated: UserProfile = {
                         ...currentUser,
-                        subscriptionTier: 'Platinum',
+                        subscriptionTier: isBunny ? 'Silver' : 'Platinum',
                         subscriptionExpiresAt: newExpiry,
                         isVerified: true
                       };
                       onUpdateUser(updated);
                       secureSetItem('va_session', JSON.stringify(updated));
                       setPortalMessage({
-                        text: '🔄 5-Minute Platinum Trial has been successfully reset! Watch the countdown below.',
+                        text: `🔄 5-Minute ${isBunny ? 'Silver' : 'Platinum'} Trial has been successfully reset! Watch the countdown below.`,
                         type: 'success'
                       });
                     }}
@@ -563,7 +598,7 @@ export function SubscriptionPortal({
         </div>
       </div>
 
-      {/* SECURE DIRECT ACTIVATION MODULE */}
+      {/* SECURE DIRECT ACTIVATION / MANUAL PAYMENT VERIFICATION MODULE */}
       <AnimatePresence>
         {selectedTier && (
           <motion.div
@@ -577,20 +612,24 @@ export function SubscriptionPortal({
               
               <div className="flex items-center justify-between border-b border-[#f4f1e9] pb-4 mb-6">
                 <div className="space-y-1">
-                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit">
-                    <Shield className="w-3.5 h-3.5" />
-                    <span>DIRECT ACTIVATION ACTIVE</span>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40] flex items-center gap-1 bg-[#fcf9f2] px-2 py-0.5 rounded-lg border border-[#e3dec9] w-fit">
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Secure Manual Verification Billing</span>
                   </div>
                   <h3 className="font-serif font-black text-xl text-black">
-                    Activate {selectedTier} Elite Tier Subscription
+                    Submit Payment for {selectedTier} Elite Tier
                   </h3>
                   <p className="text-xs font-semibold text-[#7a766f]">
-                    Instant upgrade without credit cards or transaction forms.
+                    Transfer the plan price and submit your transaction receipt ID below for verification.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSelectedTier(null)}
+                  onClick={() => {
+                    setSelectedTier(null);
+                    setSuccessMode(false);
+                    setTransactionId('');
+                  }}
                   className="p-1 px-2.5 rounded-lg bg-stone-50 hover:bg-stone-100 text-stone-500 hover:text-black border border-stone-200 text-xs font-bold font-mono transition-colors cursor-pointer"
                 >
                   Cancel
@@ -602,16 +641,19 @@ export function SubscriptionPortal({
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="p-8 text-center bg-emerald-50 rounded-2xl border border-emerald-200 space-y-4 max-w-lg mx-auto"
+                  className="p-8 text-center bg-emerald-50 rounded-2xl border border-emerald-200 space-y-4 max-w-lg mx-auto animate-fadeIn"
                 >
                   <div className="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl mx-auto shadow-md">
                     ✓
                   </div>
                   <h4 className="font-serif text-xl font-black text-[#1b7c31]">
-                    Plan Activated Successfully!
+                    Payment Verification Submitted!
                   </h4>
                   <p className="text-xs font-semibold text-emerald-800 leading-relaxed max-w-sm mx-auto">
-                    Your profile has been upgraded to <strong className="font-black underline">{selectedTier}</strong> status. You now have immediate access to priority directory sorting, unlimited pet ads, and billboard credits!
+                    Your manual payment of <strong className="font-black">PKR {PLANS.find(p => p.id === selectedTier)?.price.toLocaleString()}</strong> for the <strong className="font-black">{selectedTier}</strong> tier has been submitted with Transaction ID <code className="font-mono bg-emerald-150 px-1.5 py-0.5 rounded font-bold text-emerald-950">{transactionId}</code> via <strong className="font-black">{paymentMethod}</strong>.
+                  </p>
+                  <p className="text-[11px] text-[#4d7c5a] font-medium leading-relaxed max-w-xs mx-auto">
+                    Our admin team will verify your payment receipt within a few hours. You will receive an instant clinical alert notification when your profile is upgraded!
                   </p>
                   <div className="pt-2 flex gap-3.5 justify-center">
                     <button
@@ -626,47 +668,133 @@ export function SubscriptionPortal({
                       onClick={() => {
                         setSelectedTier(null);
                         setSuccessMode(false);
+                        setTransactionId('');
                       }}
                       className="px-4 py-2 bg-white text-[#373735] border border-[#e3dec9] text-xs font-black uppercase tracking-wider rounded-xl hover:bg-stone-50 transition-all border-b-[3px] border-b-stone-300 cursor-pointer"
                     >
-                      Dismiss
+                      Close Portal
                     </button>
                   </div>
                 </motion.div>
               ) : (
-                /* DIRECT CONFIRM ACTION */
-                <div className="max-w-md mx-auto text-center space-y-5 py-2">
-                  <p className="text-sm font-semibold text-[#373735] leading-relaxed">
-                    Would you like to instantly upgrade your registered practitioner account to <strong className="font-extrabold text-[#5a5a40]">{selectedTier}</strong> for free? 
-                  </p>
-                  <p className="text-xs text-[#7a766f]">
-                    Upon clicking, your professional badge will update instantly in the public search directory.
-                  </p>
+                /* MANUAL PAYMENT FORM */
+                <form onSubmit={handleManualPaymentSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                  {/* Step 1: Payment Instructions Panel (Left) */}
+                  <div className="lg:col-span-3 space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-[#a49f92] block">
+                      Step 1: Send Amount via EasyPaisa or Raast
+                    </label>
 
-                  {checkoutError && (
-                    <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold leading-relaxed">
-                      ⚠️ Error: {checkoutError}
+                    {/* Interactive Method Details Box */}
+                    <div className="bg-[#fcf9f2] p-5 rounded-2xl border border-[#e3dec9] space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-[#5a5a40] font-bold">🟢 EasyPaisa Account Details</span>
+                          <span className="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg text-[10px] text-emerald-700 font-extrabold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                            <span>Direct Transfer</span>
+                          </span>
+                        </div>
+                        
+                        <div className="p-4 bg-white border border-[#e3dec9] rounded-xl space-y-3">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
+                            <div>
+                              <p className="text-[10px] text-[#7a766f] font-mono font-bold leading-none">EasyPaisa Account Number</p>
+                              <p className="text-base font-mono font-black text-black mt-1.5 selection:bg-stone-200">0300-1216272</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-[#7a766f] font-mono font-bold leading-none">Account Title</p>
+                              <p className="text-sm font-serif font-black text-stone-800 mt-1.5">Naseeb Ullah</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-0.5">
+                            <p className="text-[10px] text-[#7a766f] font-mono font-bold leading-none">Raast IBAN (Any Banking App)</p>
+                            <p className="text-xs font-mono font-black text-emerald-950 bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-150/50 mt-1.5 break-all select-all">
+                              PK36TMFB0000000092532839
+                            </p>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] font-semibold text-[#7a766f] leading-relaxed">
+                          💡 <strong>How to Pay:</strong> Send exactly <strong className="text-black font-black">PKR {PLANS.find(p => p.id === selectedTier)?.price.toLocaleString()}</strong> to the mobile number above directly from your EasyPaisa app, or transfer from any banking app using the <strong>Raast IBAN</strong> under the receiver name <strong className="text-black font-bold">Naseeb Ullah</strong>.
+                        </p>
+                        <p className="text-[11px] font-semibold text-[#7a766f] leading-relaxed">
+                          Copy the 11-digit or 12-digit transaction ID from the success receipt/SMS and enter it in the form on the right.
+                        </p>
+                      </div>
                     </div>
-                  )}
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTier(null)}
-                      className="flex-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 py-3 rounded-2xl font-bold text-xs cursor-pointer"
-                    >
-                      No, Go Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDirectUpgrade}
-                      disabled={checkoutLoading}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black text-xs border border-emerald-700 border-b-[4px] border-b-emerald-800 cursor-pointer"
-                    >
-                      {checkoutLoading ? 'Activating Tier...' : `Yes, Activate ${selectedTier}`}
-                    </button>
                   </div>
-                </div>
+
+                  {/* Step 2: Form Input Panel (Right) */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-[#a49f92] block">
+                      Step 2: Enter Transaction Details
+                    </label>
+
+                    <div className="bg-[#fcf9f2]/60 p-5 rounded-2xl border border-[#e3dec9] space-y-4">
+                      {/* Price Tag */}
+                      <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-[#e3dec9] text-xs">
+                        <span className="font-semibold text-[#7a766f]">Tier Selected:</span>
+                        <span className="font-bold text-black">{selectedTier} Premium</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-[#e3dec9] text-xs">
+                        <span className="font-semibold text-[#7a766f]">Transfer Amount:</span>
+                        <span className="font-serif font-black text-base text-black">PKR {PLANS.find(p => p.id === selectedTier)?.price.toLocaleString()}</span>
+                      </div>
+
+                      {/* Transaction ID Input */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-[#373735] flex items-center justify-between">
+                          <span>Transaction ID / Receipt Ref</span>
+                          <span className="text-[10px] text-red-500 font-bold">*Required</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={transactionId}
+                          onChange={(e) => setTransactionId(e.target.value)}
+                          placeholder="e.g. 52391054921"
+                          className="w-full bg-white border border-[#e3dec9] focus:border-[#5a5a40] focus:ring-1 focus:ring-[#5a5a40] p-3 text-sm font-mono font-bold rounded-xl outline-hidden"
+                        />
+                        <p className="text-[10px] text-[#7a766f] font-semibold leading-normal">
+                          Please double check the transaction ID. Inputting false IDs may result in account termination.
+                        </p>
+                      </div>
+
+                      {checkoutError && (
+                        <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold leading-normal">
+                          ⚠️ {checkoutError}
+                        </div>
+                      )}
+
+                      {/* Submit Actions Button Strip */}
+                      <div className="flex gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTier(null)}
+                          className="flex-1 bg-white hover:bg-stone-50 border border-[#e3dec9] text-stone-600 py-3 rounded-2xl font-bold text-xs cursor-pointer transition-all"
+                        >
+                          Go Back
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={checkoutLoading}
+                          className="flex-1 bg-[#5a5a40] text-white py-3 rounded-2xl font-black text-xs border border-[#3e3e2b] border-b-[4px] border-b-[#303022] hover:bg-[#4a4a34] cursor-pointer transition-all flex items-center justify-center gap-1"
+                        >
+                          {checkoutLoading ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Submitting...</span>
+                            </>
+                          ) : (
+                            <span>Submit Payment</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
               )}
 
             </div>

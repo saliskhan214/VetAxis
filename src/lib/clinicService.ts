@@ -53,19 +53,8 @@ export interface ClinicSoapRecord {
   createdAt: number;
   lastUpdated: number;
   isLocked: boolean; // lock records after 24 hrs
-}
-
-export interface DrugRecord {
-  id: string;
-  name: string;
-  brandName?: string;
-  isControlled: boolean;
-  stockQuantity: number;
-  unitPrice: number;
-  expiryDate: string;
-  dosageFormula: string; // e.g., "0.1 ml/kg"
-  commonContraindications?: string[];
-  alternatives?: string[];
+  authorUid?: string;
+  userId?: string;
 }
 
 export interface ClinicPrescription {
@@ -90,6 +79,8 @@ export interface ClinicPrescription {
     instructions: string;
   }>;
   createdAt: number;
+  authorUid?: string;
+  userId?: string;
 }
 
 export interface InvoiceItem {
@@ -119,6 +110,8 @@ export interface ClinicInvoice {
   refundReason?: string;
   refundAuthorizedBy?: string;
   createdAt: number;
+  authorUid?: string;
+  userId?: string;
 }
 
 export interface ServiceCatalogItem {
@@ -135,7 +128,6 @@ const LOCAL_SOAP_KEY = 'va_clinic_soap_records';
 const LOCAL_PRESC_KEY = 'va_clinic_prescriptions';
 const LOCAL_INVOICE_KEY = 'va_clinic_invoices';
 const LOCAL_CATALOG_KEY = 'va_clinic_catalog';
-const LOCAL_DRUGS_KEY = 'va_clinic_drugs_inventory';
 
 let offlineOverride = false;
 
@@ -171,14 +163,6 @@ const DEFAULT_CATALOG: ServiceCatalogItem[] = [
   { id: 'sc_6', name: 'Grooming Standard', category: 'other', price: 2500, taxPct: 16 },
   { id: 'sc_7', name: 'Dental Scaling', category: 'procedure', price: 8000, taxPct: 16 },
   { id: 'sc_8', name: 'CBC Blood Analysis', category: 'procedure', price: 1800, taxPct: 16 }
-];
-
-const DEFAULT_DRUGS: DrugRecord[] = [
-  { id: 'dr_1', name: 'Amoxicillin', brandName: 'Aclam', isControlled: false, stockQuantity: 150, unitPrice: 400, expiryDate: '2027-12-01', dosageFormula: '12.5 mg/kg', commonContraindications: ['Penicillin allergy'], alternatives: ['Erythromycin', 'Clindamycin'] },
-  { id: 'dr_2', name: 'Meloxicam', brandName: 'Maxicam', isControlled: false, stockQuantity: 200, unitPrice: 200, expiryDate: '2026-11-15', dosageFormula: '0.2 mg/kg', commonContraindications: ['Gastrointestinal ulcers', 'Kidney impaired'], alternatives: ['Carprofen', 'Ketoprofen'] },
-  { id: 'dr_3', name: 'Ketamine 10%', brandName: 'Ketamax', isControlled: true, stockQuantity: 15, unitPrice: 1500, expiryDate: '2028-05-30', dosageFormula: '5.0 mg/kg', commonContraindications: ['Hypertension', 'Cardiac arrest risks'], alternatives: ['Propofol'] },
-  { id: 'dr_4', name: 'Xylazine 2%', brandName: 'Rompun', isControlled: true, stockQuantity: 20, unitPrice: 1200, expiryDate: '2027-02-28', dosageFormula: '1.0 mg/kg', commonContraindications: ['Cardiorespiratory failure'], alternatives: ['Dexmedetomidine'] },
-  { id: 'dr_5', name: 'Ivermectin Injection', brandName: 'Ivermax', isControlled: false, stockQuantity: 80, unitPrice: 650, expiryDate: '2026-08-10', dosageFormula: '0.2 mg/kg', commonContraindications: ['Collie breeds risk (MDR1 mutation)'], alternatives: ['Selamectin', 'Milbemycin'] }
 ];
 
 const DEFAULT_APPOINTMENTS = (clinicId: string): ClinicAppointment[] => {
@@ -317,14 +301,12 @@ export const ClinicService = {
       const prescs: ClinicPrescription[] = JSON.parse(localStorage.getItem(LOCAL_PRESC_KEY) || '[]');
       const invoices: ClinicInvoice[] = JSON.parse(localStorage.getItem(LOCAL_INVOICE_KEY) || '[]');
       const catalog: ServiceCatalogItem[] = JSON.parse(localStorage.getItem(LOCAL_CATALOG_KEY) || '[]');
-      const drugs: DrugRecord[] = JSON.parse(localStorage.getItem(LOCAL_DRUGS_KEY) || '[]');
 
       for (const a of appts) await setDoc(doc(db, 'clinic_appointments', a.id), cleanUndefined(a));
       for (const s of soaps) await setDoc(doc(db, 'clinic_soap_records', s.id), cleanUndefined(s));
       for (const p of prescs) await setDoc(doc(db, 'clinic_prescriptions', p.id), cleanUndefined(p));
       for (const i of invoices) await setDoc(doc(db, 'clinic_invoices', i.id), cleanUndefined(i));
       for (const c of catalog) await setDoc(doc(db, 'clinic_service_catalog', c.id), cleanUndefined(c));
-      for (const d of drugs) await setDoc(doc(db, 'clinic_drugs_inventory', d.id), cleanUndefined(d));
 
       console.log('[VetAxis] Clinic management data synchronized safely with custom firestore collections.');
     } catch (err) {
@@ -620,51 +602,6 @@ export const ClinicService = {
         all.push(cleaned);
       }
       localStorage.setItem(LOCAL_CATALOG_KEY, JSON.stringify(all));
-    }
-  },
-
-  async fetchDrugsInventory(): Promise<DrugRecord[]> {
-    if (isCloud()) {
-      try {
-        const snaps = await getDocs(collection(db, 'clinic_drugs_inventory'));
-        const results = snaps.docs.map(d => d.data() as DrugRecord);
-        if (results.length === 0) {
-          for (const s of DEFAULT_DRUGS) {
-            await setDoc(doc(db, 'clinic_drugs_inventory', s.id), s);
-          }
-          return DEFAULT_DRUGS;
-        }
-        return results;
-      } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'clinic_drugs_inventory');
-      }
-    } else {
-      let local = localStorage.getItem(LOCAL_DRUGS_KEY);
-      if (!local) {
-        localStorage.setItem(LOCAL_DRUGS_KEY, JSON.stringify(DEFAULT_DRUGS));
-        return DEFAULT_DRUGS;
-      }
-      return JSON.parse(local) as DrugRecord[];
-    }
-  },
-
-  async saveDrugRecord(drug: DrugRecord): Promise<void> {
-    const cleaned = cleanUndefined(drug);
-    if (isCloud()) {
-      try {
-        await setDoc(doc(db, 'clinic_drugs_inventory', drug.id), cleaned);
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `clinic_drugs_inventory/${drug.id}`);
-      }
-    } else {
-      const all = JSON.parse(localStorage.getItem(LOCAL_DRUGS_KEY) || '[]') as DrugRecord[];
-      const idx = all.findIndex(d => d.id === drug.id);
-      if (idx !== -1) {
-        all[idx] = cleaned;
-      } else {
-        all.push(cleaned);
-      }
-      localStorage.setItem(LOCAL_DRUGS_KEY, JSON.stringify(all));
     }
   }
 };

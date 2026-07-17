@@ -369,7 +369,7 @@ export default function App() {
       if (typeof cn !== 'string') return false;
       
       const isFixed = node.classList.contains('fixed') && !node.classList.contains('pointer-events-none');
-      const hasBackdrop = cn.includes('bg-black/') || cn.includes('backdrop-blur') || cn.includes('bg-stone-900/');
+      const hasBackdrop = (cn.includes('bg-black/') || cn.includes('backdrop-blur') || cn.includes('bg-stone-900/')) && node.classList.contains('fixed');
       const hasDialog = node.getAttribute('role') === 'dialog' || node.querySelector('[role="dialog"]') !== null;
       
       return isFixed || hasBackdrop || hasDialog;

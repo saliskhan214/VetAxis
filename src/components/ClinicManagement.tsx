@@ -44,7 +44,6 @@ import {
   ClinicService, 
   ClinicAppointment, 
   ClinicSoapRecord, 
-  DrugRecord, 
   ClinicPrescription, 
   ClinicInvoice, 
   ServiceCatalogItem 
@@ -71,7 +70,6 @@ export function ClinicManagement({
   const [prescriptions, setPrescriptions] = useState<ClinicPrescription[]>([]);
   const [invoices, setInvoices] = useState<ClinicInvoice[]>([]);
   const [catalog, setCatalog] = useState<ServiceCatalogItem[]>([]);
-  const [drugs, setDrugs] = useState<DrugRecord[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Filter and view states
@@ -239,14 +237,12 @@ export function ClinicManagement({
       const p = await ClinicService.fetchPrescriptions(user.uid);
       const i = await ClinicService.fetchInvoices(user.uid);
       const cat = await ClinicService.fetchServiceCatalog();
-      const drg = await ClinicService.fetchDrugsInventory();
 
       setAppointments(a);
       setSoaps(s);
       setPrescriptions(p);
       setInvoices(i);
       setCatalog(cat);
-      setDrugs(drg);
     } catch (err) {
       console.error("Failed loading clinic metrics:", err);
     } finally {
@@ -457,7 +453,9 @@ export function ClinicManagement({
         vetSignature: newSoap.vetSignature || 'Licensed Practitioner',
         createdAt: Date.now(),
         lastUpdated: Date.now(),
-        isLocked: true // Button says "Lock Soap Card" so publish it locked!
+        isLocked: true, // Button says "Lock Soap Card" so publish it locked!
+        authorUid: user.uid,
+        userId: user.uid
       };
 
       await ClinicService.saveSoapRecord(record);
@@ -465,8 +463,8 @@ export function ClinicManagement({
       // If Prescription section is enabled, write linked prescription
       if (includePrescription) {
         const isControlled = prescriptionForm.drugs.some(pd => {
-          const info = drugs.find(d => d.name.toLowerCase() === pd.name.toLowerCase());
-          return info?.isControlled;
+          const nameLower = pd.name.toLowerCase();
+          return nameLower.includes('ketamine') || nameLower.includes('xylazine');
         });
 
         const presc: ClinicPrescription = {
@@ -484,7 +482,9 @@ export function ClinicManagement({
           controlledLogRef: isControlled ? 'CR-LOG-' + Math.floor(100000 + Math.random() * 900000) : undefined,
           vetSignature: record.vetSignature,
           drugs: prescriptionForm.drugs,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          authorUid: user.uid,
+          userId: user.uid
         };
         await ClinicService.savePrescription(presc);
       }
@@ -581,33 +581,6 @@ export function ClinicManagement({
     setPrescriptionForm({ ...prescriptionForm, drugs: updated });
   };
 
-  const handleDrugSelect = (idx: number, drugName: string) => {
-    const matched = drugs.find(d => d.name === drugName);
-    if (!matched) return;
-
-    // Weight auto-calculator integration
-    const weight = prescriptionForm.weightKg;
-    let autoDose = matched.dosageFormula;
-
-    // Simulate direct dosage calculations if formula matches "X mg/kg" pattern and details available
-    const matchMg = matched.dosageFormula.match(/([\d\.]+)\s*mg\/kg/i);
-    if (matchMg && weight) {
-      const perKg = parseFloat(matchMg[1]);
-      const totalMg = (perKg * weight).toFixed(1);
-      autoDose = `${totalMg} mg (Calculated for ${weight}kg via ${perKg}mg/kg formula)`;
-    }
-
-    const updated = [...prescriptionForm.drugs];
-    updated[idx] = {
-      name: matched.name,
-      brandName: matched.brandName || '',
-      isGeneric: true,
-      dosage: autoDose,
-      instructions: `Give once daily for 5 days. Contraindications Check: ${matched.commonContraindications?.join(', ') || 'None reported'}.`
-    };
-    setPrescriptionForm({ ...prescriptionForm, drugs: updated });
-  };
-
   const handleCreatePrescription = async (e: FormEvent) => {
     e.preventDefault();
     if (!prescriptionForm.patientName || prescriptionForm.drugs.some(d => !d.name)) return;
@@ -616,8 +589,8 @@ export function ClinicManagement({
       // Interaction Warn Analyzer
       const selectedDrugNames = prescriptionForm.drugs.map(d => d.name.toLowerCase());
       const isControlled = prescriptionForm.drugs.some(pd => {
-        const info = drugs.find(d => d.name.toLowerCase() === pd.name.toLowerCase());
-        return info?.isControlled;
+        const nameLower = pd.name.toLowerCase();
+        return nameLower.includes('ketamine') || nameLower.includes('xylazine');
       });
 
       const record: ClinicPrescription = {
@@ -634,7 +607,9 @@ export function ClinicManagement({
         controlledLogRef: isControlled ? 'CR-LOG-' + Math.floor(100000 + Math.random() * 900000) : undefined,
         vetSignature: prescriptionForm.vetSignature,
         drugs: prescriptionForm.drugs,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        authorUid: user.uid,
+        userId: user.uid
       };
 
       await ClinicService.savePrescription(record);
@@ -656,28 +631,50 @@ export function ClinicManagement({
     }
   };
 
-  const handleDeletePrescription = async (id: string, patientName: string) => {
-    try {
-      await ClinicService.deletePrescription(id);
-      if (activePrescription?.id === id) {
-        setActivePrescription(null);
+  const handleDeletePrescription = (id: string, patientName: string) => {
+    setConfirmState({
+      title: "Delete Prescription Record",
+      message: `Are you sure you want to permanently delete the clinical prescription for ${patientName}? This action is irreversible and will remove the prescription from the digital veterinary records.`,
+      confirmText: "🗑️ Yes, Delete",
+      cancelText: "Cancel / Return",
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          await ClinicService.deletePrescription(id);
+          setActivePrescription((prev) => {
+            if (prev?.id === id) return null;
+            return prev;
+          });
+          await loadData();
+          setConfirmState(null);
+        } catch (err) {
+          alert(`Error deleting prescription: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
-      await loadData();
-    } catch (err) {
-      alert(`Error deleting prescription: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    });
   };
 
-  const handleDeleteSoap = async (id: string, patientName: string) => {
-    try {
-      await ClinicService.deleteSoapRecord(id);
-      if (activeSoap?.id === id) {
-        setActiveSoap(null);
+  const handleDeleteSoap = (id: string, patientName: string) => {
+    setConfirmState({
+      title: "Delete SOAP Clinical Record",
+      message: `Are you sure you want to permanently delete the SOAP ledger entry for ${patientName}? This action is irreversible and will remove the clinical card from the medical registry.`,
+      confirmText: "🗑️ Yes, Delete",
+      cancelText: "Cancel / Return",
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          await ClinicService.deleteSoapRecord(id);
+          setActiveSoap((prev) => {
+            if (prev?.id === id) return null;
+            return prev;
+          });
+          await loadData();
+          setConfirmState(null);
+        } catch (err) {
+          alert(`Error deleting SOAP record: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
-      await loadData();
-    } catch (err) {
-      alert(`Error deleting SOAP record: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    });
   };
 
   // Canvas Exporter: Merges SOAP + Prescription and downloads as PNG Image alongside JSON local record
@@ -979,7 +976,9 @@ export function ClinicManagement({
       paidAmount: total, // Set fully paid by default
       paymentMethod: invoiceForm.paymentMethod,
       paymentStatus: 'Paid',
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      authorUid: user.uid,
+      userId: user.uid
     };
 
     await ClinicService.saveInvoice(record);
@@ -1039,7 +1038,7 @@ export function ClinicManagement({
     const totalRevenueToday = closedInvoices.reduce((sum, inv) => sum + inv.total, 0);
 
     // Low stock count finder
-    const lowStock = drugs.filter(d => d.stockQuantity < 25).length;
+    const lowStock = 0;
 
     // Fulfill rate percentage
     const finishedCount = appointments.filter(a => a.status === 'Completed').length;
@@ -2166,19 +2165,6 @@ export function ClinicManagement({
                                 <input type="text" placeholder="e.g. Meloxicam liquid 1.5mg/ml" required={includePrescription} value={d.name} onChange={(e) => {
                                   const updated = [...prescriptionForm.drugs];
                                   updated[index].name = e.target.value;
-                                  
-                                  // Auto calculations dosage helper based on drug inventory record and weight
-                                  const matchedDrug = drugs.find(drv => drv.name.toLowerCase() === e.target.value.toLowerCase());
-                                  if (matchedDrug && matchedDrug.dosageFormula && prescriptionForm.weightKg) {
-                                    // Parse formula like "0.1 ml/kg"
-                                    const match = matchedDrug.dosageFormula.match(/([\d\.]+)\s*(ml|mg|vial)?/i);
-                                    if (match) {
-                                      const factor = parseFloat(match[1]);
-                                      const computedVal = (factor * prescriptionForm.weightKg).toFixed(2);
-                                      updated[index].dosage = `${computedVal} ${match[2] || 'ml'}`;
-                                    }
-                                  }
-                                  
                                   setPrescriptionForm({...prescriptionForm, drugs: updated});
                                 }} className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl" />
                               </div>
