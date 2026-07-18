@@ -100,7 +100,7 @@ export default function VeterinaryNewsBrief() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/veterinary-news?category=${cat}`);
+      const response = await fetch(`/api/veterinary-news?category=${cat}&refresh=${forceRefresh}`);
       if (!response.ok) {
         throw new Error('Server returned an error response');
       }

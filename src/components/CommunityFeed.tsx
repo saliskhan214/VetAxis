@@ -105,7 +105,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [payerCvvOrPin, setPayerCvvOrPin] = useState<string>('');
   const [nearbyEstimCount, setNearbyEstimCount] = useState<number>(0);
   const [isNewsModalOpen, setIsNewsModalOpen] = useState<boolean>(false);
-  const [newsActiveTab, setNewsActiveTab] = useState<'guides' | 'news'>('guides');
+  const [newsActiveTab, setNewsActiveTab] = useState<'guides' | 'news'>('news');
 
   // Subscription Alert privilege evaluations
   const userTier = currentUser.subscriptionTier;
@@ -1209,32 +1209,22 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
           <div className="bg-gradient-to-br from-[#fcfbf9] via-[#f7f5ef] to-stone-100 border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-5 shadow-sm space-y-3.5 text-left relative overflow-hidden">
             <div className="absolute top-0 right-0 w-16 h-16 bg-[#5a5a40]/5 rounded-bl-full pointer-events-none" />
             <div className="space-y-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#a0522d] bg-[#a0522d]/10 px-2.5 py-0.5 rounded">📚 Academic & News</span>
-              <h4 className="font-serif font-black text-sm text-[#373735]">Knowledge & News Hub</h4>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#a0522d] bg-[#a0522d]/10 px-2.5 py-0.5 rounded">📰 Veterinary News</span>
+              <h4 className="font-serif font-black text-sm text-[#373735]">Veterinary News Hub</h4>
               <p className="text-[11px] font-medium text-[#7a766f] leading-relaxed">
-                Natively access peer-reviewed clinical guides, livestock health methodologies, global disease alerts, and small animal studies.
+                Natively access peer-reviewed clinical studies, global disease alerts, and small animal studies.
               </p>
             </div>
             
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  setNewsActiveTab('guides');
-                  setIsNewsModalOpen(true);
-                }}
-                className="cursor-pointer text-center bg-[#5a5a40] hover:bg-[#4a4a34] text-white py-2.5 px-2 rounded-xl font-bold text-[11px] border border-b-[3px] border-b-[#303022] transition-all flex items-center justify-center gap-1.5 shadow-xs"
-              >
-                <span>📚 Guides Hub</span>
-              </button>
-              
+            <div className="w-full">
               <button
                 onClick={() => {
                   setNewsActiveTab('news');
                   setIsNewsModalOpen(true);
                 }}
-                className="cursor-pointer text-center bg-white hover:bg-stone-50 text-[#5a5a40] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] py-2.5 px-2 rounded-xl font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                className="w-full cursor-pointer text-center bg-[#5a5a40] hover:bg-[#4a4a34] text-white py-2.5 px-4 rounded-xl font-bold text-[11px] border border-b-[3px] border-b-[#303022] transition-all flex items-center justify-center gap-1.5 shadow-xs"
               >
-                <span>📰 News Briefs</span>
+                <span>📰 View News Briefs</span>
               </button>
             </div>
           </div>
@@ -1287,38 +1277,14 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                 ✕
               </button>
 
-              {/* Toggle Switcher Header */}
-              <div className="border-b border-[#e3dec9] px-6 pt-5 pb-0 flex gap-6">
-                <button
-                  onClick={() => setNewsActiveTab('guides')}
-                  className={`pb-3 text-sm font-black border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                    newsActiveTab === 'guides'
-                      ? 'border-[#5a5a40] text-[#5a5a40]'
-                      : 'border-transparent text-stone-400 hover:text-stone-600'
-                  }`}
-                >
-                  <span>📚</span>
-                  <span>Educational Guides Hub</span>
-                </button>
-                <button
-                  onClick={() => setNewsActiveTab('news')}
-                  className={`pb-3 text-sm font-black border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                    newsActiveTab === 'news'
-                      ? 'border-[#5a5a40] text-[#5a5a40]'
-                      : 'border-transparent text-stone-400 hover:text-stone-600'
-                  }`}
-                >
-                  <span>📰</span>
-                  <span>Veterinary News Briefs</span>
-                </button>
+              {/* Header Title */}
+              <div className="border-b border-[#e3dec9] px-6 pt-5 pb-3 flex items-center gap-2">
+                <span className="text-xl">📰</span>
+                <span className="text-base font-black text-[#5a5a40] font-serif">Veterinary News Briefs</span>
               </div>
 
               <div className="p-3">
-                {newsActiveTab === 'guides' ? (
-                  <BlogSection currentUser={currentUser} />
-                ) : (
-                  <VeterinaryNewsBrief />
-                )}
+                <VeterinaryNewsBrief />
               </div>
             </motion.div>
           </div>

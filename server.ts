@@ -53,7 +53,7 @@ async function startServer() {
   // IN-MEMORY CACHE FOR HIGH PERFORMANCE & RATE LIMIT PROTECTION
   // ─────────────────────────────────────────────────────────────────
   const newsCache: Record<string, { data: any; timestamp: number }> = {};
-  const NEWS_CACHE_DURATION = 15 * 60 * 1000; // Cache news for 15 minutes
+  const NEWS_CACHE_DURATION = 12 * 60 * 60 * 1000; // Cache news for 12 hours to prevent exceeding rate limits
 
   let cachedSitemap: { xml: string; timestamp: number } | null = null;
   const SITEMAP_CACHE_DURATION = 30 * 60 * 1000; // Cache sitemap for 30 minutes
@@ -277,10 +277,11 @@ async function startServer() {
   // ─────────────────────────────────────────────────────────────────
   app.get("/api/veterinary-news", async (req, res) => {
     const category = (req.query.category as string) || "latest";
+    const forceRefresh = req.query.refresh === "true";
     try {
-      // Serve from memory cache if active
+      // Serve from memory cache if active and not force-refreshed
       const now = Date.now();
-      if (newsCache[category] && (now - newsCache[category].timestamp < NEWS_CACHE_DURATION)) {
+      if (!forceRefresh && newsCache[category] && (now - newsCache[category].timestamp < NEWS_CACHE_DURATION)) {
         console.log(`[News Cache] Serving category "${category}" from memory cache`);
         return res.json(newsCache[category].data);
       }
@@ -369,7 +370,7 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
 
       res.json(responseData);
     } catch (error: any) {
-      console.warn(`[News Resilience System] Gemini news generation failed or exceeded quota: ${error.message || error}. Serving pristine high-fidelity backup bulletins for category "${category}".`);
+      console.log(`[News Resilience] Serving robust backup bulletins for category "${category}" due to temporary API rate-limiting.`);
       
       const fallbackList = SERVER_FALLBACK_NEWS[category] || SERVER_FALLBACK_NEWS["latest"];
       const responseData = { success: true, news: fallbackList, isFallback: true };

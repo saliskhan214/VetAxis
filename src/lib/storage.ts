@@ -153,54 +153,48 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
       let expiresStr = localStorage.getItem('va_salis_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
-      if (!expiresMs || isNaN(expiresMs)) {
-        expiresMs = Date.now() + 5 * 60 * 1000; // 5-minute premium trial for testing auto-revert!
-        localStorage.setItem('va_salis_sub_expires', expiresMs.toString());
-      }
-      
-      // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
-      if (Date.now() > expiresMs) {
-        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
-          // Keep active manual subscription tier and expiration
+      if (expiresMs > 0) {
+        // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
+        if (Date.now() > expiresMs) {
+          if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
+            // Keep active manual subscription tier and expiration
+          } else {
+            user.subscriptionTier = undefined;
+            user.subscriptionExpiresAt = undefined;
+          }
         } else {
-          user.subscriptionTier = undefined;
-          user.subscriptionExpiresAt = undefined;
-        }
-      } else {
-        // Still within active trial period - FORCE Platinum so both home feed card and portal are Platinum
-        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
-          // Respect their manual subscription!
-        } else {
-          user.subscriptionTier = 'Platinum';
-          user.isVerified = true;
-          user.subscriptionExpiresAt = expiresMs;
+          // Still within active trial period - FORCE Platinum so both home feed card and portal are Platinum
+          if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
+            // Respect their manual subscription!
+          } else {
+            user.subscriptionTier = 'Platinum';
+            user.isVerified = true;
+            user.subscriptionExpiresAt = expiresMs;
+          }
         }
       }
     } else if (emailLower === 'bunnykhan329@gmail.com') {
       let expiresStr = localStorage.getItem('va_bunny_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
-      if (!expiresMs || isNaN(expiresMs)) {
-        expiresMs = Date.now() + 5 * 60 * 1000; // 5-minute premium trial for testing auto-revert!
-        localStorage.setItem('va_bunny_sub_expires', expiresMs.toString());
-      }
-      
-      // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
-      if (Date.now() > expiresMs) {
-        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
-          // Keep active manual subscription tier and expiration
+      if (expiresMs > 0) {
+        // If trial has expired, do NOT auto-resubscribe or extend! Revert to normal.
+        if (Date.now() > expiresMs) {
+          if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
+            // Keep active manual subscription tier and expiration
+          } else {
+            user.subscriptionTier = undefined;
+            user.subscriptionExpiresAt = undefined;
+          }
         } else {
-          user.subscriptionTier = undefined;
-          user.subscriptionExpiresAt = undefined;
-        }
-      } else {
-        // Still within active trial period - FORCE Silver
-        if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
-          // Respect their manual subscription!
-        } else {
-          user.subscriptionTier = 'Silver';
-          user.isVerified = true;
-          user.subscriptionExpiresAt = expiresMs;
+          // Still within active trial period - FORCE Silver
+          if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now() && user.subscriptionExpiresAt !== expiresMs) {
+            // Respect their manual subscription!
+          } else {
+            user.subscriptionTier = 'Silver';
+            user.isVerified = true;
+            user.subscriptionExpiresAt = expiresMs;
+          }
         }
       }
     }
