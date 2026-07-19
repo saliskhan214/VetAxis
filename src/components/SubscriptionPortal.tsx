@@ -803,84 +803,161 @@ export function SubscriptionPortal({
       </AnimatePresence>
 
       {/* DETAILED FEATURES COMPARATIVE COMPARISON MATRIX */}
-      <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl overflow-hidden mt-6">
-        <div className="bg-[#fcf9f2] p-5 border-b border-[#e3dec9]">
-          <h3 className="font-serif text-lg font-black text-[#373735]">
-            Subscription Level Matrix
+      <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl overflow-hidden mt-8 shadow-sm">
+        <div className="bg-[#fcf9f2] p-6 border-b border-[#e3dec9]">
+          <h3 className="font-serif text-xl font-black text-[#373735] flex items-center gap-2">
+            🛡️ Subscription Level Matrix
           </h3>
           <p className="text-xs font-semibold text-[#7a766f]">
-            Detailed permissions breakdown for clinics, practitioners and support teams.
+            Detailed permissions breakdown for clinics, practitioners, and support teams. Compare features below.
           </p>
         </div>
 
         <div className="overflow-x-auto text-[11px]">
-          <table className="w-full border-collapse text-left min-w-[600px]">
+          <table className="w-full border-collapse text-left min-w-[750px]">
             <thead>
-              <tr className="border-b border-[#e3dec9] bg-stone-50 text-[10px] uppercase font-black tracking-wider text-[#7a766f] select-none">
-                <th className="p-4 pl-6">Clinical Privilege / Benefit</th>
-                <th className="p-4 text-center">Unsubscribed</th>
-                <th className="p-4 text-center">🥈 Silver</th>
-                <th className="p-4 text-center">👑 Gold</th>
-                <th className="p-4 text-center">🏆 Platinum</th>
+              <tr className="border-b border-[#e3dec9] bg-stone-50/50 text-[10px] uppercase font-black tracking-wider text-[#7a766f] select-none">
+                <th className="p-4 pl-6 w-1/3">Clinical Privilege / Benefit</th>
+                <th className={`p-4 text-center transition-colors ${!currentUser.subscriptionTier ? 'bg-amber-50/40 border-x border-[#e3dec9]' : ''}`}>
+                  <div className="flex flex-col items-center gap-1">
+                    <span>Unsubscribed</span>
+                    {!currentUser.subscriptionTier && (
+                      <span className="text-[8px] bg-[#5a5a40] text-white px-1.5 py-0.5 rounded font-black tracking-wide uppercase">Your Status</span>
+                    )}
+                  </div>
+                </th>
+                <th className={`p-4 text-center transition-colors ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/50 border-x border-[#e3dec9]' : ''}`}>
+                  <div className="flex flex-col items-center gap-1">
+                    <span>🥈 Silver</span>
+                    {currentUser.subscriptionTier === 'Silver' && (
+                      <span className="text-[8px] bg-[#5a5a40] text-white px-1.5 py-0.5 rounded font-black tracking-wide uppercase">Your Status</span>
+                    )}
+                  </div>
+                </th>
+                <th className={`p-4 text-center transition-colors ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50 border-x border-[#e3dec9]' : ''}`}>
+                  <div className="flex flex-col items-center gap-1">
+                    <span>👑 Gold</span>
+                    {currentUser.subscriptionTier === 'Gold' && (
+                      <span className="text-[8px] bg-amber-600 text-white px-1.5 py-0.5 rounded font-black tracking-wide uppercase">Your Status</span>
+                    )}
+                  </div>
+                </th>
+                <th className={`p-4 text-center transition-colors ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50 border-x border-[#e3dec9]' : ''}`}>
+                  <div className="flex flex-col items-center gap-1">
+                    <span>🏆 Platinum</span>
+                    {currentUser.subscriptionTier === 'Platinum' && (
+                      <span className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded font-black tracking-wide uppercase">Your Status</span>
+                    )}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f4f1e9] font-semibold text-[#373735]">
-              <tr>
-                <td className="p-4 pl-6 text-[#5a5a40] font-black">🚜 Farm Workspaces managed</td>
-                <td className="p-4 text-center text-red-500">Max 1 Farm</td>
-                <td className="p-4 text-center text-slate-700">Max 3 Farms</td>
-                <td className="p-4 text-center text-amber-800">Max 10 Farms</td>
-                <td className="p-4 text-center text-indigo-700 font-extrabold">Unlimited Farms</td>
+              {/* CATEGORY 1 */}
+              <tr className="bg-stone-50/80">
+                <td colSpan={5} className="p-3 pl-6 font-black text-[#5a5a40] tracking-wider uppercase text-[9px] border-y border-[#e3dec9]/60">
+                  🏥 Clinical Operations & Practice Management
+                </td>
               </tr>
               <tr>
-                <td className="p-4 pl-6 text-[#5a5a40] font-black">🔔 Free Emergency Radar Alerts</td>
-                <td className="p-4 text-center text-stone-500">Paid (₨ 300 / 500)</td>
-                <td className="p-4 text-center text-slate-700 font-extrabold">15 Free Alerts</td>
-                <td className="p-4 text-center text-amber-800 font-extrabold">30 Free Alerts</td>
-                <td className="p-4 text-center text-indigo-700 font-black">Unlimited Free</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Clinic Management Access</td>
+                <td className={`p-4 text-center text-red-500 font-extrabold ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>❌ Restricted / Locked</td>
+                <td className={`p-4 text-center text-emerald-700 font-extrabold ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>✅ Fully Unlocked</td>
+                <td className={`p-4 text-center text-emerald-700 font-extrabold ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>✅ Fully Unlocked</td>
+                <td className={`p-4 text-center text-emerald-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>✅ Fully Unlocked</td>
               </tr>
               <tr>
-                <td className="p-4 pl-6 text-[#5a5a40] font-black">📦 Marketplace Product & Pet Ads</td>
-                <td className="p-4 text-center text-red-500">Max 3 ads weekly</td>
-                <td className="p-4 text-center text-slate-700 font-black">Unlimited Ads</td>
-                <td className="p-4 text-center text-amber-800 font-black">Unlimited Ads</td>
-                <td className="p-4 text-center text-indigo-700 font-black">Unlimited Ads</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Farm Workspaces managed</td>
+                <td className={`p-4 text-center text-red-500 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Max 1 Farm</td>
+                <td className={`p-4 text-center text-slate-700 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>Max 3 Farms</td>
+                <td className={`p-4 text-center text-amber-800 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>Max 10 Farms</td>
+                <td className={`p-4 text-center text-indigo-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>Unlimited Farms</td>
+              </tr>
+
+
+              {/* CATEGORY 2 */}
+              <tr className="bg-stone-50/80">
+                <td colSpan={5} className="p-3 pl-6 font-black text-[#5a5a40] tracking-wider uppercase text-[9px] border-y border-[#e3dec9]/60">
+                  📢 Directory & Professional Branding
+                </td>
               </tr>
               <tr>
-                <td className="p-4 pl-6 text-black font-extrabold">Vet Directory sorted list rank priority</td>
-                <td className="p-4 text-center text-[#7a766f]">Standard Low</td>
-                <td className="p-4 text-center text-slate-700">🥈 High Rank</td>
-                <td className="p-4 text-center text-amber-800">👑 Top tier Priority</td>
-                <td className="p-4 text-center text-indigo-700 font-extrabold">🏆 Absolute Top (Primary)</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Search List sorted rank priority</td>
+                <td className={`p-4 text-center text-[#7a766f] ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Standard Low</td>
+                <td className={`p-4 text-center text-slate-700 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>🥈 High Rank</td>
+                <td className={`p-4 text-center text-amber-800 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>👑 Top Tier Priority</td>
+                <td className={`p-4 text-center text-indigo-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>🏆 Absolute Top (Primary)</td>
               </tr>
               <tr>
-                <td className="p-4 pl-6 text-black font-extrabold">Professional Badge Verification styling</td>
-                <td className="p-4 text-center">None</td>
-                <td className="p-4 text-center">slate badging</td>
-                <td className="p-4 text-center text-amber-600">Vetted gold badge</td>
-                <td className="p-4 text-center text-indigo-600">Holographic badge</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Professional Portfolio Badge</td>
+                <td className={`p-4 text-center text-[#7a766f] ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Standard Row None</td>
+                <td className={`p-4 text-center text-slate-600 font-bold ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>🥈 Silver Portfolio Badge</td>
+                <td className={`p-4 text-center text-amber-600 font-bold ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>👑 Official Gold Badge</td>
+                <td className={`p-4 text-center text-indigo-600 font-black ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>💎 Holographic Diamond Badge</td>
+              </tr>
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">3D Member Card Design</td>
+                <td className={`p-4 text-center text-[#7a766f] ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Standard Card</td>
+                <td className={`p-4 text-center text-slate-600 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>🥈 Interactive 3D Silver</td>
+                <td className={`p-4 text-center text-amber-600 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>👑 Golden Guilloche Design</td>
+                <td className={`p-4 text-center text-indigo-600 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>💎 Holographic Dark Metal</td>
+              </tr>
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Priority Support & Branding</td>
+                <td className={`p-4 text-center text-stone-400 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Standard</td>
+                <td className={`p-4 text-center text-stone-400 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>Standard</td>
+                <td className={`p-4 text-center text-stone-500 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>Standard</td>
+                <td className={`p-4 text-center text-indigo-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>⚡ VIP 24/7 Priority Support</td>
+              </tr>
+
+              {/* CATEGORY 3 */}
+              <tr className="bg-stone-50/80">
+                <td colSpan={5} className="p-3 pl-6 font-black text-[#5a5a40] tracking-wider uppercase text-[9px] border-y border-[#e3dec9]/60">
+                  📡 Local Radar & Promotions
+                </td>
               </tr>
 
               <tr>
-                <td className="p-4 pl-6 text-black font-extrabold">Classified Pet Ads expiration cycle duration</td>
-                <td className="p-4 text-center">30 Days</td>
-                <td className="p-4 text-center">90 Days</td>
-                <td className="p-4 text-center">90 Days</td>
-                <td className="p-4 text-center">90 Days</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Veterinary Billboard Banner Ads</td>
+                <td className={`p-4 text-center text-red-500 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>❌ Locked (Paid only)</td>
+                <td className={`p-4 text-center text-slate-700 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>3 Free Ads (3d duration)</td>
+                <td className={`p-4 text-center text-amber-800 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>5 Free Ads (3d duration)</td>
+                <td className={`p-4 text-center text-indigo-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>10 Free Ads (3d duration)</td>
+              </tr>
+
+              {/* CATEGORY 4 */}
+              <tr className="bg-stone-50/80">
+                <td colSpan={5} className="p-3 pl-6 font-black text-[#5a5a40] tracking-wider uppercase text-[9px] border-y border-[#e3dec9]/60">
+                  📦 Marketplace & Classified Ads
+                </td>
               </tr>
               <tr>
-                <td className="p-4 pl-6 text-black font-extrabold">Free Active Veterinary Billboard Banner Ads</td>
-                <td className="p-4 text-center text-red-500">❌ Locked</td>
-                <td className="p-4 text-center text-slate-700">3 ads (3d duration each)</td>
-                <td className="p-4 text-center text-amber-800">5 ads (3d duration each)</td>
-                <td className="p-4 text-center text-indigo-700 font-extrabold">10 ads (3d duration each)</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Marketplace Product Postings</td>
+                <td className={`p-4 text-center text-red-500 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Max 3 Active / 15 Mo</td>
+                <td className={`p-4 text-center text-slate-700 font-bold ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>Unlimited Listings</td>
+                <td className={`p-4 text-center text-amber-800 font-bold ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>Unlimited Listings</td>
+                <td className={`p-4 text-center text-indigo-700 font-black ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>Unlimited Listings</td>
               </tr>
               <tr>
-                <td className="p-4 pl-6 text-black font-extrabold text-teal-600">Dynamic Holographic Product listing highlights</td>
-                <td className="p-4 text-center">Default white</td>
-                <td className="p-4 text-center">Default white</td>
-                <td className="p-4 text-center">Highlighted border</td>
-                <td className="p-4 text-center text-teal-600 font-extrabold">🏆 True Shimmer Holographic</td>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Classified Pet Advertisements</td>
+                <td className={`p-4 text-center text-red-500 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Max 3 Ads Weekly</td>
+                <td className={`p-4 text-center text-slate-700 font-bold ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>Unlimited Listings</td>
+                <td className={`p-4 text-center text-amber-800 font-bold ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>Unlimited Listings</td>
+                <td className={`p-4 text-center text-indigo-700 font-black ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>Unlimited Listings</td>
+              </tr>
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Classified Ads Retention Visibility</td>
+                <td className={`p-4 text-center text-[#7a766f] ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>30 Days Expiry</td>
+                <td className={`p-4 text-center text-[#7a766f] ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>90 Days Expiry</td>
+                <td className={`p-4 text-center text-[#7a766f] ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>90 Days Expiry</td>
+                <td className={`p-4 text-center text-[#7a766f] ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>90 Days Expiry</td>
+              </tr>
+              <tr>
+                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Product Listing Highlights</td>
+                <td className={`p-4 text-center text-stone-400 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Default White</td>
+                <td className={`p-4 text-center text-stone-400 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>Default White</td>
+                <td className={`p-4 text-center text-amber-650 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>👑 Gold Ribbon Highlight</td>
+                <td className={`p-4 text-center text-indigo-600 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>🏆 Holographic Highlight</td>
               </tr>
             </tbody>
           </table>
