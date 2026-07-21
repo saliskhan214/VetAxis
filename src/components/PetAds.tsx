@@ -6,7 +6,7 @@ import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Spar
 
 interface PetAdsProps {
   currentUser: UserProfile;
-  onNavigate?: (section: string) => void;
+  onNavigate?: (section: string, highlightId?: string) => void;
 }
 
 export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
@@ -503,7 +503,7 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
                           </span>
                           {onNavigate && (
                             <button
-                              onClick={() => onNavigate('community')}
+                              onClick={() => onNavigate('community', post.id)}
                               className="cursor-pointer bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-xl border-none shadow-xs transition-colors"
                             >
                               Check Community Feed 💬

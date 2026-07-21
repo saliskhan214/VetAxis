@@ -1092,7 +1092,7 @@ export function ClinicManagement({
       
       {/* Top Header Card with Stats */}
       <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] rounded-2xl p-6 shadow-xs relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 text-neutral-100 font-bold select-none text-[150px] leading-none pointer-events-none font-serif">
+        <div className="hidden md:block absolute top-0 right-0 p-8 text-neutral-100 font-bold select-none text-[150px] leading-none pointer-events-none font-serif opacity-30">
           ➕
         </div>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
@@ -1698,13 +1698,6 @@ export function ClinicManagement({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="font-bold text-gray-700">Assigned Doctor</label>
-                    <select value={newAppt.vetName} onChange={(e) => setNewAppt({...newAppt, vetName: e.target.value})} className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl">
-                      <option value="Dr. Sarah Alizai">Dr. Sarah Alizai</option>
-                      <option value="Dr. Faisal Shah">Dr. Faisal Shah</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
                     <label className="font-bold text-gray-700">Recurring Treatments</label>
                     <select value={newAppt.recurrencePattern} onChange={(e) => setNewAppt({...newAppt, recurrencePattern: e.target.value as any, isRecurring: e.target.value !== 'None'})} className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl">
                       <option value="None">Non-Recurring</option>
@@ -1713,9 +1706,6 @@ export function ClinicManagement({
                       <option value="Monthly">Monthly Vaccinations</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="font-bold text-gray-700">Appointment Status</label>
                     <select value={newAppt.status} onChange={(e) => setNewAppt({...newAppt, status: e.target.value as any})} className="w-full bg-white border border-[#e3dec9] p-2 rounded-xl text-[#5a5a40] font-bold">
@@ -1727,11 +1717,12 @@ export function ClinicManagement({
                       <option value="Cancelled">Cancelled</option>
                     </select>
                   </div>
-                  <div className="space-y-1 flex flex-col justify-end">
-                    <div className="flex items-center gap-2 p-1.5 pt-4">
-                      <input type="checkbox" id="is_blocked_appt" checked={!!newAppt.isBlocked} onChange={(e) => setNewAppt({...newAppt, isBlocked: e.target.checked, patientName: e.target.checked ? '⚠️ BLOCKED SLOT' : (newAppt.patientName === '⚠️ BLOCKED SLOT' ? '' : newAppt.patientName)})} className="w-4 h-4 text-[#5a5a40]" />
-                      <label htmlFor="is_blocked_appt" className="font-bold text-gray-700 cursor-pointer">Block this slot (lunch/meetings)</label>
-                    </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 p-1.5">
+                    <input type="checkbox" id="is_blocked_appt" checked={!!newAppt.isBlocked} onChange={(e) => setNewAppt({...newAppt, isBlocked: e.target.checked, patientName: e.target.checked ? '⚠️ BLOCKED SLOT' : (newAppt.patientName === '⚠️ BLOCKED SLOT' ? '' : newAppt.patientName)})} className="w-4 h-4 text-[#5a5a40]" />
+                    <label htmlFor="is_blocked_appt" className="font-bold text-gray-700 cursor-pointer">Block this slot (lunch/meetings)</label>
                   </div>
                 </div>
 
@@ -1776,11 +1767,13 @@ export function ClinicManagement({
               </div>
 
               {/* Template shortcuts */}
-              <div className="flex items-center gap-2 p-2 bg-stone-50 rounded-xl border">
-                <span className="text-[10px] font-bold text-gray-500 uppercase font-mono">Fill Preset Diagnostics Template:</span>
-                <button type="button" onClick={() => applySoapTemplate('vaccine')} className="cursor-pointer text-[10px] font-bold bg-white border hover:bg-stone-100 p-1 px-2 rounded-lg">Core Vaccine Inoculation</button>
-                <button type="button" onClick={() => applySoapTemplate('flea')} className="cursor-pointer text-[10px] font-bold bg-white border hover:bg-stone-100 p-1 px-2 rounded-lg">Flea Dermatitis</button>
-                <button type="button" onClick={() => applySoapTemplate('spay')} className="cursor-pointer text-[10px] font-bold bg-white border hover:bg-stone-100 p-1 px-2 rounded-lg">Ovariohysterectomy Spay</button>
+              <div className="flex flex-col sm:flex-row sm:items-center flex-wrap gap-2 p-2.5 bg-stone-50 rounded-xl border">
+                <span className="text-[10px] font-bold text-[#5a5a40] uppercase font-mono">Fill Preset:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button type="button" onClick={() => applySoapTemplate('vaccine')} className="cursor-pointer text-[10px] font-bold bg-white border hover:bg-stone-100 p-1 px-2 rounded-lg">Core Vaccine</button>
+                  <button type="button" onClick={() => applySoapTemplate('flea')} className="cursor-pointer text-[10px] font-bold bg-white border hover:bg-stone-100 p-1 px-2 rounded-lg">Flea Dermatitis</button>
+                  <button type="button" onClick={() => applySoapTemplate('spay')} className="cursor-pointer text-[10px] font-bold bg-white border hover:bg-stone-100 p-1 px-2 rounded-lg">Spay Surgery (Ovariohysterectomy)</button>
+                </div>
               </div>
 
               <form onSubmit={handleCreateSoap} className="space-y-4 text-xs">

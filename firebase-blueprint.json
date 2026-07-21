@@ -99,9 +99,13 @@
         "role": { "type": "string" },
         "profilePic": { "type": "string" },
         "text": { "type": "string" },
-        "category": { "type": "string", "enum": ["lost", "adoption", "help", "general"] },
+        "category": { "type": "string", "enum": ["lost", "adoption", "help", "general", "emergency", "ask_vet"] },
         "ts": { "type": "number" },
-        "reactions": { "type": "object" }
+        "reactions": { "type": "object" },
+        "answers": {
+          "type": "array",
+          "description": "Answers from verified practitioners"
+        }
       },
       "required": ["authorEmail", "authorName", "text", "category", "ts"]
     },

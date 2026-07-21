@@ -65,17 +65,9 @@ service cloud.firestore {
     // USERS COLLECTION Rules
     // ─────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow get: if isSignedIn() && (
-        isOwner(userId) ||
-        isAdmin() ||
-        resource.data.role != 'user'
-      );
+      allow get: if resource.data.role != 'user' || isSignedIn();
       
-      allow list: if isSignedIn() && (
-        isAdmin() || 
-        resource.data.role != 'user' ||
-        resource.data.uid == request.auth.uid
-      );
+      allow list: if resource.data.role != 'user' || isSignedIn();
 
       allow create: if isSignedIn() && isOwner(userId) && (
         incoming().keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
@@ -280,12 +272,13 @@ service cloud.firestore {
         incoming().get('authorEmail', '') == request.auth.token.email
       );
 
-      // Protect update: allows reactions, editing, and priority boosting
+      // Protect update: allows reactions, editing, answers upvotes, and priority boosting
       allow update: if isSignedIn() && (
         existing().get('authorUid', '') == request.auth.uid ||
         existing().get('authorEmail', '') == request.auth.token.email ||
-        // Allow anyone else to update reactions map
-        incoming().reactions is map
+        // Allow anyone else to update reactions map or answers list
+        incoming().reactions is map ||
+        incoming().get('answers', []) is list
       );
 
       allow delete: if isSignedIn() && (

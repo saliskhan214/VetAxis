@@ -25,7 +25,7 @@ import {
 } from 'firebase/auth';
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd, ManualPayment } from '../types';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd, ManualPayment, VetAnswer } from '../types';
 import bcrypt from 'bcryptjs';
 
 // ─────────────────────────────────────────────────────────────────
@@ -1188,20 +1188,7 @@ class WildcardSet extends Set<string> {
 }
 
 async function getValidUserEmails(): Promise<Set<string>> {
-  if (isFirebaseConfigured && db) {
-    // In Firebase mode, we do not query the entire '/users' collection on client side
-    // to search for emails (which breaks rules under PII security and leaks user details).
-    // Any post, ad, or product is already guaranteed to be authored by a authenticated user on creation.
-    return new WildcardSet();
-  }
-  const emails = new Set<string>(SEED_EMAILS);
-  const users = getLocalUsers();
-  users.forEach(u => {
-    if (u.email) {
-      emails.add(u.email.toLowerCase().trim());
-    }
-  });
-  return emails;
+  return new WildcardSet();
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1875,6 +1862,135 @@ export const CommunityService = {
       const posts = await this.fetchPosts();
       const filtered = posts.filter(p => p.id !== postId);
       localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(filtered));
+    }
+  },
+
+  async addAnswer(postId: string, text: string, practitioner: UserProfile): Promise<CommunityPost> {
+    const answer: VetAnswer = {
+      id: 'ans_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      authorUid: practitioner.uid,
+      authorEmail: practitioner.email,
+      authorName: practitioner.name,
+      authorRole: practitioner.role,
+      profilePic: practitioner.profilePic || 'default',
+      subscriptionTier: practitioner.subscriptionTier || undefined,
+      text: text.trim(),
+      ts: Date.now(),
+      upvotes: []
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, 'community_posts', postId);
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) throw new Error('Post not found in database.');
+        const post = snap.data() as CommunityPost;
+        const answers = post.answers || [];
+        answers.push(answer);
+        await updateDoc(docRef, { answers });
+        
+        // Notify author of post
+        if (post.authorUid && post.authorUid !== practitioner.uid) {
+          const notifId = 'notif_ans_' + Date.now();
+          await setDoc(doc(db, 'notifications', notifId), {
+            id: notifId,
+            userId: post.authorUid,
+            senderId: practitioner.uid,
+            senderName: practitioner.name,
+            type: 'comment',
+            targetId: postId,
+            targetType: 'post',
+            message: `🩺 Verified Practitioner Dr. ${practitioner.name} answered your Ask-A-Vet question: "${text.substring(0, 60)}..."`,
+            read: false,
+            createdAt: Date.now()
+          });
+        }
+
+        return { ...post, id: postId, answers };
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `community_posts/${postId}`);
+        throw err;
+      }
+    } else {
+      const posts = await this.fetchPosts();
+      const idx = posts.findIndex(p => p.id === postId);
+      if (idx !== -1) {
+        const answers = posts[idx].answers || [];
+        answers.push(answer);
+        posts[idx].answers = answers;
+        localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+
+        const post = posts[idx];
+        if (post.authorUid && post.authorUid !== practitioner.uid) {
+          const localNotifs = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+          localNotifs.unshift({
+            id: 'notif_ans_' + Date.now(),
+            userId: post.authorUid,
+            senderId: practitioner.uid,
+            senderName: practitioner.name,
+            type: 'comment',
+            targetId: postId,
+            targetType: 'post',
+            message: `🩺 Verified Practitioner Dr. ${practitioner.name} answered your Ask-A-Vet question: "${text.substring(0, 60)}..."`,
+            read: false,
+            createdAt: Date.now()
+          });
+          localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(localNotifs));
+        }
+
+        return posts[idx];
+      }
+      throw new Error('Post not found.');
+    }
+  },
+
+  async upvoteAnswer(postId: string, answerId: string, userUidOrEmail: string): Promise<CommunityPost> {
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, 'community_posts', postId);
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) throw new Error('Post not found.');
+        const post = snap.data() as CommunityPost;
+        const answers = post.answers || [];
+        const ansIdx = answers.findIndex(a => a.id === answerId);
+        if (ansIdx !== -1) {
+          const upvotes = answers[ansIdx].upvotes || [];
+          const uIdx = upvotes.indexOf(userUidOrEmail);
+          if (uIdx === -1) {
+            upvotes.push(userUidOrEmail);
+          } else {
+            upvotes.splice(uIdx, 1);
+          }
+          answers[ansIdx].upvotes = upvotes;
+          await updateDoc(docRef, { answers });
+          return { ...post, id: postId, answers };
+        }
+        throw new Error('Answer not found.');
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `community_posts/${postId}`);
+        throw err;
+      }
+    } else {
+      const posts = await this.fetchPosts();
+      const idx = posts.findIndex(p => p.id === postId);
+      if (idx !== -1) {
+        const answers = posts[idx].answers || [];
+        const ansIdx = answers.findIndex(a => a.id === answerId);
+        if (ansIdx !== -1) {
+          const upvotes = answers[ansIdx].upvotes || [];
+          const uIdx = upvotes.indexOf(userUidOrEmail);
+          if (uIdx === -1) {
+            upvotes.push(userUidOrEmail);
+          } else {
+            upvotes.splice(uIdx, 1);
+          }
+          answers[ansIdx].upvotes = upvotes;
+          posts[idx].answers = answers;
+          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+          return posts[idx];
+        }
+      }
+      throw new Error('Post or Answer not found.');
     }
   }
 };

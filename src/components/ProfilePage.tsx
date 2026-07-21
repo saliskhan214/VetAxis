@@ -1023,8 +1023,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
 
                     {currentUser.location?.lat && currentUser.location?.lng && (
                       <div className="space-y-3">
-                        <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200/60 flex items-center justify-between gap-3.5">
-                          <div className="space-y-0.5">
+                        <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-0.5 text-left">
                             <span className="text-[9px] font-black uppercase text-emerald-800 block tracking-wider leading-none mb-1">📍 Saved GPS Location</span>
                             <span className="text-xs font-mono font-bold text-emerald-900 block">
                               Lat: {currentUser.location.lat.toFixed(6)}, Lng: {currentUser.location.lng.toFixed(6)}
@@ -1034,7 +1034,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                             href={`https://www.google.com/maps?q=${currentUser.location.lat},${currentUser.location.lng}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="cursor-pointer border border-emerald-300 border-b-[3px] border-b-emerald-800 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-2xs font-extrabold py-1.5 px-3 rounded-xl transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+                            className="cursor-pointer border border-emerald-300 border-b-[3px] border-b-emerald-800 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-2xs font-extrabold py-2 px-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full sm:w-auto text-center shrink-0"
                           >
                             🗺️ Show on Google Maps
                           </a>

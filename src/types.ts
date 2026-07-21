@@ -92,6 +92,19 @@ export interface Product {
   ownerSubscriptionTier?: 'Silver' | 'Gold' | 'Platinum';
 }
 
+export interface VetAnswer {
+  id: string;
+  authorUid: string;
+  authorEmail: string;
+  authorName: string;
+  authorRole: UserRole;
+  profilePic?: string;
+  subscriptionTier?: 'Silver' | 'Gold' | 'Platinum';
+  text: string;
+  ts: number;
+  upvotes: string[]; // array of user UIDs or emails who upvoted this answer
+}
+
 export interface CommunityPost {
   id: string;
   authorEmail: string;
@@ -100,7 +113,7 @@ export interface CommunityPost {
   role: UserRole;
   profilePic: string;
   text: string;
-  category: 'lost' | 'adoption' | 'help' | 'general' | 'emergency';
+  category: 'lost' | 'adoption' | 'help' | 'general' | 'emergency' | 'ask_vet';
   ts: number;
   reactions: {
     [key: string]: string[]; // maps '❤️' | '👍' | '❗' to array of user emails/UIDs
@@ -118,6 +131,7 @@ export interface CommunityPost {
     notifiedCount: number;
     ts: number;
   };
+  answers?: VetAnswer[]; // Answers from verified Silver/Gold/Platinum practitioners
 }
 
 export enum SORT_TYPES {

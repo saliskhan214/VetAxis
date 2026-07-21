@@ -133,9 +133,6 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
     } catch (e) {
       console.warn('Could not update browser history state', e);
     }
-    
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Back to list

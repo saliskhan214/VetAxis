@@ -419,7 +419,7 @@ export default function App() {
   // Sync and validate that the stored session user profile still exists in Firestore or Fallback DB
   // Also runs a real-time periodic clock to guarantee user downgrades when subscription duration runs out
   useEffect(() => {
-    if (dbQuotaExceeded) return;
+    if (isAuthInitializing || dbQuotaExceeded) return;
     let active = true;
 
     const validateSession = async () => {
@@ -442,11 +442,11 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser?.uid, dbQuotaExceeded]);
+  }, [currentUser?.uid, dbQuotaExceeded, isAuthInitializing]);
 
   // Real-time precise monthly/trial subscription expiration checker
   useEffect(() => {
-    if (!currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || dbQuotaExceeded) return;
+    if (isAuthInitializing || !currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || dbQuotaExceeded) return;
     
     let active = true;
     const checkExpiry = async () => {
@@ -511,11 +511,11 @@ export default function App() {
       active = false;
       clearInterval(timerId);
     };
-  }, [currentUser?.uid, currentUser?.subscriptionTier, currentUser?.subscriptionExpiresAt, dbQuotaExceeded]);
+  }, [currentUser?.uid, currentUser?.subscriptionTier, currentUser?.subscriptionExpiresAt, dbQuotaExceeded, isAuthInitializing]);
 
   // Real-time online presence heartbeat
   useEffect(() => {
-    if (!currentUser || dbQuotaExceeded) return;
+    if (isAuthInitializing || !currentUser || dbQuotaExceeded) return;
 
     const performHeartbeat = async () => {
       try {
@@ -534,7 +534,7 @@ export default function App() {
     // Trigger heartbeat clock cycle every 30 seconds to be extremely precise
     const interval = setInterval(performHeartbeat, 30000);
     return () => clearInterval(interval);
-  }, [currentUser?.uid, dbQuotaExceeded]);
+  }, [currentUser?.uid, dbQuotaExceeded, isAuthInitializing]);
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
@@ -687,7 +687,15 @@ export default function App() {
             )}
 
             {activeSection === 'pet_ads' && (
-              <PetAds currentUser={currentUser} onNavigate={setActiveSection} />
+              <PetAds 
+                currentUser={currentUser} 
+                onNavigate={(section, highlightId) => {
+                  if (highlightId) {
+                    setHighlightPostId(highlightId);
+                  }
+                  setActiveSection(section);
+                }} 
+              />
             )}
 
             {activeSection === 'jobs' && (

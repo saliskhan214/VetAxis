@@ -63,7 +63,8 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   // Compose variables
   const [newTitle, setNewTitle] = useState<string>('');
   const [newPostText, setNewPostText] = useState<string>('');
-  const [newCategory, setNewCategory] = useState<'lost' | 'adoption' | 'help' | 'general' | 'emergency'>('general');
+  const [newCategory, setNewCategory] = useState<'lost' | 'adoption' | 'help' | 'general' | 'emergency' | 'ask_vet'>('general');
+  const [activeAnswerTexts, setActiveAnswerTexts] = useState<{[postId: string]: string}>({});
   
   // States
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -113,6 +114,9 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const myAlertsCount = posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length;
   const isAlertFree = userTier ? (myAlertsCount < maxFreeAlerts) : false;
 
+  const isVerifiedPractitioner = (currentUser.role === 'doctor' || currentUser.role === 'clinic') &&
+    (currentUser.subscriptionTier === 'Silver' || currentUser.subscriptionTier === 'Gold' || currentUser.subscriptionTier === 'Platinum');
+
   // Load posts
   const loadPosts = async () => {
     setLoading(true);
@@ -131,6 +135,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     if (post) {
       if (activeFilter !== 'all' && activeFilter !== post.category) {
         setActiveFilter('all');
+      }
+      
+      const postCity = post.city || 'All Cities';
+      if (cityFilter !== 'all' && postCity !== 'All Cities' && postCity.toLowerCase().trim() !== cityFilter.toLowerCase().trim()) {
+        setCityFilter('all');
       }
       
       setTimeout(() => {
@@ -162,6 +171,12 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
           setActiveFilter('all');
         }
         
+        // If active city filter is filtering this post out, reset to show 'all'
+        const postCity = match.city || 'All Cities';
+        if (cityFilter !== 'all' && postCity !== 'All Cities' && postCity.toLowerCase().trim() !== cityFilter.toLowerCase().trim()) {
+          setCityFilter('all');
+        }
+        
         const scrollTimer = setTimeout(() => {
           const postEl = document.getElementById(`post-${highlightPostId}`);
           if (postEl) {
@@ -171,7 +186,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         return () => clearTimeout(scrollTimer);
       }
     }
-  }, [highlightPostId, posts, activeFilter]);
+  }, [highlightPostId, posts, activeFilter, cityFilter]);
 
   // Update nearby user estimate when coordinate / radius changes
   useEffect(() => {
@@ -280,6 +295,32 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       triggerToast(formatErrorMessage(err.message || 'Post failed.'), 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddAnswer = async (postId: string) => {
+    const text = activeAnswerTexts[postId] || '';
+    if (!text.trim()) {
+      triggerToast('Answer text cannot be empty.', 'error');
+      return;
+    }
+
+    try {
+      const updated = await CommunityService.addAnswer(postId, text, currentUser);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+      setActiveAnswerTexts((prev) => ({ ...prev, [postId]: '' }));
+      triggerToast('✓ Your practitioner advice has been posted successfully!', 'success');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to post answer.', 'error');
+    }
+  };
+
+  const handleToggleUpvoteAnswer = async (postId: string, answerId: string) => {
+    try {
+      const updated = await CommunityService.upvoteAnswer(postId, answerId, currentUser.uid || currentUser.email);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to upvote answer.', 'error');
     }
   };
 
@@ -464,7 +505,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   });
 
   // Calculate stats for sidebar
-  const categoryCounts = { lost: 0, adoption: 0, help: 0, general: 0, emergency: 0 };
+  const categoryCounts: Record<string, number> = { lost: 0, adoption: 0, help: 0, general: 0, emergency: 0, ask_vet: 0 };
   posts.forEach((p) => {
     if (categoryCounts[p.category] !== undefined) categoryCounts[p.category]++;
   });
@@ -818,6 +859,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     {[
                       { id: 'adoption', label: '🟢 Adoption', activeClass: 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold' },
                       { id: 'help', label: '🔵 Help Call', activeClass: 'bg-blue-50 border-blue-500 text-blue-700 font-bold' },
+                      { id: 'ask_vet', label: '💬 Ask-A-Vet Q&A', activeClass: 'bg-amber-50 border-amber-500 text-amber-800 font-bold' },
                       { id: 'general', label: '📝 General', activeClass: 'bg-stone-100 border-[#5a5a40] text-[#5a5a40] font-bold' }
                     ].map((cat) => {
                       const isSelected = newCategory === cat.id;
@@ -878,6 +920,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               {[
                 { id: 'all', label: '🌐 All Streams', activeClass: 'bg-[#5a5a40] border-[#5a5a40] border-b-[3px] border-b-[#3e3e2b] text-white font-extrabold' },
                 { id: 'emergency', label: '🚨 Emergency Alerts', activeClass: 'bg-red-600 border-red-700 border-b-[3px] border-b-red-800 text-white font-extrabold' },
+                { id: 'ask_vet', label: '💬 Ask-A-Vet Q&A Hub', activeClass: 'bg-amber-600 border-amber-700 border-b-[3px] border-b-amber-800 text-white font-extrabold' },
                 { id: 'lost', label: '🔴 Missing Pets', activeClass: 'bg-[#df4747] border-[#c23838] border-b-[3px] border-b-[#9e2a2a] text-white font-extrabold' },
                 { id: 'adoption', label: '🟢 Adoption Circles', activeClass: 'bg-emerald-600 border-emerald-700 border-b-[3px] border-b-emerald-800 text-white font-extrabold' },
                 { id: 'help', label: '🔵 Assistance Queries', activeClass: 'bg-blue-600 border-blue-700 border-b-[3px] border-b-blue-800 text-white font-extrabold' }
@@ -1087,10 +1130,12 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                                   : post.category === 'help'
                                   ? 'bg-blue-50 border-blue-200 text-[#1a5f94]'
+                                  : post.category === 'ask_vet'
+                                  ? 'bg-amber-50 border-amber-300 text-amber-800'
                                   : 'bg-[#f4f1e9] border-[#e3dec9] text-[#5a5a40]'
                               }`}
                             >
-                              {post.category} Stream Entry
+                              {post.category === 'ask_vet' ? '💬 Ask-A-Vet Q&A' : `${post.category} Stream Entry`}
                             </span>
 
                             {post.isBoosted ? (
@@ -1191,6 +1236,129 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                             <span className="font-mono text-xs text-[#373735]">{post.reactions?.['❗']?.length || 0}</span>
                           </motion.button>
                         </div>
+
+                        {/* Ask-A-Vet Q&A Hub Section */}
+                        {post.category === 'ask_vet' && (
+                          <div className="border-t border-[#f4f1e9] mt-4 pt-4 space-y-4 text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">🩺</span>
+                              <h4 className="font-serif font-black text-xs uppercase tracking-wider text-[#5a5a40]">
+                                Professional Answers ({post.answers?.length || 0})
+                              </h4>
+                            </div>
+
+                            {/* Existing Answers List */}
+                            <div className="space-y-3">
+                              {(!post.answers || post.answers.length === 0) ? (
+                                <div className="text-xs text-[#a49f92] font-semibold italic bg-[#fcf9f2] p-4 rounded-2xl border border-dashed border-[#e3dec9] text-center">
+                                  No professional answers yet. Verified clinicians can add advice below.
+                                </div>
+                              ) : (
+                                post.answers.map((ans) => {
+                                  const alreadyUpvoted = ans.upvotes?.includes(currentUser.uid || currentUser.email);
+                                  return (
+                                    <div key={ans.id} className="bg-[#fcf9f2] border border-[#e3dec9] rounded-2xl p-4 space-y-2 relative transition-all hover:shadow-xs">
+                                      {/* Answer header */}
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                          {ans.profilePic && ans.profilePic !== 'default' ? (
+                                            <img
+                                              src={ans.profilePic}
+                                              alt={ans.authorName}
+                                              className="w-8 h-8 rounded-xl object-cover border border-[#e3dec9]"
+                                            />
+                                          ) : (
+                                            <div className="w-8 h-8 rounded-xl bg-[#5a5a40] text-white font-serif text-xs font-black flex items-center justify-center uppercase">
+                                              {ans.authorName[0]}
+                                            </div>
+                                          )}
+                                          <div>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <strong className="text-xs font-black text-[#373735]">
+                                                Dr. {ans.authorName}
+                                              </strong>
+                                              {ans.subscriptionTier && (
+                                                <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                                  ans.subscriptionTier === 'Platinum'
+                                                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                                    : ans.subscriptionTier === 'Gold'
+                                                    ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                                    : 'bg-stone-200 text-stone-700 border border-stone-300'
+                                                }`}>
+                                                  ★ {ans.subscriptionTier}
+                                                </span>
+                                              )}
+                                              <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-wider">
+                                                Verified Vet
+                                              </span>
+                                            </div>
+                                            <span className="text-[10px] text-stone-400 font-semibold font-mono">
+                                              {new Date(ans.ts).toLocaleString()}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        {/* Upvote button */}
+                                        <motion.button
+                                          whileTap={{ scale: 0.93 }}
+                                          onClick={() => handleToggleUpvoteAnswer(post.id, ans.id)}
+                                          className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all ${
+                                            alreadyUpvoted
+                                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-black'
+                                              : 'bg-white border-[#e3dec9] text-[#7a766f] hover:bg-stone-50'
+                                          }`}
+                                        >
+                                          <span>▲ Upvote</span>
+                                          <span className="font-mono bg-stone-100 px-1.5 py-0.5 rounded-md text-stone-700 font-black">
+                                            {ans.upvotes?.length || 0}
+                                          </span>
+                                        </motion.button>
+                                      </div>
+
+                                      {/* Answer text */}
+                                      <p className="text-xs text-stone-700 leading-relaxed font-medium pl-0.5 whitespace-pre-wrap">
+                                        {ans.text}
+                                      </p>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+
+                            {/* Answer Composer (Only for Verified Silver/Gold/Platinum Practitioners) */}
+                            <div className="bg-[#fcfbf9] border border-[#e3dec9] rounded-2xl p-4 space-y-3">
+                              {isVerifiedPractitioner ? (
+                                <div className="space-y-3">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/50 px-2.5 py-1 rounded-md block w-fit">
+                                    🩺 Clinical Practitioner Portal Active
+                                  </span>
+                                  <textarea
+                                    value={activeAnswerTexts[post.id] || ''}
+                                    onChange={(e) => setActiveAnswerTexts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                                    placeholder="Provide peer-reviewed medical insight, diagnostic thoughts, or husbandry suggestions..."
+                                    rows={3}
+                                    className="w-full text-xs font-semibold bg-white border border-[#e3dec9] p-3 rounded-xl outline-none resize-none focus:ring-1 focus:ring-[#5a5a40]"
+                                  />
+                                  <div className="flex justify-end">
+                                    <button
+                                      onClick={() => handleAddAnswer(post.id)}
+                                      className="cursor-pointer font-serif font-black bg-[#5a5a40] hover:bg-[#4a4a34] text-white border border-[#3e3e2b] border-b-[3px] text-xs px-5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                                    >
+                                      <span>🩺 Post Verified Answer</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-stone-500 text-[11px] leading-relaxed font-semibold flex items-start gap-2 p-1.5">
+                                  <span className="text-lg">ℹ️</span>
+                                  <span>
+                                    Only <strong>Verified Practitioners</strong> (Doctors and Clinics with Silver, Gold, or Platinum tiers) can contribute clinical answers in the Q&A Hub. This maintains high trust and prevents unverified advice.
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                       </motion.div>
                     );
