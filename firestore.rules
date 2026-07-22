@@ -65,9 +65,9 @@ service cloud.firestore {
     // USERS COLLECTION Rules
     // ─────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow get: if resource.data.role != 'user' || isSignedIn();
+      allow get: if resource.data.role in ['doctor', 'clinic', 'assistant'] || isSignedIn();
       
-      allow list: if resource.data.role != 'user' || isSignedIn();
+      allow list: if resource.data.role in ['doctor', 'clinic', 'assistant'] || isSignedIn();
 
       allow create: if isSignedIn() && isOwner(userId) && (
         incoming().keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
@@ -135,8 +135,8 @@ service cloud.firestore {
       // REVIEWS SUBCOLLECTION (users/{userId}/reviews/{reviewId})
       // ───────────────────────────────────────────────────────────────
       match /reviews/{reviewId} {
-        // Any signed-in user can view clinican reviews
-        allow read: if isSignedIn();
+        // Anyone can view clinician reviews
+        allow read: if true;
 
         allow create: if isSignedIn() && (
           // Reviewer can write review of someone else
