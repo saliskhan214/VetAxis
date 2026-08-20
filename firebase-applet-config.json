@@ -1,0 +1,11 @@
+{
+  "projectId": "vetaxis360",
+  "appId": "1:55809552788:web:1da5892d6ce0c5d2661f81",
+  "apiKey": "AIzaSyDy4Lrmi3DcP7Ux7aimzM2b8A79cYWIFKc",
+  "authDomain": "vetaxis360.firebaseapp.com",
+  "databaseURL": "https://vetaxis360-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "storageBucket": "vetaxis360.firebasestorage.app",
+  "messagingSenderId": "55809552788",
+  "measurementId": "G-906VTNPLH7",
+  "firestoreDatabaseId": "ai-studio-vetaxis-5a8cee99-a29c-45f0-b339-2d74ef068510"
+}

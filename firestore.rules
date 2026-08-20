@@ -1,0 +1,576 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────────
+    // GLOBAL SAFETY NET
+    // ─────────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // SECURE REUSABLE HELPER PRIMITIVES
+    // ─────────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'saliskhan214@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true)
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isFarmMember(farmId) {
+      return isSignedIn() &&
+        farmId != null &&
+        farmId != "" &&
+        exists(/databases/$(database)/documents/livestock_farms/$(farmId)) && (
+          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.ownerUid == request.auth.uid ||
+          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.managerUid == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('memberUids', [])
+        );
+    }
+
+    function isClinician() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic', 'assistant'];
+    }
+
+    function canUserReview(reviewerRole, targetRole) {
+      return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // USERS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow get: if resource.data.role in ['doctor', 'clinic', 'assistant'] || isSignedIn();
+      
+      allow list: if resource.data.role in ['doctor', 'clinic', 'assistant'] || isSignedIn();
+
+      allow create: if isSignedIn() && isOwner(userId) && (
+        incoming().keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().role in ['doctor', 'clinic', 'assistant', 'user'] &&
+        incoming().name is string && incoming().name.size() <= 80 &&
+        incoming().email is string && incoming().email.size() <= 128 &&
+        (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
+        (!('expertise' in incoming()) || (incoming().expertise is string && incoming().expertise.size() <= 200)) &&
+        (!('facilities' in incoming()) || (incoming().facilities is string && incoming().facilities.size() <= 200)) &&
+        (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
+        (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
+        (!('isVerified' in incoming()) || incoming().isVerified == false) && // Block self-verification during registration
+        (!('isAdmin' in incoming()) || incoming().isAdmin == false) && // Block self-admin status during registration
+        (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum'] || incoming().subscriptionTier == null) &&
+        (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number || incoming().subscriptionExpiresAt == null) &&
+        (!('emailVerified' in incoming()) || incoming().emailVerified is bool) &&
+        (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
+        (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
+        (!('location' in incoming()) || incoming().location == null || (
+          incoming().location is map &&
+          incoming().location.lat is number &&
+          incoming().location.lng is number &&
+          (!('address' in incoming().location) || incoming().location.address is string)
+        ))
+      );
+
+      // Protect against privilege escalation and role-switching attacks
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isOwner(userId) && (
+          incoming().role == existing().role &&
+          incoming().email == existing().email &&
+          incoming().createdAt == existing().createdAt &&
+          (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
+          (!('subscriptionTier' in incoming()) || incoming().subscriptionTier == existing().get('subscriptionTier', null)) && // Guard: cannot self-upgrade tier
+          (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt == existing().get('subscriptionExpiresAt', null)) && // Guard: cannot self-extend subscription
+          (!('isAdmin' in incoming()) || incoming().isAdmin == existing().get('isAdmin', false)) && // Guard: cannot self-admin
+          (!('promoAdsUsed' in incoming()) || incoming().promoAdsUsed is number) &&
+          (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
+          incoming().name is string && incoming().name.size() <= 80 &&
+          (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
+          (!('expertise' in incoming()) || (incoming().expertise is string && incoming().expertise.size() <= 200)) &&
+          (!('facilities' in incoming()) || (incoming().facilities is string && incoming().facilities.size() <= 200)) &&
+          (!('address' in incoming()) || (incoming().address is string && incoming().address.size() <= 200)) &&
+          (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
+          (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
+          (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
+          (!('location' in incoming()) || incoming().location == null || (
+            incoming().location is map &&
+            incoming().location.lat is number &&
+            incoming().location.lng is number &&
+            (!('address' in incoming().location) || incoming().location.address is string)
+          ))
+        )) || (
+          // Allow any signed-in user to update only the cumulative ratings statistics of clinicians
+          existing().role != 'user' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['avgRating', 'totalReviews'])
+        )
+      );
+      
+      allow delete: if isOwner(userId);
+
+      // ───────────────────────────────────────────────────────────────
+      // REVIEWS SUBCOLLECTION (users/{userId}/reviews/{reviewId})
+      // ───────────────────────────────────────────────────────────────
+      match /reviews/{reviewId} {
+        // Anyone can view clinician reviews
+        allow read: if true;
+
+        allow create: if isSignedIn() && (
+          // Reviewer can write review of someone else
+          userId != request.auth.uid &&
+          incoming().reviewerEmail == request.auth.token.email &&
+          incoming().reviewerName is string &&
+          incoming().reviewerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
+          incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
+          (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
+          incoming().date is number && incoming().date <= request.time.toMillis() + 60000 &&
+          // Verify that reviewer can review the target clinician
+          canUserReview(
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role,
+            get(/databases/$(database)/documents/users/$(userId)).data.role
+          )
+        );
+
+        allow update: if isSignedIn() && (
+          // Reviewer update
+          existing().reviewerEmail == request.auth.token.email &&
+          incoming().reviewerEmail == existing().reviewerEmail &&
+          incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
+          (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
+          incoming().date == existing().date
+        );
+
+        allow delete: if isSignedIn() && (
+          existing().reviewerEmail == request.auth.token.email
+        );
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PENDING MANUAL PAYMENTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /pending_manual_payments/{paymentId} {
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CONNECTION METADATA TEST RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /test-metadata-connection/{docId} {
+      allow read: if true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PET ADS RULES (Classifieds)
+    // ─────────────────────────────────────────────────────────────────
+    match /pet_ads/{adId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().ownerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
+        incoming().adType in ['sale', 'adoption'] &&
+        incoming().petType is string && incoming().petType.size() <= 50 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().location is string && incoming().location.size() <= 100 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow update: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().ownerRole == existing().ownerRole &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().adType == existing().adType &&
+        incoming().petType is string && incoming().petType.size() <= 50 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().location is string && incoming().location.size() <= 100 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // MARKETPLACE PRODUCTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /marketplace_products/{productId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        // Authority check: Only Clinicians (Doctors or Clinics) can post marketplace items
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic'] &&
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().ownerRole in ['doctor', 'clinic'] &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().price is number && incoming().price >= 0 &&
+        incoming().quantity is number && incoming().quantity >= 1 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow update: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().ownerRole == existing().ownerRole &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().price is number && incoming().price >= 0 &&
+        incoming().quantity is number && incoming().quantity >= 0 &&
+        incoming().description is string && incoming().description.size() <= 1500 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerEmail == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMMUNITY POSTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /community_posts/{postId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        incoming().get('authorUid', '') == request.auth.uid ||
+        incoming().get('authorEmail', '') == request.auth.token.email
+      );
+
+      // Protect update: allows reactions, editing, answers upvotes, and priority boosting
+      allow update: if isSignedIn() && (
+        existing().get('authorUid', '') == request.auth.uid ||
+        existing().get('authorEmail', '') == request.auth.token.email ||
+        // Allow anyone else to update reactions map or answers list
+        incoming().reactions is map ||
+        incoming().get('answers', []) is list
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().get('authorUid', '') == request.auth.uid ||
+        existing().get('authorEmail', '') == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // JOB POSTS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /job_posts/{jobId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'clinic' &&
+        incoming().get('clinicId', '') == request.auth.uid &&
+        incoming().get('clinicEmail', '') == request.auth.token.email &&
+        incoming().title is string && incoming().title.size() <= 150 &&
+        incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
+        incoming().location is string && incoming().location.size() <= 150 &&
+        incoming().salaryMin is number && incoming().salaryMin >= 0 &&
+        incoming().salaryMax is number && incoming().salaryMax >= incoming().salaryMin &&
+        incoming().experience is string && incoming().experience.size() <= 1000 &&
+        incoming().workingHours is string && incoming().workingHours.size() <= 1000 &&
+        incoming().genderPreference in ['No Preference', 'Male', 'Female'] &&
+        incoming().deadline is string && incoming().deadline.size() <= 50 &&
+        incoming().positions is number && incoming().positions >= 1 &&
+        incoming().status == 'open' &&
+        incoming().screeningQuestions is list &&
+        incoming().requiredDocuments is list &&
+        incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
+        incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
+        incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
+        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
+      );
+
+      allow update: if isSignedIn() && (
+        (existing().get('clinicId', '') == request.auth.uid || existing().get('clinicEmail', '') == request.auth.token.email) &&
+        incoming().get('clinicId', '') == existing().get('clinicId', '') &&
+        incoming().get('createdAt', 0) == existing().get('createdAt', 0) &&
+        incoming().title is string && incoming().title.size() <= 150 &&
+        incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
+        incoming().location is string && incoming().location.size() <= 150 &&
+        incoming().salaryMin is number && incoming().salaryMin >= 0 &&
+        incoming().salaryMax is number && incoming().salaryMax >= incoming().salaryMin &&
+        incoming().experience is string && incoming().experience.size() <= 1000 &&
+        incoming().workingHours is string && incoming().workingHours.size() <= 1000 &&
+        incoming().genderPreference in ['No Preference', 'Male', 'Female'] &&
+        incoming().deadline is string && incoming().deadline.size() <= 50 &&
+        incoming().positions is number && incoming().positions >= 1 &&
+        incoming().status in ['open', 'closed'] &&
+        incoming().screeningQuestions is list &&
+        incoming().requiredDocuments is list &&
+        incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
+        incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
+        incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
+        incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
+        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().get('clinicId', '') == request.auth.uid ||
+        existing().get('clinicEmail', '') == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // JOB APPLICATIONS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /job_applications/{applicationId} {
+      allow read: if isSignedIn() && (
+        resource.data.applicantId == request.auth.uid ||
+        resource.data.clinicId == request.auth.uid ||
+        resource.data.clinicEmail == request.auth.token.email
+      );
+
+      allow create: if isSignedIn() && (
+        incoming().get('applicantId', '') == request.auth.uid &&
+        incoming().get('applicantEmail', '') == request.auth.token.email &&
+        incoming().applicantName is string && incoming().applicantName.size() <= 150 &&
+        incoming().applicantPhone is string && incoming().applicantPhone.size() <= 24 &&
+        incoming().status == 'Pending' &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000
+      );
+
+      allow update: if isSignedIn() && (
+        // Only the clinic owning the job post can update the application status
+        (existing().get('clinicId', '') == request.auth.uid || existing().get('clinicEmail', '') == request.auth.token.email) &&
+        incoming().get('clinicId', '') == existing().get('clinicId', '') &&
+        incoming().get('jobId', '') == existing().get('jobId', '') &&
+        incoming().get('applicantId', '') == existing().get('applicantId', '') &&
+        incoming().get('applicantEmail', '') == existing().get('applicantEmail', '') &&
+        incoming().get('applicantName', '') == existing().get('applicantName', '') &&
+        incoming().get('applicantPhone', '') == existing().get('applicantPhone', '') &&
+        incoming().answers == existing().answers &&
+        incoming().submittedDocs == existing().submittedDocs &&
+        incoming().get('createdAt', 0) == existing().get('createdAt', 0) &&
+        incoming().status in ['Pending', 'Reviewed', 'Shortlisted', 'Rejected', 'Hired']
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().get('applicantId', '') == request.auth.uid ||
+        existing().get('clinicId', '') == request.auth.uid ||
+        existing().get('clinicEmail', '') == request.auth.token.email
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NOTIFICATIONS COLLECTION Rules
+    // ─────────────────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read, delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+      );
+      
+      allow create: if isSignedIn();
+      
+      allow update: if isSignedIn() && (
+        existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().senderId == existing().senderId &&
+        incoming().message == existing().message
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK FARMS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_farms/{farmId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn() && (
+        incoming().ownerUid == request.auth.uid &&
+        incoming().name is string && incoming().name.size() <= 150 &&
+        incoming().location is string && incoming().location.size() <= 200 &&
+        incoming().farmType in ['Poultry Farm', 'Dairy Farm', 'Buffalo Farm', 'Goat Farm', 'Sheep Farm', 'Mixed Farm']
+      );
+
+      allow update: if isSignedIn() && (
+        // Farm Owner can edit farm details
+        existing().ownerUid == request.auth.uid ||
+        // Or assigned vet can update status or notes
+        existing().managerUid == request.auth.uid ||
+        // Allow vet to link / decline when requested
+        (existing().get('managerStatus', '') == 'pending' && incoming().managerUid == request.auth.uid) ||
+        // Allow updating teams or records
+        (incoming().ownerUid == existing().ownerUid)
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerUid == request.auth.uid
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK ANIMALS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_animals/{animalId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK BATCHES RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_batches/{batchId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK TASKS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_tasks/{taskId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PROMOTIONAL ADS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /promotional_ads/{adId} {
+      allow read: if true;
+
+      allow create: if isSignedIn() && (
+        incoming().ownerUid == request.auth.uid &&
+        incoming().ownerEmail == request.auth.token.email &&
+        incoming().ownerRole in ['doctor', 'clinic'] &&
+        incoming().sponsorName is string && incoming().sponsorName.size() <= 100 &&
+        incoming().title is string && incoming().title.size() <= 155 &&
+        incoming().description is string && incoming().description.size() <= 1000 &&
+        incoming().ctaText is string && incoming().ctaText.size() <= 100 &&
+        incoming().ctaUrl is string && incoming().ctaUrl.size() <= 550 &&
+        incoming().pricePaid is number && incoming().pricePaid in [0, 1000, 1500] &&
+        incoming().durationDays is number && incoming().durationDays in [3, 7] &&
+        incoming().expiresAt is number &&
+        incoming().createdAt is number
+      );
+
+      allow delete: if isSignedIn() && (
+        existing().ownerUid == request.auth.uid
+      );
+
+      allow update: if isAdmin() || (
+        isSignedIn() && existing().ownerUid == request.auth.uid &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().ownerEmail == existing().ownerEmail &&
+        incoming().ownerRole == existing().ownerRole &&
+        incoming().pricePaid == existing().pricePaid &&
+        incoming().durationDays == existing().durationDays &&
+        incoming().expiresAt == existing().expiresAt &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().title is string && incoming().title.size() <= 155 &&
+        incoming().description is string && incoming().description.size() <= 1000 &&
+        incoming().ctaText is string && incoming().ctaText.size() <= 100 &&
+        incoming().ctaUrl is string && incoming().ctaUrl.size() <= 550
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK INDIVIDUAL RECORDS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_individual_records/{recordId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LIVESTOCK HERD RECORDS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /livestock_herd_records/{recordId} {
+      allow get: if isFarmMember(existing().farmId);
+      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
+      allow create: if isFarmMember(incoming().farmId);
+      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
+      allow delete: if isFarmMember(existing().farmId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // VETAXIS CLINIC AND CLINICAL RECORDS RULES
+    // ─────────────────────────────────────────────────────────────────
+
+    match /clinic_appointments/{apptId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isSignedIn() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid || isClinician());
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+    }
+
+    match /clinic_soap_records/{soapId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+    }
+
+    match /clinic_prescriptions/{prescId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+    }
+
+    match /clinic_invoices/{invoiceId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
+    }
+
+    match /clinic_service_catalog/{serviceId} {
+      allow read: if isSignedIn();
+      allow write: if isClinician() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
+    }
+  }
+}
