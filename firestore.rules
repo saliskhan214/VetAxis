@@ -45,8 +45,10 @@ service cloud.firestore {
         farmId != null &&
         farmId != "" &&
         exists(/databases/$(database)/documents/livestock_farms/$(farmId)) && (
+          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('ownerId', '') == request.auth.uid ||
           get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.ownerUid == request.auth.uid ||
           get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.managerUid == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('authorizedUsers', []) ||
           request.auth.uid in get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('memberUids', [])
         );
     }
@@ -412,21 +414,25 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────
     match /livestock_farms/{farmId} {
       allow get: if isSignedIn() && (
+        resource.data.get('ownerId', '') == request.auth.uid ||
         resource.data.ownerUid == request.auth.uid ||
         resource.data.managerUid == request.auth.uid ||
+        request.auth.uid in resource.data.get('authorizedUsers', []) ||
         request.auth.uid in resource.data.get('memberUids', []) ||
         isAdmin()
       );
       
       allow list: if isSignedIn() && (
+        resource.data.get('ownerId', '') == request.auth.uid ||
         resource.data.ownerUid == request.auth.uid ||
         resource.data.managerUid == request.auth.uid ||
+        request.auth.uid in resource.data.get('authorizedUsers', []) ||
         request.auth.uid in resource.data.get('memberUids', []) ||
         isAdmin()
       );
       
       allow create: if isSignedIn() && (
-        incoming().ownerUid == request.auth.uid &&
+        (incoming().get('ownerId', '') == request.auth.uid || incoming().ownerUid == request.auth.uid) &&
         incoming().name is string && incoming().name.size() <= 150 &&
         incoming().location is string && incoming().location.size() <= 200 &&
         incoming().farmType in ['Poultry Farm', 'Dairy Farm', 'Buffalo Farm', 'Goat Farm', 'Sheep Farm', 'Mixed Farm']
@@ -434,18 +440,21 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && (
         // Farm Owner can edit farm details
+        existing().get('ownerId', '') == request.auth.uid ||
         existing().ownerUid == request.auth.uid ||
         // Or assigned vet can update status or notes
         existing().managerUid == request.auth.uid ||
         // Allow vet to link / decline when requested
         (existing().get('managerStatus', '') == 'pending' && incoming().managerUid == request.auth.uid) ||
         // Allow updating teams or records
-        (incoming().ownerUid == existing().ownerUid) ||
+        (incoming().get('ownerId', '') == existing().get('ownerId', '') || incoming().ownerUid == existing().ownerUid) ||
+        request.auth.uid in existing().get('authorizedUsers', []) ||
         request.auth.uid in existing().get('memberUids', []) ||
         isAdmin()
       );
 
       allow delete: if isSignedIn() && (
+        existing().get('ownerId', '') == request.auth.uid ||
         existing().ownerUid == request.auth.uid ||
         isAdmin()
       );
@@ -529,7 +538,7 @@ service cloud.firestore {
     // LIVESTOCK INDIVIDUAL RECORDS RULES
     // ─────────────────────────────────────────────────────────────────
     match /livestock_individual_records/{recordId} {
-      allow get: if isFarmMember(existing().farmId);
+      allow get: if true;
       allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
       allow create: if isFarmMember(incoming().farmId);
       allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);

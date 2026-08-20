@@ -229,6 +229,7 @@ export interface LivestockFarm {
   farmType: FarmType;
   mixedOptions?: MixedFarmOptions;
   ownerUid: string;
+  ownerId?: string;          // User UID of the farm owner (alias for ownerUid)
   ownerName: string;
   ownerEmail: string;
   managerUid?: string;       // Assigned Vet/Clinic UID
@@ -239,6 +240,7 @@ export interface LivestockFarm {
   createdAt: number;
   team: FarmTeamMember[];
   memberUids?: string[];
+  authorizedUsers?: string[]; // List of user UIDs explicitly authorized to access this farm
 }
 
 export interface LivestockAnimal {

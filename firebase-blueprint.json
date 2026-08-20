@@ -185,6 +185,7 @@
         "farmType": { "type": "string" },
         "mixedOptions": { "type": "object" },
         "ownerUid": { "type": "string" },
+        "ownerId": { "type": "string", "description": "UID of the farm owner" },
         "ownerName": { "type": "string" },
         "ownerEmail": { "type": "string" },
         "managerUid": { "type": "string" },
@@ -194,7 +195,8 @@
         "managerDeclinedReason": { "type": "string" },
         "createdAt": { "type": "number" },
         "team": { "type": "array" },
-        "memberUids": { "type": "array", "description": "List of user UIDs authorized to access this farm workspace" }
+        "memberUids": { "type": "array", "description": "List of user UIDs authorized to access this farm workspace" },
+        "authorizedUsers": { "type": "array", "description": "List of user UIDs explicitly authorized to access this farm" }
       },
       "required": ["name", "location", "farmType", "ownerUid", "ownerName", "ownerEmail", "managerStatus", "createdAt"]
     },

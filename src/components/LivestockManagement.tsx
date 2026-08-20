@@ -220,7 +220,7 @@ export default function LivestockManagement({
   const handleSyncData = async () => {
     setIsSyncing(true);
     try {
-      await LivestockService.syncOfflineDataWithServer();
+      await LivestockService.syncOfflineDataWithServer(currentUser.uid);
       await loadGlobalData();
       
       setConfirmDialog({
@@ -515,12 +515,14 @@ export default function LivestockManagement({
   const loadGlobalData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch farms isolated to current user
+      // 1. Fetch farms isolated strictly to current user's UID (ownerId / authorizedUsers / invited manager)
       const farmList = await LivestockService.fetchFarms(currentUser.uid);
       const userFarms = farmList.filter(f =>
+        f.ownerId === currentUser.uid ||
         f.ownerUid === currentUser.uid ||
-        f.managerUid === currentUser.uid ||
+        (f.authorizedUsers && Array.isArray(f.authorizedUsers) && f.authorizedUsers.includes(currentUser.uid)) ||
         (f.memberUids && Array.isArray(f.memberUids) && f.memberUids.includes(currentUser.uid)) ||
+        f.managerUid === currentUser.uid ||
         (f.team && Array.isArray(f.team) && f.team.some(member => member.uid === currentUser.uid))
       );
       setFarms(userFarms);
@@ -1115,10 +1117,12 @@ export default function LivestockManagement({
         location: newFarmLocation,
         farmType: newFarmType,
         mixedOptions: newFarmType === 'Mixed Farm' ? newMixedOptions : undefined,
+        ownerId: currentUser.uid,
         ownerUid: currentUser.uid,
         ownerName: currentUser.name,
         ownerEmail: currentUser.email,
         managerStatus: 'unassigned',
+        authorizedUsers: [currentUser.uid],
         team: [teamMemberMe]
       });
 
@@ -1817,7 +1821,7 @@ export default function LivestockManagement({
               >
                 {farms.map((f) => (
                   <option key={f.id} value={f.id}>
-                    🚜 {f.name} {f.ownerUid === currentUser.uid ? '' : `(Managed: ${f.ownerName || 'Farm'})`}
+                    🚜 {f.name} {(f.ownerId === currentUser.uid || f.ownerUid === currentUser.uid) ? '' : `(Managed: ${f.ownerName || 'Farm'})`}
                   </option>
                 ))}
               </select>

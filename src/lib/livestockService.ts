@@ -66,9 +66,11 @@ function cleanUndefined<T>(obj: T): T {
 export function filterFarmsByUser(farms: LivestockFarm[], userUid?: string): LivestockFarm[] {
   if (!userUid) return farms;
   return farms.filter(f =>
+    f.ownerId === userUid ||
     f.ownerUid === userUid ||
-    f.managerUid === userUid ||
+    (f.authorizedUsers && Array.isArray(f.authorizedUsers) && f.authorizedUsers.includes(userUid)) ||
     (f.memberUids && Array.isArray(f.memberUids) && f.memberUids.includes(userUid)) ||
+    f.managerUid === userUid ||
     (f.team && Array.isArray(f.team) && f.team.some(m => m.uid === userUid))
   );
 }
@@ -105,23 +107,36 @@ export const LivestockService = {
     offlineOverride = val;
   },
 
-  async syncOfflineDataWithServer(): Promise<void> {
+  async syncOfflineDataWithServer(userUid?: string): Promise<void> {
     if (!isFirebaseConfigured || !db) return;
 
     // 1. Sync Farms
     try {
-      const farms: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+      const allFarms: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+      const farms = userUid ? filterFarmsByUser(allFarms, userUid) : allFarms;
       for (const f of farms) {
+        if (userUid && f.ownerUid !== userUid && f.managerUid !== userUid && !f.memberUids?.includes(userUid)) {
+          continue;
+        }
         await setDoc(doc(db, 'livestock_farms', f.id), cleanUndefined(f));
       }
     } catch (e) {
       console.error("Sync farms error:", e);
     }
 
+    // Determine authorized farm IDs
+    let authorizedFarmIds: Set<string> | null = null;
+    if (userUid) {
+      const allFarms: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+      const myFarms = filterFarmsByUser(allFarms, userUid);
+      authorizedFarmIds = new Set(myFarms.map(f => f.id));
+    }
+
     // 2. Sync Animals
     try {
       const animals: LivestockAnimal[] = JSON.parse(localStorage.getItem(LOCAL_ANIMALS_KEY) || '[]');
       for (const a of animals) {
+        if (authorizedFarmIds && !authorizedFarmIds.has(a.farmId)) continue;
         await setDoc(doc(db, 'livestock_animals', a.id), cleanUndefined(a));
       }
     } catch (e) {
@@ -132,6 +147,7 @@ export const LivestockService = {
     try {
       const batches: LivestockBatch[] = JSON.parse(localStorage.getItem(LOCAL_BATCHES_KEY) || '[]');
       for (const b of batches) {
+        if (authorizedFarmIds && !authorizedFarmIds.has(b.farmId)) continue;
         await setDoc(doc(db, 'livestock_batches', b.id), cleanUndefined(b));
       }
     } catch (e) {
@@ -142,6 +158,7 @@ export const LivestockService = {
     try {
       const tasks: LivestockTask[] = JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]');
       for (const t of tasks) {
+        if (authorizedFarmIds && !authorizedFarmIds.has(t.farmId)) continue;
         await setDoc(doc(db, 'livestock_tasks', t.id), cleanUndefined(t));
       }
     } catch (e) {
@@ -152,6 +169,7 @@ export const LivestockService = {
     try {
       const records: IndividualAnimalRecord[] = JSON.parse(localStorage.getItem(LOCAL_INDIVIDUAL_RECORDS_KEY) || '[]');
       for (const r of records) {
+        if (authorizedFarmIds && !authorizedFarmIds.has(r.farmId)) continue;
         await setDoc(doc(db, 'livestock_individual_records', r.id), cleanUndefined(r));
       }
     } catch (e) {
@@ -162,6 +180,7 @@ export const LivestockService = {
     try {
       const records: HerdLevelMasterRecord[] = JSON.parse(localStorage.getItem(LOCAL_HERD_RECORDS_KEY) || '[]');
       for (const r of records) {
+        if (authorizedFarmIds && !authorizedFarmIds.has(r.farmId)) continue;
         await setDoc(doc(db, 'livestock_herd_records', r.id), cleanUndefined(r));
       }
     } catch (e) {
@@ -187,13 +206,17 @@ export const LivestockService = {
         let list: LivestockFarm[] = [];
         if (userUid) {
           // Strict user-isolated queries
-          const qOwner = query(collection(db, 'livestock_farms'), where('ownerUid', '==', userUid));
+          const qOwnerId = query(collection(db, 'livestock_farms'), where('ownerId', '==', userUid));
+          const qOwnerUid = query(collection(db, 'livestock_farms'), where('ownerUid', '==', userUid));
           const qManager = query(collection(db, 'livestock_farms'), where('managerUid', '==', userUid));
+          const qAuthorized = query(collection(db, 'livestock_farms'), where('authorizedUsers', 'array-contains', userUid));
           const qMember = query(collection(db, 'livestock_farms'), where('memberUids', 'array-contains', userUid));
 
           const results = await Promise.allSettled([
-            getDocs(qOwner),
+            getDocs(qOwnerId),
+            getDocs(qOwnerUid),
             getDocs(qManager),
+            getDocs(qAuthorized),
             getDocs(qMember)
           ]);
 
@@ -257,13 +280,15 @@ export const LivestockService = {
   },
 
   async createFarm(farm: Partial<LivestockFarm>): Promise<LivestockFarm> {
+    const owner = farm.ownerId || farm.ownerUid || '';
     const newFarm: LivestockFarm = {
       id: 'farm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       name: farm.name || 'My Farm',
       location: farm.location || 'Capital Area, Islamabad',
       farmType: farm.farmType || 'Mixed Farm',
       mixedOptions: farm.mixedOptions,
-      ownerUid: farm.ownerUid || '',
+      ownerUid: owner,
+      ownerId: owner,
       ownerName: farm.ownerName || 'Fermer',
       ownerEmail: farm.ownerEmail || '',
       managerUid: farm.managerUid,
@@ -274,11 +299,13 @@ export const LivestockService = {
       team: farm.team || []
     };
 
-    const initialMemberUids = [newFarm.ownerUid, ...(newFarm.team || []).map(m => m.uid)];
+    const initialAuthorizedUsers = [owner, ...(newFarm.team || []).map(m => m.uid)];
     if (newFarm.managerUid) {
-      initialMemberUids.push(newFarm.managerUid);
+      initialAuthorizedUsers.push(newFarm.managerUid);
     }
-    newFarm.memberUids = Array.from(new Set(initialMemberUids.filter(Boolean)));
+    const finalAuthorized = Array.from(new Set(initialAuthorizedUsers.filter(Boolean)));
+    newFarm.authorizedUsers = finalAuthorized;
+    newFarm.memberUids = finalAuthorized;
 
     if (isCloud()) {
       try {
@@ -301,23 +328,29 @@ export const LivestockService = {
     if (isCloud()) {
       try {
         let finalUpdates = { ...updates };
-        if (updates.team || updates.managerUid || updates.ownerUid) {
+        if (updates.team || updates.managerUid || updates.ownerUid || updates.ownerId) {
           try {
             const snap = await getDoc(doc(db, 'livestock_farms', farmId));
             if (snap.exists()) {
               const existingFarm = snap.data() as LivestockFarm;
-              const owner = updates.ownerUid || existingFarm.ownerUid || '';
+              const owner = updates.ownerId || updates.ownerUid || existingFarm.ownerId || existingFarm.ownerUid || '';
               const t = updates.team || existingFarm.team || [];
               const mgr = 'managerUid' in updates ? updates.managerUid : existingFarm.managerUid;
 
-              const finalMemberUids = [owner, ...t.map(m => m.uid)];
+              const finalAuthorized = [owner, ...t.map(m => m.uid)];
               if (mgr) {
-                finalMemberUids.push(mgr);
+                finalAuthorized.push(mgr);
               }
-              finalUpdates.memberUids = Array.from(new Set(finalMemberUids.filter(Boolean)));
+              const authorizedList = Array.from(new Set(finalAuthorized.filter(Boolean)));
+              if (owner) {
+                finalUpdates.ownerId = owner;
+                finalUpdates.ownerUid = owner;
+              }
+              finalUpdates.authorizedUsers = authorizedList;
+              finalUpdates.memberUids = authorizedList;
             }
           } catch (e) {
-            console.error("Failed to dynamically compute memberUids on update:", e);
+            console.error("Failed to dynamically compute authorizedUsers on update:", e);
           }
         }
         await updateDoc(doc(db, 'livestock_farms', farmId), cleanUndefined(finalUpdates));
