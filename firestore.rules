@@ -411,7 +411,19 @@ service cloud.firestore {
     // LIVESTOCK FARMS RULES
     // ─────────────────────────────────────────────────────────────────
     match /livestock_farms/{farmId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.managerUid == request.auth.uid ||
+        request.auth.uid in resource.data.get('memberUids', []) ||
+        isAdmin()
+      );
+      
+      allow list: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.managerUid == request.auth.uid ||
+        request.auth.uid in resource.data.get('memberUids', []) ||
+        isAdmin()
+      );
       
       allow create: if isSignedIn() && (
         incoming().ownerUid == request.auth.uid &&
@@ -428,11 +440,14 @@ service cloud.firestore {
         // Allow vet to link / decline when requested
         (existing().get('managerStatus', '') == 'pending' && incoming().managerUid == request.auth.uid) ||
         // Allow updating teams or records
-        (incoming().ownerUid == existing().ownerUid)
+        (incoming().ownerUid == existing().ownerUid) ||
+        request.auth.uid in existing().get('memberUids', []) ||
+        isAdmin()
       );
 
       allow delete: if isSignedIn() && (
-        existing().ownerUid == request.auth.uid
+        existing().ownerUid == request.auth.uid ||
+        isAdmin()
       );
     }
 

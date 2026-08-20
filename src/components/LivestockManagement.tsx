@@ -515,9 +515,15 @@ export default function LivestockManagement({
   const loadGlobalData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch farms
-      const farmList = await LivestockService.fetchFarms();
-      setFarms(farmList);
+      // 1. Fetch farms isolated to current user
+      const farmList = await LivestockService.fetchFarms(currentUser.uid);
+      const userFarms = farmList.filter(f =>
+        f.ownerUid === currentUser.uid ||
+        f.managerUid === currentUser.uid ||
+        (f.memberUids && Array.isArray(f.memberUids) && f.memberUids.includes(currentUser.uid)) ||
+        (f.team && Array.isArray(f.team) && f.team.some(member => member.uid === currentUser.uid))
+      );
+      setFarms(userFarms);
 
       // 2. Load potential clinicians
       const docs = await ExploreService.fetchProfessionals('doctor');
@@ -525,26 +531,25 @@ export default function LivestockManagement({
       const assistants = await ExploreService.fetchProfessionals('assistant');
       setAllProfessionals([...(docs || []), ...(clinics || []), ...(assistants || [])]);
 
-      // 3. Auto select highlight farm if matching, else default first farm
+      // 3. Auto select highlight farm if matching, else default first farm belonging to this user
       if (highlightFarmId) {
-        const targetFarm = farmList.find(f => f.id === highlightFarmId);
+        const targetFarm = userFarms.find(f => f.id === highlightFarmId);
         if (targetFarm) {
           setSelectedFarm(targetFarm);
+        } else if (userFarms.length > 0) {
+          setSelectedFarm(userFarms[0]);
+        } else {
+          setSelectedFarm(null);
         }
-      } else if (!isClinician && farmList.length > 0) {
-        // filter farms where user resides in team
-        const myFarms = farmList.filter(f =>
-          f.ownerUid === currentUser.uid || f.team.some(member => member.uid === currentUser.uid)
-        );
-        if (myFarms.length > 0) {
-          setSelectedFarm(myFarms[0]);
-        }
-      } else if (isClinician) {
-        // Clinicians might see list of linked farms on dashboard
-        const clinicianFarms = farmList.filter(f => f.managerUid === currentUser.uid);
-        if (clinicianFarms.length > 0 && !selectedFarm) {
-          setSelectedFarm(clinicianFarms[0]);
-        }
+      } else if (userFarms.length > 0) {
+        setSelectedFarm(prev => {
+          if (prev && userFarms.some(f => f.id === prev.id)) {
+            return userFarms.find(f => f.id === prev.id) || prev;
+          }
+          return userFarms[0];
+        });
+      } else {
+        setSelectedFarm(null);
       }
     } catch (err) {
       console.error('Failed to load livestock dashboards:', err);
@@ -1800,7 +1805,7 @@ export default function LivestockManagement({
 
         {/* Selected Farm Dropdown or Create Button */}
         <div className="flex items-center gap-3">
-          {farms.length > 0 && !isClinician && (
+          {farms.length > 0 && (
             <div className="relative">
               <select
                 value={selectedFarm?.id || ''}
@@ -1812,7 +1817,7 @@ export default function LivestockManagement({
               >
                 {farms.map((f) => (
                   <option key={f.id} value={f.id}>
-                    🚜 {f.name}
+                    🚜 {f.name} {f.ownerUid === currentUser.uid ? '' : `(Managed: ${f.ownerName || 'Farm'})`}
                   </option>
                 ))}
               </select>

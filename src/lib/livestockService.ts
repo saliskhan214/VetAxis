@@ -63,6 +63,16 @@ function cleanUndefined<T>(obj: T): T {
   return result;
 }
 
+export function filterFarmsByUser(farms: LivestockFarm[], userUid?: string): LivestockFarm[] {
+  if (!userUid) return farms;
+  return farms.filter(f =>
+    f.ownerUid === userUid ||
+    f.managerUid === userUid ||
+    (f.memberUids && Array.isArray(f.memberUids) && f.memberUids.includes(userUid)) ||
+    (f.team && Array.isArray(f.team) && f.team.some(m => m.uid === userUid))
+  );
+}
+
 // Date helper to add days
 export function addDays(dateStr: string | undefined, days: number): string {
   const base = dateStr ? new Date(dateStr) : new Date();
@@ -171,26 +181,52 @@ export const LivestockService = {
   // ─────────────────────────────────────────────────────────────────
   // FARMS SERVICE
   // ─────────────────────────────────────────────────────────────────
-  async fetchFarms(): Promise<LivestockFarm[]> {
+  async fetchFarms(userUid?: string): Promise<LivestockFarm[]> {
     if (isCloud()) {
       try {
-        const snap = await getDocs(collection(db, 'livestock_farms'));
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockFarm[];
+        let list: LivestockFarm[] = [];
+        if (userUid) {
+          // Strict user-isolated queries
+          const qOwner = query(collection(db, 'livestock_farms'), where('ownerUid', '==', userUid));
+          const qManager = query(collection(db, 'livestock_farms'), where('managerUid', '==', userUid));
+          const qMember = query(collection(db, 'livestock_farms'), where('memberUids', 'array-contains', userUid));
+
+          const results = await Promise.allSettled([
+            getDocs(qOwner),
+            getDocs(qManager),
+            getDocs(qMember)
+          ]);
+
+          const farmMap = new Map<string, LivestockFarm>();
+          results.forEach(res => {
+            if (res.status === 'fulfilled') {
+              res.value.docs.forEach(d => {
+                farmMap.set(d.id, { id: d.id, ...d.data() } as LivestockFarm);
+              });
+            }
+          });
+          list = Array.from(farmMap.values());
+        } else {
+          const snap = await getDocs(collection(db, 'livestock_farms'));
+          list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as LivestockFarm[];
+        }
         mergeCachedItems(LOCAL_FARMS_KEY, list);
-        return list;
+        return filterFarmsByUser(list, userUid);
       } catch (err) {
         if (!isPermissionError(err)) {
           console.warn("Offline fallback triggered for fetchFarms. Using local storage cache:", err);
         }
         try {
-          return JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+          const cached: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+          return filterFarmsByUser(cached, userUid);
         } catch {
           return [];
         }
       }
     } else {
       try {
-        return JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+        const cached: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+        return filterFarmsByUser(cached, userUid);
       } catch {
         return [];
       }
@@ -247,12 +283,13 @@ export const LivestockService = {
     if (isCloud()) {
       try {
         await setDoc(doc(db, 'livestock_farms', newFarm.id), cleanUndefined(newFarm));
+        mergeCachedItems(LOCAL_FARMS_KEY, [newFarm]);
         return newFarm;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `livestock_farms/${newFarm.id}`);
       }
     } else {
-      const list = await this.fetchFarms();
+      const list: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
       list.push(newFarm);
       localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(list));
       return newFarm;
@@ -288,7 +325,7 @@ export const LivestockService = {
         handleFirestoreError(err, OperationType.UPDATE, `livestock_farms/${farmId}`);
       }
     } else {
-      const list = await this.fetchFarms();
+      const list: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
       const idx = list.findIndex(f => f.id === farmId);
       if (idx !== -1) {
         list[idx] = { ...list[idx], ...updates };
@@ -304,20 +341,19 @@ export const LivestockService = {
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `livestock_farms/${farmId}`);
       }
-    } else {
-      // Cascade delete locally
-      const farms = await this.fetchFarms();
-      localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(farms.filter(f => f.id !== farmId)));
-
-      const animals = await this.fetchAllAnimals();
-      localStorage.setItem(LOCAL_ANIMALS_KEY, JSON.stringify(animals.filter(a => a.farmId !== farmId)));
-
-      const batches = await this.fetchAllBatches();
-      localStorage.setItem(LOCAL_BATCHES_KEY, JSON.stringify(batches.filter(b => b.farmId !== farmId)));
-
-      const tasks = await this.fetchAllTasks();
-      localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks.filter(t => t.farmId !== farmId)));
     }
+    // Clean local cache
+    const farms: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
+    localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(farms.filter(f => f.id !== farmId)));
+
+    const animals = await this.fetchAllAnimals();
+    localStorage.setItem(LOCAL_ANIMALS_KEY, JSON.stringify(animals.filter(a => a.farmId !== farmId)));
+
+    const batches = await this.fetchAllBatches();
+    localStorage.setItem(LOCAL_BATCHES_KEY, JSON.stringify(batches.filter(b => b.farmId !== farmId)));
+
+    const tasks = await this.fetchAllTasks();
+    localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks.filter(t => t.farmId !== farmId)));
   },
 
   // ─────────────────────────────────────────────────────────────────

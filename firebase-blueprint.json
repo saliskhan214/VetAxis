@@ -193,7 +193,8 @@
         "managerStatus": { "type": "string", "enum": ["unassigned", "pending", "linked", "declined"] },
         "managerDeclinedReason": { "type": "string" },
         "createdAt": { "type": "number" },
-        "team": { "type": "array" }
+        "team": { "type": "array" },
+        "memberUids": { "type": "array", "description": "List of user UIDs authorized to access this farm workspace" }
       },
       "required": ["name", "location", "farmType", "ownerUid", "ownerName", "ownerEmail", "managerStatus", "createdAt"]
     },
