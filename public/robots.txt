@@ -16,5 +16,5 @@ Disallow: /?tab=admin
 Disallow: /api/
 
 # Host and Sitemap locations
-Host: https://vetaxis.pk
-Sitemap: https://vetaxis.pk/sitemap.xml
+Host: https://vetaxis360.com
+Sitemap: https://vetaxis360.com/sitemap.xml
