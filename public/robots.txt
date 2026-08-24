@@ -1,6 +1,8 @@
 User-agent: *
 Allow: /
 Allow: /index.html
+Allow: /ads.txt
+Allow: /sitemap.xml
 Allow: /?tab=explore
 Allow: /?tab=jobs
 Allow: /?tab=pets
