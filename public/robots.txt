@@ -1,4 +1,3 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
 Allow: /index.html
@@ -7,14 +6,21 @@ Allow: /?tab=jobs
 Allow: /?tab=pets
 Allow: /?tab=marketplace
 Allow: /?tab=community
-Allow: /?tab=news
 Allow: /?tab=livestock
+Allow: /?tab=blogs
+Allow: /?tab=about
+Allow: /?tab=terms
+Allow: /?tab=privacy
 
-# Disallow private auth and sync/admin paths
-Disallow: /?tab=profile
+# Disallow authenticated/administrative portals
 Disallow: /?tab=admin
+Disallow: /?tab=profile
+Disallow: /?tab=clinic_management
 Disallow: /api/
 
-# Host and Sitemap locations
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Host and Sitemap
 Host: https://vetaxis360.com
 Sitemap: https://vetaxis360.com/sitemap.xml
