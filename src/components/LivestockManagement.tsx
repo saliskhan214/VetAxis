@@ -407,12 +407,18 @@ export default function LivestockManagement({
   };
 
   useEffect(() => {
-    if (promoPaused) return;
+    if (promoPaused || activeSlides.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
     }, 10000);
     return () => clearInterval(timer);
   }, [promoPaused, activeSlides.length]);
+
+  useEffect(() => {
+    if (currentSlideIdx >= activeSlides.length) {
+      setCurrentSlideIdx(0);
+    }
+  }, [activeSlides.length, currentSlideIdx]);
 
   useEffect(() => {
     loadGlobalData();

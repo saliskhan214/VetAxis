@@ -2778,3 +2778,5 @@ export const PromotionalAdsService = {
   }
 };
 
+export { AdminService } from './adminService';
+

@@ -15,64 +15,20 @@ interface ExploreFeedProps {
   onNavigate?: (section: string) => void;
 }
 
-const BANNER_SLIDES = [
-  {
-    id: 'welcome',
-    type: 'welcome',
-    sponsorName: '',
-    badge: 'Clinical Network',
-    icon: '🧭',
-    bgGradient: "from-[#3e3e2b] via-[#5a5a40] to-[#7c7c5a]",
-    borderColors: "border-[#5a5a40] border-b-[#323223]",
-    title: "Pakistan Medical Directory",
-    description: "Instantly connect with highly-qualified vet doctors, dynamic clinical centers, and on-call home vaccinators near you.",
-    couponCode: '',
-    ctaText: '',
-    ctaUrl: ''
-  },
-  {
-    id: 'promo_hills',
-    type: 'promo',
-    sponsorName: "Hill's Science Diet",
-    title: "Support Joint & Mobility Health",
-    description: "Veterinarian recommended diet formula engineered with EPA. Protect cartilage and improve active daily movement.",
-    couponCode: "HILLS15",
-    ctaText: "Claim 15% Vet Voucher",
-    ctaUrl: "https://www.hillspet.com",
-    bgGradient: "from-[#201d14] via-[#3a3928] to-[#201d14]",
-    borderColors: "border-[#3a3928] border-b-[#181710]",
-    badge: "Official Sponsor",
-    icon: "🐕"
-  },
-  {
-    id: 'promo_zoetis',
-    type: 'promo',
-    sponsorName: "Zoetis Animal Health",
-    title: "Advanced Vet Diagnostics & Vaccines",
-    description: "Anti-itching Cytopoint therapies to professional canine vaccines. Helping veterinarians protect cats and dog patients.",
-    couponCode: "ZOECARE",
-    ctaText: "Clinical Resource Hub",
-    ctaUrl: "https://www.zoetis.com",
-    bgGradient: "from-[#2d3238] via-[#3d444d] to-[#2d3238]",
-    borderColors: "border-[#3d444d] border-b-[#1e2226]",
-    badge: "Accredited Partner",
-    icon: "💉"
-  },
-  {
-    id: 'promo_purina',
-    type: 'promo',
-    sponsorName: "Purina Veterinary Diets",
-    title: "Specialist Digestive Probiotic Formulas",
-    description: "Customized clinical probiotics & food formulas designed to soothe and resolve animal gastrointestinal discomfort.",
-    couponCode: "PURINAVET",
-    ctaText: "Request Clinical Pack",
-    ctaUrl: "https://www.purina.com",
-    bgGradient: "from-[#281a0e] via-[#432d18] to-[#281a0e]",
-    borderColors: "border-[#432d18] border-b-[#1e140a]",
-    badge: "Premium Sponsor",
-    icon: "🐈"
-  }
-];
+const WELCOME_BANNER_SLIDE = {
+  id: 'welcome',
+  type: 'welcome',
+  sponsorName: '',
+  badge: 'Clinical Network',
+  icon: '🧭',
+  bgGradient: "from-[#3e3e2b] via-[#5a5a40] to-[#7c7c5a]",
+  borderColors: "border-[#5a5a40] border-b-[#323223]",
+  title: "Pakistan Medical Directory",
+  description: "Instantly connect with highly-qualified vet doctors, dynamic clinical centers, and on-call home vaccinators near you.",
+  couponCode: '',
+  ctaText: '',
+  ctaUrl: ''
+};
 
 const PAKISTAN_CITIES = [
   { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },
@@ -237,6 +193,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
         triggerAdSuccess(`⚡ Congratulations! Your promotional campaign "${adTitle}" and payment transaction ID "${adTransactionId}" have been successfully submitted! It will appear on the VetAxis Billboard as soon as an Admin approves it.`);
       }
       loadActiveAds();
+      fetchCampaigns();
       
       // Clean form fields
       setAdTitle('');
@@ -424,7 +381,9 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
     fetchCampaigns();
   }, []);
 
-  const activeSlides = [...BANNER_SLIDES, ...dbAds];
+  const activeSlides = [WELCOME_BANNER_SLIDE, ...dbAds];
+  const safeSlideIdx = currentSlideIdx < activeSlides.length ? currentSlideIdx : 0;
+  const currentSlide = activeSlides[safeSlideIdx] || WELCOME_BANNER_SLIDE;
 
   // 3D Tilt orientation & Gloss Reflection for Billboard Card
   const billboardRef = useRef<HTMLDivElement>(null);
@@ -463,12 +422,19 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   };
 
   useEffect(() => {
-    if (promoPaused) return;
+    if (promoPaused || activeSlides.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
     }, 10000);
     return () => clearInterval(timer);
   }, [promoPaused, activeSlides.length]);
+
+  // Keep index clamped if ads change
+  useEffect(() => {
+    if (currentSlideIdx >= activeSlides.length) {
+      setCurrentSlideIdx(0);
+    }
+  }, [activeSlides.length, currentSlideIdx]);
 
   // Load specialists on mount or tab change
   const loadData = async () => {
@@ -654,7 +620,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
       >
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentSlideIdx}
+            key={currentSlide.id}
             initial={{ x: "100%", opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "-100%", opacity: 0 }}
@@ -666,7 +632,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
               rotateX: bspringX,
               rotateY: bspringY,
             }}
-            className={`absolute inset-0 text-white p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br ${activeSlides[currentSlideIdx].bgGradient} ${activeSlides[currentSlideIdx].borderColors} border border-b-[8px] transition-all duration-300`}
+            className={`absolute inset-0 text-white p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br ${currentSlide.bgGradient} ${currentSlide.borderColors} border border-b-[8px] transition-all duration-300`}
           >
             {/* Holographic grid wallpaper */}
             <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1.2px,transparent_1.2px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
@@ -682,7 +648,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
               className="absolute inset-0 z-20 mix-blend-overlay pointer-events-none"
             />
 
-            {activeSlides[currentSlideIdx].type === 'welcome' ? (
+            {currentSlide.type === 'welcome' ? (
               // WELCOME BANNER SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
               <div className="w-full relative" style={{ transformStyle: "preserve-3d" }}>
                 <div 
@@ -703,7 +669,7 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                     className="text-2.5xl md:text-4xl font-serif font-black tracking-tight leading-tight"
                     style={{ transform: "translateZ(45px)" }}
                   >
-                    Hello, {currentUser.name.split(' ')[0]} 👋
+                    Welcome to VetAxis 👋
                   </h2>
                   <p 
                     className="text-neutral-200 text-xs md:text-sm font-semibold leading-relaxed"
@@ -732,37 +698,37 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                     className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
                     style={{ transform: "translateZ(30px)" }}
                   >
-                    📌 {activeSlides[currentSlideIdx].badge} • Sponsored Campaign
+                    📌 {currentSlide.badge} • Sponsored Campaign
                   </span>
                   <h2 
                     className="text-xl md:text-3xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
                     style={{ transform: "translateZ(45px)" }}
                   >
-                    <span className="text-2xl md:text-3.5xl shrink-0 select-none">{activeSlides[currentSlideIdx].icon}</span>
-                    <span>{activeSlides[currentSlideIdx].title}</span>
+                    <span className="text-2xl md:text-3.5xl shrink-0 select-none">{currentSlide.icon}</span>
+                    <span>{currentSlide.title}</span>
                   </h2>
                   <p 
                     className="text-neutral-200 text-xs md:text-xs font-semibold leading-relaxed line-clamp-3"
                     style={{ transform: "translateZ(20px)" }}
                   >
-                    {activeSlides[currentSlideIdx].description}
+                    {currentSlide.description}
                   </p>
                   <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
                     <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
-                      {activeSlides[currentSlideIdx].sponsorName}
+                      {currentSlide.sponsorName}
                     </span>
-                    {activeSlides[currentSlideIdx].couponCode && (
+                    {currentSlide.couponCode && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigator.clipboard.writeText(activeSlides[currentSlideIdx].couponCode || '');
-                          alert(`📋 Copied coupon code "${activeSlides[currentSlideIdx].couponCode}" to clipboard!`);
+                          navigator.clipboard.writeText(currentSlide.couponCode || '');
+                          alert(`📋 Copied coupon code "${currentSlide.couponCode}" to clipboard!`);
                         }}
                         className="inline-flex items-center gap-2 px-2.5 py-1 bg-dashed border border-white/30 hover:border-white/50 bg-white/10 rounded-xl text-[9px] font-black tracking-wider text-amber-300 shadow-inner cursor-pointer transition-all"
                         title="Click to copy coupon code"
                       >
-                        <span>Code: {activeSlides[currentSlideIdx].couponCode}</span>
+                        <span>Code: {currentSlide.couponCode}</span>
                         <span className="text-white/60 font-normal text-[8px] pl-1">Copy 📋</span>
                       </button>
                     )}
@@ -772,64 +738,66 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
                 {/* CTA Link out (WITH COGNITIVE HEIGHT HIGHLIGHT) */}
                 <div className="shrink-0 flex flex-col gap-2 min-w-[180px] md:min-w-[200px]" style={{ transform: "translateZ(35px)" }}>
                   <a
-                    href={activeSlides[currentSlideIdx].ctaUrl.startsWith('http') ? activeSlides[currentSlideIdx].ctaUrl : `https://${activeSlides[currentSlideIdx].ctaUrl}`}
+                    href={currentSlide.ctaUrl.startsWith('http') ? currentSlide.ctaUrl : `https://${currentSlide.ctaUrl}`}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer decoration-none shadow-md"
                   >
-                    <span>{activeSlides[currentSlideIdx].ctaText}</span>
+                    <span>{currentSlide.ctaText}</span>
                     <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
                   </a>
                 </div>
               </div>
             )}
 
-            {/* Carousel Navigation Toolbar */}
-            <div 
-              className="absolute bottom-4 right-6 flex items-center gap-3 bg-black/25 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-20 select-none"
-              style={{ transform: "translateZ(40px)" }}
-            >
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentSlideIdx((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
-                }}
-                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
-                title="Previous Slide"
+            {/* Carousel Navigation Toolbar (Only shown when ads exist and multiple slides are active) */}
+            {activeSlides.length > 1 && (
+              <div 
+                className="absolute bottom-4 right-6 flex items-center gap-3 bg-black/25 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-20 select-none"
+                style={{ transform: "translateZ(40px)" }}
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              
-              <div className="flex gap-1.5">
-                {activeSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentSlideIdx(idx);
-                    }}
-                    className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all border-none ${
-                      idx === currentSlideIdx ? 'bg-amber-400 scale-120' : 'bg-white/40 hover:bg-white/60'
-                    }`}
-                  />
-                ))}
-              </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentSlideIdx((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
+                  }}
+                  className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
+                  title="Previous Slide"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                
+                <div className="flex gap-1.5">
+                  {activeSlides.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentSlideIdx(idx);
+                      }}
+                      className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all border-none ${
+                        idx === safeSlideIdx ? 'bg-amber-400 scale-120' : 'bg-white/40 hover:bg-white/60'
+                      }`}
+                    />
+                  ))}
+                </div>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
-                }}
-                className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
-                title="Next Slide"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentSlideIdx((prev) => (prev + 1) % activeSlides.length);
+                  }}
+                  className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-0.5 flex items-center justify-center"
+                  title="Next Slide"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
           </motion.div>
         </AnimatePresence>
