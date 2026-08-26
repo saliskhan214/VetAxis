@@ -7,14 +7,19 @@ import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Spar
 interface PetAdsProps {
   currentUser: UserProfile;
   onNavigate?: (section: string, highlightId?: string) => void;
+  highlightAdId?: string | null;
+  initialType?: string | null;
 }
 
-export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
+export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: PetAdsProps) {
   const [ads, setAds] = useState<PetAd[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [speciesFilter, setSpeciesFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>(() => {
+    if (initialType === 'adoption' || initialType === 'sale') return initialType;
+    return 'all';
+  });
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -138,6 +143,17 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
       setWhatsapp(currentUser.phone);
     }
   }, []);
+
+  useEffect(() => {
+    if (highlightAdId && ads.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`pet-ad-${highlightAdId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [highlightAdId, ads]);
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -1061,12 +1077,14 @@ export function PetAds({ currentUser, onNavigate }: PetAdsProps) {
               );
             }
 
+            const isHighlighted = highlightAdId === ad.id;
             return (
               <motion.div
                 key={ad.id}
+                id={`pet-ad-${ad.id}`}
                 layout
                 whileHover={{ y: -5 }}
-                className={cardStyle}
+                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
               >
                 <div>
                   <div className={headerGradient}>

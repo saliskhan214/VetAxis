@@ -7,9 +7,10 @@ import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkle
 interface MarketplaceProps {
   currentUser: UserProfile;
   onNavigate?: (section: string) => void;
+  highlightProductId?: string | null;
 }
 
-export function Marketplace({ currentUser, onNavigate }: MarketplaceProps) {
+export function Marketplace({ currentUser, onNavigate, highlightProductId }: MarketplaceProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -51,6 +52,17 @@ export function Marketplace({ currentUser, onNavigate }: MarketplaceProps) {
       setProdWhatsapp(currentUser.phone);
     }
   }, []);
+
+  useEffect(() => {
+    if (highlightProductId && products.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`product-${highlightProductId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [highlightProductId, products]);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -501,12 +513,14 @@ export function Marketplace({ currentUser, onNavigate }: MarketplaceProps) {
               );
             }
 
+            const isHighlighted = highlightProductId === p.id;
             return (
               <motion.div
                 key={p.id}
+                id={`product-${p.id}`}
                 layout
                 whileHover={{ y: -5 }}
-                className={cardStyle}
+                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
               >
                 <div>
                   {/* Thumbnail Banner */}

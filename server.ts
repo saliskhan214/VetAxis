@@ -392,268 +392,507 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
   });
 
   // ─────────────────────────────────────────────────────────────────
-  // DYNAMIC SITEMAP.XML ENDPOINT (For Search Engines like Google)
+  // DYNAMIC SITEMAP.XML GENERATOR & SEO ENGINE (For Google, Bing & Search Crawlers)
   // ─────────────────────────────────────────────────────────────────
-  app.get("/sitemap.xml", async (req, res) => {
+  let sitemapStats = {
+    totalUrls: 0,
+    clinicsCount: 0,
+    doctorsCount: 0,
+    jobsCount: 0,
+    marketplaceCount: 0,
+    petAdsCount: 0,
+    blogsCount: 0,
+    cityHubsCount: 0,
+    specialtyHubsCount: 0,
+    staticPagesCount: 11,
+    generatedAt: 0,
+    cached: false
+  };
+
+  const escapeXml = (unsafe: any = ""): string => {
+    if (unsafe === null || unsafe === undefined) return "";
+    return String(unsafe)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  const getIsoDate = (val?: any): string => {
+    if (!val) return new Date().toISOString().split("T")[0];
+    const d = typeof val === "number" ? new Date(val) : new Date(val);
+    if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
+    return d.toISOString().split("T")[0];
+  };
+
+  const PAKISTAN_METRO_CITIES = [
+    "Islamabad", "Rawalpindi", "Lahore", "Karachi", "Peshawar",
+    "Faisalabad", "Multan", "Quetta", "Sialkot", "Gujranwala", "Hyderabad"
+  ];
+
+  async function generateDynamicSitemapXml(): Promise<{ xml: string; stats: typeof sitemapStats }> {
+    const BASE_URL = "https://vetaxis360.com";
+    const todayStr = getIsoDate();
+
+    let firebaseConfig: any = null;
     try {
-      // Return from cache if valid
-      const now = Date.now();
-      if (cachedSitemap && (now - cachedSitemap.timestamp < SITEMAP_CACHE_DURATION)) {
-        console.log("[Sitemap Cache] Serving cached sitemap.xml");
-        res.header("Content-Type", "application/xml");
-        return res.send(cachedSitemap.xml);
-      }
+      firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), "firebase-applet-config.json"), "utf8"));
+    } catch (e) {
+      console.warn("[Sitemap] Could not load firebase-applet-config.json:", e);
+    }
 
-      let firebaseConfig: any = null;
+    let adminDb: any = null;
+    if (firebaseConfig && firebaseConfig.projectId) {
       try {
-        firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), "firebase-applet-config.json"), "utf8"));
-      } catch (e) {
-        console.warn("[Sitemap] Could not load firebase-applet-config.json:", e);
+        const { getApps, initializeApp } = await import("firebase-admin/app");
+        const { getFirestore } = await import("firebase-admin/firestore");
+        
+        if (!getApps().length) {
+          initializeApp({
+            projectId: firebaseConfig.projectId,
+          });
+        }
+        adminDb = getFirestore(firebaseConfig.firestoreDatabaseId || "(default)");
+      } catch (err) {
+        console.warn("[Sitemap] Could not initialize firebase-admin SDK:", err);
       }
+    }
 
-      let adminDb: any = null;
-      if (firebaseConfig && firebaseConfig.projectId) {
-        try {
-          const { getApps, initializeApp } = await import("firebase-admin/app");
-          const { getFirestore } = await import("firebase-admin/firestore");
-          
-          if (!getApps().length) {
-            initializeApp({
-              projectId: firebaseConfig.projectId,
-            });
-          }
-          adminDb = getFirestore(firebaseConfig.firestoreDatabaseId || "(default)");
-        } catch (err) {
-          console.warn("[Sitemap] Could not initialize firebase-admin SDK:", err);
-        }
-      }
+    // Dynamic lists
+    let clinicUrls: string[] = [];
+    let doctorUrls: string[] = [];
+    let jobUrls: string[] = [];
+    let productUrls: string[] = [];
+    let petAdUrls: string[] = [];
+    let blogUrls: string[] = [];
 
-      // Helper to get formatted last-modified date from timestamp
-      const getFormattedDate = (timestampMs?: number) => {
-        const date = timestampMs ? new Date(timestampMs) : new Date();
-        const validDate = isNaN(date.getTime()) ? new Date() : date;
-        return validDate.toISOString().split("T")[0];
-      };
+    let lastModHome = todayStr;
+    let lastModExplore = todayStr;
+    let lastModJobs = todayStr;
+    let lastModPets = todayStr;
+    let lastModMarketplace = todayStr;
+    let lastModLivestock = todayStr;
+    let lastModCommunity = todayStr;
+    let lastModNews = todayStr;
 
-      // Initialize dates with default of today
-      const todayStr = getFormattedDate();
-      let lastModHome = todayStr;
-      let lastModExplore = todayStr;
-      let lastModJobs = todayStr;
-      let lastModPets = todayStr;
-      let lastModMarketplace = todayStr;
-      let lastModCommunity = todayStr;
-      let lastModNews = todayStr;
-      let lastModLivestock = todayStr;
-      let blogUrls = "";
+    if (adminDb) {
+      // 1. CRAWL PUBLIC VETERINARY CLINICS & DVM DOCTORS
+      try {
+        const usersSnapshot = await adminDb.collection("users")
+          .limit(300)
+          .get();
 
-      // Dynamically query database for newest updates in each section
-      if (adminDb) {
-        try {
-          // 1. Explore (Users / Clinics)
-          const newestUserDocs = await adminDb.collection("users")
-            .orderBy("createdAt", "desc")
-            .limit(1)
-            .get();
-          if (!newestUserDocs.empty) {
-            const uData = newestUserDocs.docs[0].data();
-            if (uData.createdAt) {
-              lastModExplore = getFormattedDate(uData.createdAt);
-              lastModHome = lastModExplore; // Home page showcases clinic listings
-            }
-          }
-        } catch (e) {
-          console.warn("[Sitemap] Failed to fetch newest user timestamp:", e);
-        }
+        if (!usersSnapshot.empty) {
+          usersSnapshot.forEach((docSnap: any) => {
+            const u = docSnap.data();
+            const uid = u.uid || docSnap.id;
+            const docDate = getIsoDate(u.updatedAt || u.createdAt);
+            const rawName = u.name || u.clinicName || (u.role === "clinic" ? "Veterinary Clinic" : "Veterinary Doctor");
+            const cleanName = escapeXml(rawName.replace(/[^\w\s.-]/g, "").trim());
+            const city = escapeXml(u.city || u.address || "Pakistan");
 
-        try {
-          // 2. Jobs
-          const newestJobDocs = await adminDb.collection("job_posts")
-            .orderBy("createdAt", "desc")
-            .limit(1)
-            .get();
-          if (!newestJobDocs.empty) {
-            const jData = newestJobDocs.docs[0].data();
-            if (jData.createdAt) {
-              lastModJobs = getFormattedDate(jData.createdAt);
-            }
-          }
-        } catch (e) {
-          console.warn("[Sitemap] Failed to fetch newest job timestamp:", e);
-        }
-
-        try {
-          // 3. Pets
-          const newestPetDocs = await adminDb.collection("pet_ads")
-            .orderBy("createdAt", "desc")
-            .limit(1)
-            .get();
-          if (!newestPetDocs.empty) {
-            const pData = newestPetDocs.docs[0].data();
-            if (pData.createdAt) {
-              lastModPets = getFormattedDate(pData.createdAt);
-            }
-          }
-        } catch (e) {
-          console.warn("[Sitemap] Failed to fetch newest pet ad timestamp:", e);
-        }
-
-        try {
-          // 4. Marketplace
-          const newestProductDocs = await adminDb.collection("marketplace_products")
-            .orderBy("createdAt", "desc")
-            .limit(1)
-            .get();
-          if (!newestProductDocs.empty) {
-            const mData = newestProductDocs.docs[0].data();
-            if (mData.createdAt) {
-              lastModMarketplace = getFormattedDate(mData.createdAt);
-            }
-          }
-        } catch (e) {
-          console.warn("[Sitemap] Failed to fetch newest marketplace product timestamp:", e);
-        }
-
-        let blogArticles: any[] = [];
-        try {
-          // 6. Blogs / Articles
-          const blogSnapshot = await adminDb.collection("blogs")
-            .orderBy("createdAt", "desc")
-            .limit(100)
-            .get();
-          if (!blogSnapshot.empty) {
-            blogSnapshot.forEach((docSnap: any) => {
-              blogArticles.push(docSnap.data());
-            });
-            const newestBlog = blogArticles[0];
-            if (newestBlog.createdAt) {
-              lastModNews = getFormattedDate(newestBlog.createdAt);
-            }
-          }
-        } catch (e) {
-          console.warn("[Sitemap] Failed to fetch newest blog articles:", e);
-        }
-
-        try {
-          // 5. Community
-          const newestPostDocs = await adminDb.collection("community_posts")
-            .orderBy("ts", "desc")
-            .limit(1)
-            .get();
-          if (!newestPostDocs.empty) {
-            const cData = newestPostDocs.docs[0].data();
-            if (cData.ts) {
-              lastModCommunity = getFormattedDate(cData.ts);
-            }
-          }
-        } catch (e) {
-          console.warn("[Sitemap] Failed to fetch newest community post timestamp:", e);
-        }
-
-        // Generate individual blog links for search engines
-        if (blogArticles.length > 0) {
-          blogUrls = blogArticles.map(blog => {
-            const modDate = getFormattedDate(blog.createdAt);
-            const escapedSlug = (blog.slug || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const escapedTitle = (blog.title || "").replace(/[^a-zA-Z0-9 ]/g, '');
-            return `
-  <!-- Educational Guide: ${escapedTitle} -->
+            if (u.role === "clinic" || u.facilities || u.clinicName) {
+              clinicUrls.push(`
+  <!-- Veterinary Clinic: ${cleanName} (${city}) -->
   <url>
-    <loc>https://vetaxis.pk/?tab=news&amp;slug=${escapedSlug}</loc>
-    <lastmod>${modDate}</lastmod>
+    <loc>${BASE_URL}/?tab=explore&amp;clinic=${encodeURIComponent(uid)}</loc>
+    <lastmod>${docDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>`);
+              if (docDate > lastModExplore) lastModExplore = docDate;
+            } else if (u.role === "doctor" || u.degrees || u.specialization) {
+              doctorUrls.push(`
+  <!-- DVM Specialist Doctor: Dr. ${cleanName} -->
+  <url>
+    <loc>${BASE_URL}/?tab=explore&amp;doctor=${encodeURIComponent(uid)}</loc>
+    <lastmod>${docDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>`);
+              if (docDate > lastModExplore) lastModExplore = docDate;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("[Sitemap Crawler] Error crawling users collection:", err);
+      }
+
+      // 2. CRAWL ACTIVE VETERINARY JOB POSTINGS
+      try {
+        const jobsSnapshot = await adminDb.collection("job_posts")
+          .limit(250)
+          .get();
+
+        if (!jobsSnapshot.empty) {
+          jobsSnapshot.forEach((docSnap: any) => {
+            const j = docSnap.data();
+            const jobId = j.id || docSnap.id;
+            // Only index active/open jobs that are not rejected
+            if (j.status !== "closed" && j.adminApprovalStatus !== "rejected") {
+              const jobDate = getIsoDate(j.updatedAt || j.createdAt);
+              const jobTitle = escapeXml((j.title || "Veterinary Professional Opportunity").replace(/[^\w\s.-]/g, "").trim());
+              const clinicName = escapeXml((j.clinicName || j.employerType || "Verified Employer").replace(/[^\w\s.-]/g, "").trim());
+
+              jobUrls.push(`
+  <!-- Job Listing: ${jobTitle} at ${clinicName} -->
+  <url>
+    <loc>${BASE_URL}/?tab=jobs&amp;jobId=${encodeURIComponent(jobId)}</loc>
+    <lastmod>${jobDate}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>`);
+              if (jobDate > lastModJobs) lastModJobs = jobDate;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("[Sitemap Crawler] Error crawling job_posts collection:", err);
+      }
+
+      // 3. CRAWL ACTIVE VETERINARY MARKETPLACE MEDICINE & PHARMACY ITEMS
+      try {
+        const prodSnapshot = await adminDb.collection("marketplace_products")
+          .limit(250)
+          .get();
+
+        if (!prodSnapshot.empty) {
+          prodSnapshot.forEach((docSnap: any) => {
+            const p = docSnap.data();
+            const prodId = p.id || docSnap.id;
+            // Only index items with remaining stock or non-zero quantity
+            if (p.quantity !== 0) {
+              const prodDate = getIsoDate(p.updatedAt || p.createdAt);
+              const prodName = escapeXml((p.name || "Veterinary Medical Supply").replace(/[^\w\s.-]/g, "").trim());
+              const priceTag = p.price ? `Rs. ${p.price}` : "Verified";
+
+              productUrls.push(`
+  <!-- Marketplace Product: ${prodName} (${priceTag}) -->
+  <url>
+    <loc>${BASE_URL}/?tab=marketplace&amp;productId=${encodeURIComponent(prodId)}</loc>
+    <lastmod>${prodDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>`);
+              if (prodDate > lastModMarketplace) lastModMarketplace = prodDate;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("[Sitemap Crawler] Error crawling marketplace_products collection:", err);
+      }
+
+      // 4. CRAWL LOST & FOUND PET SOS & PET CLASSIFIEDS
+      try {
+        const petSnapshot = await adminDb.collection("pet_ads")
+          .limit(250)
+          .get();
+
+        if (!petSnapshot.empty) {
+          petSnapshot.forEach((docSnap: any) => {
+            const pet = docSnap.data();
+            const petId = pet.id || docSnap.id;
+            const petDate = getIsoDate(pet.updatedAt || pet.createdAt);
+            const petType = escapeXml((pet.petType || pet.species || "Pet").replace(/[^\w\s.-]/g, "").trim());
+            const breed = escapeXml((pet.breed || "Animal").replace(/[^\w\s.-]/g, "").trim());
+            const adType = pet.type === "adoption" ? "Adoption" : pet.type === "sale" ? "Classified" : "Lost & Found SOS";
+
+            petAdUrls.push(`
+  <!-- Pet ${adType}: ${petType} - ${breed} -->
+  <url>
+    <loc>${BASE_URL}/?tab=pets&amp;adId=${encodeURIComponent(petId)}</loc>
+    <lastmod>${petDate}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.75</priority>
+  </url>`);
+            if (petDate > lastModPets) lastModPets = petDate;
+          });
+        }
+      } catch (err) {
+        console.warn("[Sitemap Crawler] Error crawling pet_ads collection:", err);
+      }
+
+      // 5. CRAWL CLINICAL BLOGS & ANIMAL HEALTH GUIDES
+      try {
+        const blogSnapshot = await adminDb.collection("blogs")
+          .orderBy("createdAt", "desc")
+          .limit(100)
+          .get();
+
+        if (!blogSnapshot.empty) {
+          blogSnapshot.forEach((docSnap: any) => {
+            const blog = docSnap.data();
+            const blogDate = getIsoDate(blog.createdAt);
+            const escapedSlug = escapeXml(blog.slug || blog.id || docSnap.id);
+            const blogTitle = escapeXml((blog.title || "Clinical Veterinary Guide").replace(/[^\w\s.-]/g, "").trim());
+
+            blogUrls.push(`
+  <!-- Clinical Guide: ${blogTitle} -->
+  <url>
+    <loc>${BASE_URL}/?tab=news&amp;slug=${escapedSlug}</loc>
+    <lastmod>${blogDate}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>`;
-          }).join("");
+    <priority>0.80</priority>
+  </url>`);
+            if (blogDate > lastModNews) lastModNews = blogDate;
+          });
         }
+      } catch (err) {
+        console.warn("[Sitemap Crawler] Error crawling blogs collection:", err);
       }
+    }
 
-      // Dynamic XML generation
-      const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Main Home Page & Vet Near Me Finder -->
+    // 6. BUILD METROPOLITAN CITY VETERINARY HUBS
+    const cityHubUrls = PAKISTAN_METRO_CITIES.map(city => `
+  <!-- City Directory: Veterinary Clinics in ${city} -->
   <url>
-    <loc>https://vetaxis.pk/</loc>
+    <loc>${BASE_URL}/?tab=explore&amp;city=${encodeURIComponent(city)}</loc>
+    <lastmod>${todayStr}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>`);
+
+    // 7. BUILD SPECIALTY & CATEGORY FILTER HUBS
+    const specialtyHubs = [
+      { path: "?tab=explore&amp;filter=emergency", name: "24/7 Emergency Animal Hospitals", freq: "daily", priority: "0.95" },
+      { path: "?tab=explore&amp;filter=vaccination", name: "Home Pet Vaccination Services", freq: "daily", priority: "0.85" },
+      { path: "?tab=explore&amp;filter=surgery", name: "Specialist Veterinary Surgeries", freq: "weekly", priority: "0.85" },
+      { path: "?tab=jobs&amp;type=Full-time", name: "Full-Time DVM Positions", freq: "daily", priority: "0.80" },
+      { path: "?tab=jobs&amp;type=Part-time", name: "Locum & Part-Time Vet Jobs", freq: "daily", priority: "0.80" },
+      { path: "?tab=jobs&amp;type=Internship", name: "Veterinary House Job Internships", freq: "weekly", priority: "0.80" },
+      { path: "?tab=pets&amp;type=lost_sos", name: "Emergency Missing Pet SOS Network", freq: "always", priority: "0.90" },
+      { path: "?tab=pets&amp;type=adoption", name: "Pet Rescue & Adoption Classifieds", freq: "daily", priority: "0.85" }
+    ];
+
+    const specialtyHubUrls = specialtyHubs.map(hub => `
+  <!-- Specialty Category: ${hub.name} -->
+  <url>
+    <loc>${BASE_URL}/${hub.path}</loc>
+    <lastmod>${todayStr}</lastmod>
+    <changefreq>${hub.freq}</changefreq>
+    <priority>${hub.priority}</priority>
+  </url>`);
+
+    // Stats calculations
+    const stats: typeof sitemapStats = {
+      totalUrls: 11 + cityHubUrls.length + specialtyHubUrls.length + clinicUrls.length + doctorUrls.length + jobUrls.length + productUrls.length + petAdUrls.length + blogUrls.length,
+      clinicsCount: clinicUrls.length,
+      doctorsCount: doctorUrls.length,
+      jobsCount: jobUrls.length,
+      marketplaceCount: productUrls.length,
+      petAdsCount: petAdUrls.length,
+      blogsCount: blogUrls.length,
+      cityHubsCount: cityHubUrls.length,
+      specialtyHubsCount: specialtyHubUrls.length,
+      staticPagesCount: 11,
+      generatedAt: Date.now(),
+      cached: false
+    };
+
+    // Combine everything into authoritative, valid XML
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+  <!-- ============================================================= -->
+  <!-- 1. CORE PLATFORM HUBS & PRIMARY SECTIONS                      -->
+  <!-- ============================================================= -->
+  <url>
+    <loc>${BASE_URL}/</loc>
     <lastmod>${lastModHome}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-
-  <!-- Clinic Finder & Doctor Exploration -->
   <url>
-    <loc>https://vetaxis.pk/?tab=explore</loc>
+    <loc>${BASE_URL}/?tab=explore</loc>
     <lastmod>${lastModExplore}</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.9</priority>
+    <priority>0.95</priority>
   </url>
-
-  <!-- DVM Job Board Portal -->
   <url>
-    <loc>https://vetaxis.pk/?tab=jobs</loc>
+    <loc>${BASE_URL}/?tab=jobs</loc>
     <lastmod>${lastModJobs}</lastmod>
-    <changefreq>always</changefreq>
-    <priority>0.8</priority>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
   </url>
-
-  <!-- Lost Pet Center & Pet Classifieds -->
   <url>
-    <loc>https://vetaxis.pk/?tab=pets</loc>
+    <loc>${BASE_URL}/?tab=pets</loc>
     <lastmod>${lastModPets}</lastmod>
-    <changefreq>always</changefreq>
-    <priority>0.8</priority>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
   </url>
-
-  <!-- Veterinary Medicine & Pharmacy Marketplace -->
   <url>
-    <loc>https://vetaxis.pk/?tab=marketplace</loc>
+    <loc>${BASE_URL}/?tab=marketplace</loc>
     <lastmod>${lastModMarketplace}</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.7</priority>
+    <priority>0.85</priority>
   </url>
-
-  <!-- Livestock Farming Analytics Dashboard -->
   <url>
-    <loc>https://vetaxis.pk/?tab=livestock</loc>
+    <loc>${BASE_URL}/?tab=livestock</loc>
     <lastmod>${lastModLivestock}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
   </url>
-
-  <!-- Community Feed Discussions -->
   <url>
-    <loc>https://vetaxis.pk/?tab=community</loc>
+    <loc>${BASE_URL}/?tab=community</loc>
     <lastmod>${lastModCommunity}</lastmod>
-    <changefreq>always</changefreq>
-    <priority>0.7</priority>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
   </url>
-
-  <!-- Veterinary News Bulletins -->
   <url>
-    <loc>https://vetaxis.pk/?tab=news</loc>
+    <loc>${BASE_URL}/?tab=news</loc>
     <lastmod>${lastModNews}</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>${blogUrls}
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/?tab=about</loc>
+    <lastmod>${todayStr}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/?tab=terms</loc>
+    <lastmod>${todayStr}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/?tab=privacy</loc>
+    <lastmod>${todayStr}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
+  </url>
+
+  <!-- ============================================================= -->
+  <!-- 2. CITY-SPECIFIC LOCAL VETERINARY DIRECTORIES                 -->
+  <!-- ============================================================= -->${cityHubUrls.join("")}
+
+  <!-- ============================================================= -->
+  <!-- 3. SPECIALTY & EMERGENCY SERVICES                             -->
+  <!-- ============================================================= -->${specialtyHubUrls.join("")}
+
+  <!-- ============================================================= -->
+  <!-- 4. DYNAMIC PUBLIC VETERINARY CLINICS & HOSPITALS              -->
+  <!-- ============================================================= -->${clinicUrls.length > 0 ? clinicUrls.join("") : `
+  <!-- Notice: Seed clinics listed under exploration hub -->`}
+
+  <!-- ============================================================= -->
+  <!-- 5. DYNAMIC VERIFIED DVM DOCTORS & SPECIALISTS                 -->
+  <!-- ============================================================= -->${doctorUrls.length > 0 ? doctorUrls.join("") : `
+  <!-- Notice: Seed doctors listed under practitioner directory -->`}
+
+  <!-- ============================================================= -->
+  <!-- 6. DYNAMIC ACTIVE VETERINARY JOB POSTINGS                     -->
+  <!-- ============================================================= -->${jobUrls.length > 0 ? jobUrls.join("") : `
+  <!-- Notice: Active career positions available on job portal -->`}
+
+  <!-- ============================================================= -->
+  <!-- 7. DYNAMIC MARKETPLACE MEDICINE & PHARMACY SUPPLIES           -->
+  <!-- ============================================================= -->${productUrls.length > 0 ? productUrls.join("") : `
+  <!-- Notice: Verified medical supplies available in pharmacy catalog -->`}
+
+  <!-- ============================================================= -->
+  <!-- 8. DYNAMIC LOST & FOUND PET SOS & PET CLASSIFIEDS             -->
+  <!-- ============================================================= -->${petAdUrls.length > 0 ? petAdUrls.join("") : `
+  <!-- Notice: Live pet alerts active on rescue network -->`}
+
+  <!-- ============================================================= -->
+  <!-- 9. DYNAMIC CLINICAL GUIDES & ANIMAL HEALTH ARTICLES           -->
+  <!-- ============================================================= -->${blogUrls.length > 0 ? blogUrls.join("") : `
+  <!-- Notice: Educational guides published in knowledge repository -->`}
 </urlset>`;
 
-      // Save to memory cache
-      cachedSitemap = { xml: sitemapXml, timestamp: Date.now() };
+    return { xml, stats };
+  }
 
-      res.header("Content-Type", "application/xml");
-      res.send(sitemapXml);
+  // GET /sitemap.xml endpoint
+  app.get("/sitemap.xml", async (req, res) => {
+    try {
+      const now = Date.now();
+      if (cachedSitemap && (now - cachedSitemap.timestamp < SITEMAP_CACHE_DURATION)) {
+        res.header("Content-Type", "application/xml; charset=utf-8");
+        res.header("Cache-Control", "public, max-age=1200, s-maxage=3600");
+        return res.send(cachedSitemap.xml);
+      }
+
+      console.log("[Sitemap Generator] Generating fresh dynamic XML sitemap with database crawl...");
+      const { xml, stats } = await generateDynamicSitemapXml();
+      
+      cachedSitemap = { xml, timestamp: now };
+      sitemapStats = { ...stats, cached: true };
+
+      res.header("Content-Type", "application/xml; charset=utf-8");
+      res.header("Cache-Control", "public, max-age=1200, s-maxage=3600");
+      res.send(xml);
     } catch (error) {
-      console.error("[Sitemap] Error in dynamic sitemap generation:", error);
-      // Absolute fallback so we always serve valid XML
-      res.header("Content-Type", "application/xml");
-      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+      console.error("[Sitemap] Error generating dynamic sitemap:", error);
+      const fallbackXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://vetaxis.pk/</loc>
+    <loc>https://vetaxis360.com/</loc>
     <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-</urlset>`);
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=jobs</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=marketplace</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+</urlset>`;
+      res.header("Content-Type", "application/xml; charset=utf-8");
+      res.send(fallbackXml);
+    }
+  });
+
+  // GET /api/sitemap/stats endpoint for diagnostics
+  app.get("/api/sitemap/stats", async (req, res) => {
+    try {
+      if (!cachedSitemap || Date.now() - cachedSitemap.timestamp >= SITEMAP_CACHE_DURATION) {
+        const { xml, stats } = await generateDynamicSitemapXml();
+        cachedSitemap = { xml, timestamp: Date.now() };
+        sitemapStats = { ...stats, cached: true };
+      }
+      res.json({
+        success: true,
+        stats: sitemapStats,
+        cacheAgeSeconds: Math.round((Date.now() - (cachedSitemap?.timestamp || Date.now())) / 1000)
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/sitemap/refresh endpoint for manual cache invalidation
+  app.post("/api/sitemap/refresh", async (req, res) => {
+    try {
+      console.log("[Sitemap] Manual refresh triggered.");
+      const { xml, stats } = await generateDynamicSitemapXml();
+      cachedSitemap = { xml, timestamp: Date.now() };
+      sitemapStats = { ...stats, cached: true };
+      res.json({
+        success: true,
+        message: "Dynamic sitemap successfully crawled and refreshed in-memory.",
+        stats: sitemapStats
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

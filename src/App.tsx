@@ -23,6 +23,7 @@ import { SubscriptionPortal } from './components/SubscriptionPortal';
 import { GuestAnimalViewer } from './components/GuestAnimalViewer';
 import { ClinicManagement } from './components/ClinicManagement';
 import { AboutUsDirectory } from './components/AboutUsDirectory';
+import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
 import PageNotFound from './components/PageNotFound';
 
 export default function App() {
@@ -55,14 +56,58 @@ export default function App() {
   const [highlightApplicationId, setHighlightApplicationId] = useState<string | null>(null);
   const [highlightFarmId, setHighlightFarmId] = useState<string | null>(null);
   const [highlightAppointmentId, setHighlightAppointmentId] = useState<string | null>(null);
+  const [highlightClinicId, setHighlightClinicId] = useState<string | null>(null);
+  const [highlightDoctorId, setHighlightDoctorId] = useState<string | null>(null);
+  const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
+  const [highlightAdId, setHighlightAdId] = useState<string | null>(null);
+  const [initialCity, setInitialCity] = useState<string | null>(null);
+  const [initialFilter, setInitialFilter] = useState<string | null>(null);
+  const [initialPetType, setInitialPetType] = useState<string | null>(null);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
 
-  // Unified dynamic QR code parameters scanner inside app boot
+  // Unified dynamic QR code & SEO deep-linking scanner inside app boot
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const animalId = params.get('animalRecordId');
     const tabParam = params.get('tab');
+    const clinicParam = params.get('clinic');
+    const doctorParam = params.get('doctor');
+    const jobParam = params.get('jobId') || params.get('job');
+    const productParam = params.get('productId') || params.get('product') || params.get('item');
+    const adParam = params.get('adId') || params.get('ad');
+    const cityParam = params.get('city');
+    const filterParam = params.get('filter');
+    const petTypeParam = params.get('type');
+
+    if (clinicParam) {
+      setHighlightClinicId(clinicParam);
+      setActiveSection('explore');
+    } else if (doctorParam) {
+      setHighlightDoctorId(doctorParam);
+      setActiveSection('explore');
+    } else if (jobParam) {
+      setHighlightJobId(jobParam);
+      setActiveSection('jobs');
+    } else if (productParam) {
+      setHighlightProductId(productParam);
+      setActiveSection('marketplace');
+    } else if (adParam) {
+      setHighlightAdId(adParam);
+      setActiveSection('pet_ads');
+    }
+
+    if (cityParam) {
+      setInitialCity(cityParam);
+      setActiveSection('explore');
+    }
+    if (filterParam) {
+      setInitialFilter(filterParam);
+      setActiveSection('explore');
+    }
+    if (petTypeParam) {
+      setInitialPetType(petTypeParam);
+    }
 
     if (tabParam) {
       const validSections = ['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'news'];
@@ -574,23 +619,15 @@ export default function App() {
 
   if (isAuthInitializing) {
     return (
-      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 select-none">
-        <div className="flex flex-col items-center gap-4 animate-pulse">
-          <div className="h-20 w-20 bg-[#004d40] rounded-2xl flex flex-col items-center justify-center shadow-xl text-[#fdfbf7] border border-emerald-800/40 relative">
-            <div className="flex items-center justify-center gap-1 text-base select-none drop-shadow-sm">
-              <span>🐾</span>
-              <span>🐾</span>
-            </div>
-            <span className="font-black text-xl tracking-widest text-[#fdfbf7] mt-0.5 leading-none">VA</span>
-          </div>
-          <div className="text-center space-y-1">
-            <h1 className="font-serif text-2xl font-bold text-stone-800 tracking-tight flex items-center justify-center gap-2">
-              <span className="text-xl filter drop-shadow-sm">🐾</span>
-              <span>Vet<span className="text-[#a0522d]">Axis</span> 360</span>
-              <span className="text-xl filter drop-shadow-sm">🐾</span>
-            </h1>
-            <p className="text-stone-500 text-xs font-mono">Securing connection to clinical network...</p>
-          </div>
+      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 select-none relative overflow-hidden">
+        {/* Subtle Background 3D Glow */}
+        <div className="absolute w-96 h-96 rounded-full bg-[#f4efe4] blur-3xl opacity-60 pointer-events-none" />
+        
+        <div className="relative z-10">
+          <ThreeDAnimalLoader
+            message="Connecting to VetAxis 360"
+            subMessage="Securing connection to clinical & farm database..."
+          />
         </div>
       </div>
     );
@@ -704,6 +741,10 @@ export default function App() {
                 onUpdateUser={handleUpdateUserProfile}
                 activeSection={activeSection}
                 onNavigate={handleNavigate}
+                highlightClinicId={highlightClinicId}
+                highlightDoctorId={highlightDoctorId}
+                initialCity={initialCity}
+                initialFilter={initialFilter}
               />
             )}
 
@@ -715,7 +756,11 @@ export default function App() {
             )}
 
             {activeSection === 'marketplace' && (
-              <Marketplace currentUser={currentUser} onNavigate={setActiveSection} />
+              <Marketplace 
+                currentUser={currentUser} 
+                onNavigate={setActiveSection} 
+                highlightProductId={highlightProductId}
+              />
             )}
 
             {activeSection === 'pet_ads' && (
@@ -726,7 +771,9 @@ export default function App() {
                     setHighlightPostId(highlightId);
                   }
                   setActiveSection(section);
-                }} 
+                }}
+                highlightAdId={highlightAdId}
+                initialType={initialPetType}
               />
             )}
 
@@ -830,35 +877,20 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      {/* ADVANCED MODERN SYSTEM LOADING PORTAL */}
+      {/* ADVANCED 3D ANIMAL SYSTEM LOADING PORTAL */}
       <AnimatePresence>
         {isLoadingSystem && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-stone-900/60 backdrop-blur-md z-[99999] flex flex-col items-center justify-center space-y-6"
+            className="fixed inset-0 bg-stone-900/70 backdrop-blur-md z-[99999] flex flex-col items-center justify-center p-6"
           >
-            <div className="relative flex items-center justify-center">
-              {/* Outer Pulsing Radar Ring */}
-              <motion.div
-                animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0.1, 0.6] }}
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                className="absolute w-24 h-24 rounded-full border-2 border-amber-500/40"
+            <div className="bg-[#fdfbf7] p-8 rounded-3xl border border-[#e3dec9] border-b-[6px] border-[#cdc6ad] shadow-2xl max-w-sm w-full mx-4">
+              <ThreeDAnimalLoader
+                message={loadingMessage || 'Processing Ledger Request...'}
+                subMessage="Synchronizing secure veterinary data"
               />
-              {/* Inner Rotating Gear / Ring */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                className="w-16 h-16 rounded-full border-4 border-amber-100 border-t-amber-600 border-b-amber-600"
-              />
-              {/* Center Icon */}
-              <span className="absolute text-xl animate-pulse">🩺</span>
-            </div>
-            
-            <div className="space-y-1.5 text-center px-4">
-              <h3 className="font-serif font-black text-amber-50 text-sm uppercase tracking-widest">{loadingMessage}</h3>
-              <p className="text-[10px] text-amber-200/50 font-mono tracking-wider">SECURE DIGITAL LEDGER ENGINE V2</p>
             </div>
           </motion.div>
         )}

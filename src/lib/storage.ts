@@ -2282,12 +2282,15 @@ export const JobBoardService = {
     return list;
   },
 
-  async createJob(jobData: Partial<JobPost>, clinic: UserProfile): Promise<JobPost> {
+  async createJob(jobData: Partial<JobPost>, poster: UserProfile): Promise<JobPost> {
+    const isAutoApproved = poster.isAdmin || poster.email?.toLowerCase() === 'saliskhan214@gmail.com';
     const job: JobPost = {
       id: 'job_' + Date.now(),
-      clinicId: clinic.uid,
-      clinicName: clinic.name,
-      clinicEmail: clinic.email,
+      clinicId: poster.uid,
+      clinicName: jobData.clinicName || poster.name,
+      clinicEmail: poster.email,
+      posterRole: poster.role || 'user',
+      employerType: jobData.employerType || (poster.role === 'clinic' ? 'clinic' : 'farm'),
       title: jobData.title || '',
       jobType: jobData.jobType || 'Full-time',
       location: jobData.location || '',
@@ -2299,6 +2302,7 @@ export const JobBoardService = {
       deadline: jobData.deadline || '',
       positions: jobData.positions || 1,
       status: 'open',
+      approvalStatus: isAutoApproved ? 'approved' : 'pending',
       screeningQuestions: jobData.screeningQuestions || [],
       requiredDocuments: jobData.requiredDocuments || [],
       minQualificationGate: jobData.minQualificationGate || 'none',
@@ -2321,6 +2325,85 @@ export const JobBoardService = {
       jobs.unshift(job);
       localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
       return job;
+    }
+  },
+
+  async approveJob(jobId: string, adminUser: UserProfile, jobTitle?: string, posterUid?: string): Promise<void> {
+    const updates: Partial<JobPost> = {
+      approvalStatus: 'approved',
+      status: 'open',
+      approvedAt: Date.now()
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, 'job_posts', jobId), cleanUndefined(updates));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `job_posts/${jobId}`);
+      }
+    } else {
+      const jobs = await this.fetchJobs();
+      const idx = jobs.findIndex(j => j.id === jobId);
+      if (idx !== -1) {
+        jobs[idx] = { ...jobs[idx], ...updates };
+        localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+      }
+    }
+
+    // Send instant notification to poster
+    if (posterUid) {
+      try {
+        await NotificationService.createNotification({
+          userId: posterUid,
+          senderId: adminUser.uid || 'admin',
+          senderName: adminUser.name || 'Admin Team',
+          type: 'status_change',
+          targetId: jobId,
+          targetType: 'job',
+          message: `Your job vacancy posting "${jobTitle || 'Job Post'}" has been APPROVED by the admin and is now live on the VetAxis Careers Board!`
+        });
+      } catch (notifErr) {
+        console.error('Failed to notify poster about job approval:', notifErr);
+      }
+    }
+  },
+
+  async rejectJob(jobId: string, reason: string, adminUser: UserProfile, jobTitle?: string, posterUid?: string): Promise<void> {
+    const updates: Partial<JobPost> = {
+      approvalStatus: 'rejected',
+      rejectedReason: reason || 'Does not meet our hiring guidelines.'
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, 'job_posts', jobId), cleanUndefined(updates));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `job_posts/${jobId}`);
+      }
+    } else {
+      const jobs = await this.fetchJobs();
+      const idx = jobs.findIndex(j => j.id === jobId);
+      if (idx !== -1) {
+        jobs[idx] = { ...jobs[idx], ...updates };
+        localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+      }
+    }
+
+    // Send instant notification to poster
+    if (posterUid) {
+      try {
+        await NotificationService.createNotification({
+          userId: posterUid,
+          senderId: adminUser.uid || 'admin',
+          senderName: adminUser.name || 'Admin Team',
+          type: 'status_change',
+          targetId: jobId,
+          targetType: 'job',
+          message: `Your job vacancy posting "${jobTitle || 'Job Post'}" was reviewed and REJECTED by admin. Reason: ${reason || 'Details do not meet platform verification guidelines.'}`
+        });
+      } catch (notifErr) {
+        console.error('Failed to notify poster about job rejection:', notifErr);
+      }
     }
   },
 

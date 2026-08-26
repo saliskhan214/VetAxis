@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserProfile, UserRole, ManualPayment, LivestockFarm } from '../types';
-import { PaymentService, AuthService, NotificationService, PromotionalAdsService, AdminService } from '../lib/storage';
+import { UserProfile, UserRole, ManualPayment, LivestockFarm, JobPost } from '../types';
+import { PaymentService, AuthService, NotificationService, PromotionalAdsService, AdminService, JobBoardService } from '../lib/storage';
 import {
   Loader2,
   CheckCircle,
@@ -23,14 +23,18 @@ import {
   Briefcase,
   Layers,
   ChevronRight,
-  Info
+  Info,
+  Clock,
+  MapPin,
+  DollarSign,
+  FileText
 } from 'lucide-react';
 
 interface AdminPanelProps {
   currentUser: UserProfile;
 }
 
-type AdminTab = 'users' | 'farms' | 'payments' | 'ads';
+type AdminTab = 'users' | 'farms' | 'payments' | 'ads' | 'jobs';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -38,6 +42,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [farms, setFarms] = useState<LivestockFarm[]>([]);
   const [pendingPayments, setPendingPayments] = useState<ManualPayment[]>([]);
   const [promotionalAds, setPromotionalAds] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,6 +53,21 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
   // Search for Farms
   const [farmSearchTerm, setFarmSearchTerm] = useState('');
+
+  // Search & Filters for Jobs
+  const [jobSearchTerm, setJobSearchTerm] = useState('');
+  const [jobStatusFilter, setJobStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [rejectJobModal, setRejectJobModal] = useState<{
+    isOpen: boolean;
+    job: JobPost | null;
+    reason: string;
+    isSubmitting: boolean;
+  }>({
+    isOpen: false,
+    job: null,
+    reason: '',
+    isSubmitting: false
+  });
 
   const [nowState, setNowState] = useState<number>(Date.now());
 
@@ -124,16 +144,18 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [payments, allUsers, ads, allFarms] = await Promise.all([
+      const [payments, allUsers, ads, allFarms, allJobs] = await Promise.all([
         PaymentService.getPendingPayments().catch(() => []),
         AdminService.getAllUsers().catch(() => []),
         PromotionalAdsService.fetchActiveAds(false).catch(() => []),
-        AdminService.getAllFarms().catch(() => [])
+        AdminService.getAllFarms().catch(() => []),
+        JobBoardService.fetchJobs().catch(() => [])
       ]);
       setPendingPayments(payments);
       setUsers(allUsers);
       setPromotionalAds(ads);
       setFarms(allFarms);
+      setJobs(allJobs);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -471,6 +493,95 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     );
   };
 
+  // Job Approvals & Actions
+  const handleApproveJob = async (job: JobPost) => {
+    showConfirm(
+      'Approve Job Listing',
+      `Are you sure you want to APPROVE the job posting "${job.title}" posted by ${job.clinicName}? It will become immediately visible to all candidates across Pakistan.`,
+      async () => {
+        try {
+          await JobBoardService.approveJob(job.id, currentUser, job.title, job.clinicId);
+          showNotification('Job Approved', `"${job.title}" is now active and live on the Careers Board.`, 'success');
+          fetchData();
+        } catch (err) {
+          showNotification('Error', 'Failed to approve job posting.', 'error');
+        }
+      },
+      'Approve & Publish',
+      false
+    );
+  };
+
+  const handleOpenRejectJobModal = (job: JobPost) => {
+    setRejectJobModal({
+      isOpen: true,
+      job,
+      reason: 'Job details do not meet our verification standards or incomplete requirements provided.',
+      isSubmitting: false
+    });
+  };
+
+  const handleConfirmRejectJob = async () => {
+    if (!rejectJobModal.job) return;
+    setRejectJobModal(prev => ({ ...prev, isSubmitting: true }));
+    try {
+      await JobBoardService.rejectJob(
+        rejectJobModal.job.id,
+        rejectJobModal.reason,
+        currentUser,
+        rejectJobModal.job.title,
+        rejectJobModal.job.clinicId
+      );
+      showNotification('Job Rejected', `"${rejectJobModal.job.title}" has been rejected and the employer has been notified.`, 'success');
+      setRejectJobModal({ isOpen: false, job: null, reason: '', isSubmitting: false });
+      fetchData();
+    } catch (err) {
+      showNotification('Error', 'Failed to reject job posting.', 'error');
+      setRejectJobModal(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  const handleDeleteJobPostAdmin = async (job: JobPost) => {
+    showConfirm(
+      'Delete Job Listing Permanently',
+      `Are you sure you want to PERMANENTLY DELETE the job ad "${job.title}"? This cannot be undone.`,
+      async () => {
+        try {
+          await JobBoardService.deleteJob(job.id);
+          showNotification('Job Deleted', `"${job.title}" has been deleted from the database.`, 'success');
+          fetchData();
+        } catch (err) {
+          showNotification('Error', 'Failed to delete job posting.', 'error');
+        }
+      },
+      'Delete Permanently',
+      true
+    );
+  };
+
+  // Filtered Jobs list
+  const filteredJobs = useMemo(() => {
+    return jobs.filter(j => {
+      if (!j) return false;
+      const queryStr = jobSearchTerm.toLowerCase().trim();
+      const matchesSearch =
+        !queryStr ||
+        (j.title || '').toLowerCase().includes(queryStr) ||
+        (j.clinicName || '').toLowerCase().includes(queryStr) ||
+        (j.clinicEmail || '').toLowerCase().includes(queryStr) ||
+        (j.location || '').toLowerCase().includes(queryStr);
+
+      const status = j.approvalStatus || (j.status === 'open' ? 'approved' : 'pending');
+      const matchesStatus =
+        jobStatusFilter === 'all' ||
+        (jobStatusFilter === 'pending' && (j.approvalStatus === 'pending' || (!j.approvalStatus && j.status === 'open' && j.posterRole === 'user'))) ||
+        (jobStatusFilter === 'approved' && (j.approvalStatus === 'approved' || (!j.approvalStatus && j.status === 'open' && j.posterRole !== 'user'))) ||
+        (jobStatusFilter === 'rejected' && j.approvalStatus === 'rejected');
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [jobs, jobSearchTerm, jobStatusFilter]);
+
   // Filtered Users list
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
@@ -517,6 +628,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
   // Overview Counts
   const stats = useMemo(() => {
+    const pendingJobs = jobs.filter(j => j.approvalStatus === 'pending' || (!j.approvalStatus && j.status === 'open' && j.posterRole === 'user')).length;
     return {
       totalUsers: users.length,
       doctors: users.filter(u => u.role === 'doctor').length,
@@ -527,9 +639,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
       verified: users.filter(u => u.isVerified).length,
       farmsCount: farms.length,
       pendingPaymentsCount: pendingPayments.length,
-      pendingAdsCount: promotionalAds.filter(a => a.status === 'pending' || !a.status).length
+      pendingAdsCount: promotionalAds.filter(a => a.status === 'pending' || !a.status).length,
+      jobsCount: jobs.length,
+      pendingJobsCount: pendingJobs
     };
-  }, [users, farms, pendingPayments, promotionalAds]);
+  }, [users, farms, pendingPayments, promotionalAds, jobs]);
 
   if (currentUser.email !== 'saliskhan214@gmail.com' && !currentUser.isAdmin) {
     return (
@@ -555,7 +669,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">Admin Control Panel</h1>
               <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
-                Manage roles, resolve unauthorized registrations, reassign farm/clinic ownership, and approve payments.
+                Manage roles, resolve unauthorized registrations, reassign farm/clinic ownership, verify jobs, and approve payments.
               </p>
             </div>
           </div>
@@ -591,19 +705,19 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
           <div className="text-[10px] text-indigo-500 mt-0.5">Hospital centres</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
-          <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Assistants</div>
-          <div className="text-2xl font-black text-amber-900 mt-1">{stats.assistants}</div>
-          <div className="text-[10px] text-amber-500 mt-0.5">Paravets & Staff</div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
           <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Farms / Owners</div>
           <div className="text-2xl font-black text-emerald-900 mt-1">{stats.farmsCount}</div>
           <div className="text-[10px] text-emerald-500 mt-0.5">{stats.farmers} farmer accounts</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
+          <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Jobs Queue</div>
+          <div className="text-2xl font-black text-amber-900 mt-1">{stats.jobsCount}</div>
+          <div className="text-[10px] text-amber-600 font-bold mt-0.5">{stats.pendingJobsCount} pending review</div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
           <div className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Action Queue</div>
-          <div className="text-2xl font-black text-purple-900 mt-1">{stats.pendingPaymentsCount + stats.pendingAdsCount}</div>
-          <div className="text-[10px] text-purple-500 mt-0.5">Payments & Billboard</div>
+          <div className="text-2xl font-black text-purple-900 mt-1">{stats.pendingPaymentsCount + stats.pendingAdsCount + stats.pendingJobsCount}</div>
+          <div className="text-[10px] text-purple-500 mt-0.5">Payments, Ads & Jobs</div>
         </div>
       </div>
 
@@ -629,7 +743,23 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          Farms & Ownership Reassignment ({farms.length})
+          Farms & Ownership ({farms.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('jobs')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all cursor-pointer relative ${
+            activeTab === 'jobs'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+          }`}
+        >
+          <Briefcase className="w-4 h-4" />
+          Job & Farm Vacancies ({jobs.length})
+          {stats.pendingJobsCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-white text-[10px] font-black rounded-full animate-pulse">
+              {stats.pendingJobsCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('payments')}
@@ -1254,6 +1384,281 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
       )}
 
       {/* ───────────────────────────────────────────────────────────────── */}
+      {/* TAB 5: JOB & FARM VACANCY ADS APPROVALS */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {activeTab === 'jobs' && (
+        <section className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+          <div className="p-6 border-b border-stone-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-amber-600" />
+                  Job Vacancies & Farm Helper Postings Verification
+                </h2>
+                <p className="text-xs text-stone-500 mt-1">
+                  Review and verify job openings posted by dairy farms, livestock stations, veterinary clinics, and individual pet owners across Pakistan before they become public.
+                </p>
+              </div>
+
+              {/* Status Filter Chips */}
+              <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl flex-wrap">
+                {(['all', 'pending', 'approved', 'rejected'] as const).map(filter => (
+                  <button
+                    key={filter}
+                    onClick={() => setJobStatusFilter(filter)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black capitalize transition-all cursor-pointer ${
+                      jobStatusFilter === filter
+                        ? 'bg-white text-stone-900 shadow-xs'
+                        : 'text-stone-500 hover:text-stone-900'
+                    }`}
+                  >
+                    {filter === 'all' && `All (${jobs.length})`}
+                    {filter === 'pending' && `Pending (${stats.pendingJobsCount})`}
+                    {filter === 'approved' && `Approved (${jobs.filter(j => j.approvalStatus === 'approved' || (!j.approvalStatus && j.status === 'open' && j.posterRole !== 'user')).length})`}
+                    {filter === 'rejected' && `Rejected (${jobs.filter(j => j.approvalStatus === 'rejected').length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="mt-4">
+              <div className="relative">
+                <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search job title, hiring farm/clinic name, email, or city..."
+                  value={jobSearchTerm}
+                  onChange={(e) => setJobSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm font-medium text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Job listings container */}
+          <div className="p-6">
+            {filteredJobs.length === 0 ? (
+              <div className="text-center py-12 bg-stone-50 rounded-2xl border border-dashed border-stone-200">
+                <Briefcase className="w-10 h-10 text-stone-300 mx-auto mb-2" />
+                <div className="text-sm font-bold text-stone-700">No Job Postings Found</div>
+                <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+                  {jobSearchTerm || jobStatusFilter !== 'all'
+                    ? 'No listings match your search keywords or filter criteria.'
+                    : 'No job or helper advertisements have been published yet.'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {filteredJobs.map((job) => {
+                  const isPending = job.approvalStatus === 'pending' || (!job.approvalStatus && job.status === 'open' && job.posterRole === 'user');
+                  const isRejected = job.approvalStatus === 'rejected';
+                  const isApproved = job.approvalStatus === 'approved' || (!job.approvalStatus && job.status === 'open' && job.posterRole !== 'user');
+
+                  return (
+                    <div
+                      key={job.id}
+                      className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                        isPending
+                          ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-400/20'
+                          : isRejected
+                          ? 'bg-red-50/20 border-red-200'
+                          : 'bg-white border-stone-200 hover:border-stone-300'
+                      }`}
+                    >
+                      <div>
+                        {/* Header Badge & Title */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              {/* Employer Type Badge */}
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-stone-100 text-stone-700 border border-stone-200">
+                                {job.employerType === 'farm' ? '🌾 Dairy/Livestock Farm' :
+                                 job.employerType === 'individual' ? '🐾 Individual Owner' :
+                                 job.employerType === 'shelter' ? '🏠 Pet Shelter' :
+                                 '🏥 Clinic / Hospital'}
+                              </span>
+
+                              {/* Approval Status Badge */}
+                              {isPending && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white animate-pulse">
+                                  ⏳ Pending Verification
+                                </span>
+                              )}
+                              {isApproved && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                                  ✓ Live & Approved
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
+                                  ✕ Rejected
+                                </span>
+                              )}
+
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-100 text-stone-600">
+                                {job.jobType}
+                              </span>
+                            </div>
+
+                            <h3 className="text-base font-black text-stone-900 leading-snug">
+                              {job.title}
+                            </h3>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-xs font-black text-stone-900">
+                              Rs. {job.salaryMin?.toLocaleString()} - {job.salaryMax?.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-stone-400 font-medium">per month</div>
+                          </div>
+                        </div>
+
+                        {/* Employer & Location Details */}
+                        <div className="p-3 bg-stone-50 rounded-xl border border-stone-150 space-y-1.5 mb-3 text-xs">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="font-bold text-stone-800 flex items-center gap-1.5">
+                              <span>🏛️ Employer:</span>
+                              <span className="text-stone-900 font-black">{job.clinicName}</span>
+                              {job.posterRole && (
+                                <span className="text-[10px] px-1.5 py-0.2 bg-stone-200 text-stone-700 rounded font-semibold uppercase">
+                                  {job.posterRole}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-stone-500 font-mono text-[11px] select-all">
+                              {job.clinicEmail}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-stone-600 text-[11px] flex-wrap">
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-stone-400 shrink-0" />
+                              <span>{job.location}</span>
+                            </div>
+                            {job.clinicContactPhone && (
+                              <div className="flex items-center gap-1 font-semibold text-stone-800">
+                                <span>📞</span>
+                                <span>{job.clinicContactPhone}</span>
+                              </div>
+                            )}
+                            {job.clinicAddress && (
+                              <div className="text-stone-500 truncate max-w-xs">
+                                📍 {job.clinicAddress}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Experience, Working Hours & Requirements */}
+                        <div className="space-y-2 mb-3 text-xs text-stone-700">
+                          <div>
+                            <span className="font-bold text-stone-900">Experience & Skills: </span>
+                            <span className="text-stone-600">{job.experience}</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] pt-1">
+                            <div className="p-2 bg-stone-50 rounded-lg border border-stone-100">
+                              <div className="text-stone-400 font-bold text-[9px] uppercase">Hours / Shift</div>
+                              <div className="font-bold text-stone-800 truncate">{job.workingHours || 'Standard'}</div>
+                            </div>
+                            <div className="p-2 bg-stone-50 rounded-lg border border-stone-100">
+                              <div className="text-stone-400 font-bold text-[9px] uppercase">Positions</div>
+                              <div className="font-bold text-stone-800">{job.positions || 1} available</div>
+                            </div>
+                            <div className="p-2 bg-stone-50 rounded-lg border border-stone-100">
+                              <div className="text-stone-400 font-bold text-[9px] uppercase">Deadline</div>
+                              <div className="font-bold text-stone-800">{job.deadline || 'Open'}</div>
+                            </div>
+                          </div>
+
+                          {/* Screening questions & documents */}
+                          {job.screeningQuestions && job.screeningQuestions.length > 0 && (
+                            <div className="pt-1">
+                              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                                Screening Questions ({job.screeningQuestions.length}):
+                              </span>
+                              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-stone-600">
+                                {job.screeningQuestions.map((q, idx) => (
+                                  <li key={idx} className="truncate">{q}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {isRejected && job.rejectedReason && (
+                            <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800">
+                              <span className="font-black">Rejection Reason: </span>
+                              <span>{job.rejectedReason}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Bar */}
+                      <div className="pt-3 border-t border-stone-150 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="text-[10px] text-stone-400">
+                          Posted on {new Date(job.createdAt).toLocaleDateString()}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={() => handleApproveJob(job)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all flex items-center gap-1"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Approve Live
+                              </button>
+                              <button
+                                onClick={() => handleOpenRejectJobModal(job)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all flex items-center gap-1"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Reject
+                              </button>
+                            </>
+                          )}
+
+                          {isApproved && (
+                            <button
+                              onClick={() => handleOpenRejectJobModal(job)}
+                              className="bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                            >
+                              Revoke Approval
+                            </button>
+                          )}
+
+                          {isRejected && (
+                            <button
+                              onClick={() => handleApproveJob(job)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all flex items-center gap-1"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Re-Approve Live
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleDeleteJobPostAdmin(job)}
+                            className="text-stone-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Delete Permanently"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────── */}
       {/* MODAL 1: ROLE MODIFICATION & DEMOTION DIALOG */}
       {/* ───────────────────────────────────────────────────────────────── */}
       {roleModalUser && (
@@ -1843,6 +2248,81 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                   </>
                 ) : (
                   <>Transfer All Clinic Data</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Rejection Modal */}
+      {rejectJobModal.isOpen && rejectJobModal.job && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-stone-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 border-b border-stone-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-red-50 text-red-700 rounded-xl border border-red-200">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-stone-900">Disapprove Job Posting</h3>
+                    <p className="text-xs text-stone-500">Provide rejection reason for "{rejectJobModal.job.title}".</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setRejectJobModal({ isOpen: false, job: null, reason: '', isSubmitting: false })}
+                  className="text-stone-400 hover:text-stone-600 p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs">
+                <div className="font-bold text-stone-900">{rejectJobModal.job.title}</div>
+                <div className="text-stone-600 text-[11px] mt-0.5">
+                  Employer: {rejectJobModal.job.clinicName} ({rejectJobModal.job.clinicEmail})
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Rejection Reason (Will be sent to employer) *
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectJobModal.reason}
+                  onChange={(e) => setRejectJobModal(prev => ({ ...prev, reason: e.target.value }))}
+                  placeholder="Explain why this listing was not approved..."
+                  className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm font-medium text-stone-800 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-stone-50 px-6 py-4 flex justify-end gap-2.5 border-t border-stone-100">
+              <button
+                type="button"
+                onClick={() => setRejectJobModal({ isOpen: false, job: null, reason: '', isSubmitting: false })}
+                disabled={rejectJobModal.isSubmitting}
+                className="px-4 py-2 text-xs sm:text-sm font-semibold text-stone-600 hover:text-stone-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRejectJob}
+                disabled={rejectJobModal.isSubmitting || !rejectJobModal.reason.trim()}
+                className="px-5 py-2 text-xs sm:text-sm font-black text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
+              >
+                {rejectJobModal.isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>Disapprove & Notify</>
                 )}
               </button>
             </div>

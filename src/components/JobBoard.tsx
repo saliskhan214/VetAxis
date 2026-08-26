@@ -41,6 +41,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
 
   // Job post inputs
   const [title, setTitle] = useState<string>('');
+  const [employerType, setEmployerType] = useState<JobPost['employerType']>(
+    currentUser.role === 'clinic' ? 'clinic' : currentUser.role === 'user' ? 'farm' : 'individual'
+  );
   const [jobType, setJobType] = useState<JobPost['jobType']>('Full-time');
   const [location, setLocation] = useState<string>(currentUser.address || '');
   const [salaryMin, setSalaryMin] = useState<string>('');
@@ -279,12 +282,18 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
         clinicWebsite: clinicWebsite.trim() || undefined,
         clinicContactPhone: clinicContactPhone.trim() || undefined,
         clinicFacilities: clinicFacilities.trim() || undefined,
+        employerType: employerType || (currentUser.role === 'clinic' ? 'clinic' : currentUser.role === 'user' ? 'farm' : 'individual'),
+        posterRole: currentUser.role
       };
 
       const created = await JobBoardService.createJob(payload, currentUser);
       setJobs(prev => [created, ...prev]);
       setIsPostModalOpen(false);
-      triggerToast('✓ Your Vet Job posting was published successfully!');
+      triggerToast(
+        currentUser.role === 'clinic'
+          ? '✓ Job listing submitted! It will appear live once verified by Admin.'
+          : '✓ Farm Helper vacancy submitted! It will appear live once approved by Admin.'
+      );
 
       // Reset
       setTitle('');
@@ -534,22 +543,28 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
     }
   };
 
-  // Filter lists
-  const myJobPostings = currentUser.role === 'clinic' 
-    ? jobs.filter(j => j.clinicId === currentUser.uid || j.clinicEmail === currentUser.email)
-    : [];
+  // Filter lists & permissions
+  const isSystemAdmin = currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin;
+
+  const myJobPostings = jobs.filter(j => 
+    (j.clinicId && j.clinicId === currentUser.uid) || 
+    (currentUser.email && j.clinicEmail && j.clinicEmail.toLowerCase() === currentUser.email.toLowerCase())
+  );
   
   const filteredJobs = jobs.filter(job => {
-    // Tab filtering (browse cannot include closed unless it's their own or they are looking)
+    // Tab filtering
     if (activeTab === 'my_postings') {
-      if (currentUser.role !== 'clinic') return false;
-      if (job.clinicId !== currentUser.uid && job.clinicEmail !== currentUser.email) {
-        return false;
+      const isMine = (job.clinicId && job.clinicId === currentUser.uid) ||
+        (currentUser.email && job.clinicEmail && job.clinicEmail.toLowerCase() === currentUser.email.toLowerCase());
+      if (!isMine) return false;
+    } else {
+      // Browse tab: for non-admins, only show approved jobs
+      if (!isSystemAdmin) {
+        const isApproved = job.approvalStatus === 'approved' || (!job.approvalStatus && job.status === 'open' && job.posterRole !== 'user');
+        if (!isApproved) return false;
       }
-    }
 
-    // Filter out jobs that reached or passed their last date (deadline) for regular browsing
-    if (activeTab !== 'my_postings') {
+      // Filter out jobs that reached or passed their last date (deadline) for regular browsing
       const todayStr = new Date().toISOString().split('T')[0];
       if (job.deadline && job.deadline < todayStr) {
         return false;
@@ -595,43 +610,31 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
         
         <div className="space-y-3 relative z-10 text-center md:text-left">
           <div className="inline-flex items-center gap-1.5 bg-[#ece8df] text-[#5a5a40] text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-full border border-[#e3dec9]">
-            🎯 Pakistani veterinary hiring board
+            🎯 Veterinary & Farm Employment Portal
           </div>
           <h1 className="text-3xl md:text-4xl font-serif text-[#3c3c3b] font-black tracking-tight leading-none leading-tight">
-            VetAxis <span className="text-[#a0522d]">Careers</span> Board
+            VetAxis <span className="text-[#a0522d]">Careers & Vacancies</span>
           </h1>
           <p className="text-sm text-[#7a766f] max-w-xl font-medium">
-            Bridging veterinary hospitals and clinical experts across Pakistan. Post available jobs, mandate background qualification screening, and manage local candidate selections.
+            Bridging veterinary hospitals, dairy & livestock farms, and qualified assistants across Pakistan. Post vacancies, review candidate credentials, and hire verified helpers.
           </p>
         </div>
 
-        {currentUser.role === 'clinic' && (
-          <motion.button
-            whileHover={{ scale: 1.03, y: -2 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setIsPostModalOpen(true)}
-            className="w-full md:w-auto relative cursor-pointer font-bold text-white bg-[#a0522d] border-b-[4px] border-[#69351d] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 select-none shadow-[0_4px_16px_rgba(160,82,45,0.25)] hover:bg-[#8b4513] transition-all"
-            id="publish_job_btn"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Publish Job Listing</span>
-          </motion.button>
-        )}
+        <motion.button
+          whileHover={{ scale: 1.03, y: -2 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setIsPostModalOpen(true)}
+          className="w-full md:w-auto relative cursor-pointer font-bold text-white bg-[#a0522d] border-b-[4px] border-[#69351d] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 select-none shadow-[0_4px_16px_rgba(160,82,45,0.25)] hover:bg-[#8b4513] transition-all"
+          id="publish_job_btn"
+        >
+          <Plus className="w-5 h-5" />
+          <span>{currentUser.role === 'user' ? '🌾 Post Farm Helper / Job Ad' : 'Publish Job Listing'}</span>
+        </motion.button>
       </div>
 
-      {/* TABS SELECTOR FOR CLINICS */}
-      {currentUser.role === 'clinic' && (
+      {/* TABS SELECTOR */}
+      {(myJobPostings.length > 0 || currentUser.role === 'clinic' || currentUser.role === 'user') && (
         <div className="flex border-b border-[#e3dec9] gap-4" id="clinic_job_tabs">
-          <button
-            onClick={() => setActiveTab('my_postings')}
-            className={`cursor-pointer pb-3 text-sm font-black transition-all ${
-              activeTab === 'my_postings'
-                ? 'text-[#a0522d] border-b-2 border-[#a0522d] scale-102 font-black'
-                : 'text-[#7a766f] hover:text-[#3c3c3b] font-bold'
-            }`}
-          >
-            🏥 Our Clinic Job Postings ({myJobPostings.length})
-          </button>
           <button
             onClick={() => setActiveTab('browse')}
             className={`cursor-pointer pb-3 text-sm font-black transition-all ${
@@ -640,7 +643,22 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                 : 'text-[#7a766f] hover:text-[#3c3c3b] font-bold'
             }`}
           >
-            🌐 Browse All Local Jobs ({jobs.length})
+            🌐 Browse Open Jobs ({jobs.filter(j => isSystemAdmin || j.approvalStatus === 'approved' || (!j.approvalStatus && j.status === 'open' && j.posterRole !== 'user')).length})
+          </button>
+          <button
+            onClick={() => setActiveTab('my_postings')}
+            className={`cursor-pointer pb-3 text-sm font-black transition-all flex items-center gap-1.5 ${
+              activeTab === 'my_postings'
+                ? 'text-[#a0522d] border-b-2 border-[#a0522d] scale-102 font-black'
+                : 'text-[#7a766f] hover:text-[#3c3c3b] font-bold'
+            }`}
+          >
+            📋 My Postings ({myJobPostings.length})
+            {myJobPostings.some(j => j.approvalStatus === 'pending') && (
+              <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] font-bold rounded-full">
+                Pending
+              </span>
+            )}
           </button>
         </div>
       )}
@@ -707,8 +725,13 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="jobs_listings_grid">
           {filteredJobs.map((job) => {
-            const isMyOwn = currentUser.role === 'clinic' && (job.clinicId === currentUser.uid || job.clinicEmail === currentUser.email);
+            const isMyOwn = (job.clinicId === currentUser.uid) || 
+              (currentUser.email && job.clinicEmail && job.clinicEmail.toLowerCase() === currentUser.email.toLowerCase());
             const appliedForJob = applications.find(app => app.jobId === job.id && app.applicantId === currentUser.uid);
+
+            const isPendingVerification = job.approvalStatus === 'pending' || (!job.approvalStatus && job.status === 'open' && job.posterRole === 'user');
+            const isRejected = job.approvalStatus === 'rejected';
+            const isApproved = job.approvalStatus === 'approved' || (!job.approvalStatus && job.status === 'open' && job.posterRole !== 'user');
 
             return (
               <motion.div
@@ -718,26 +741,52 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                 className={`relative bg-white border rounded-2xl overflow-hidden p-5 flex flex-col justify-between transition-shadow hover:shadow-md ${
                   localHighlightJobId === job.id
                     ? 'border-amber-500 ring-4 ring-amber-500/20 shadow-lg scale-[1.01] z-10'
-                    : job.status === 'closed' 
-                      ? 'border-[#ece8df] opacity-75 grayscale-xs' 
-                      : isMyOwn 
-                        ? 'border-[#a0522d]/40 shadow-xs border-b-[3px] border-b-[#a0522d]'
-                        : 'border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad]'
+                    : isPendingVerification
+                      ? 'border-amber-300 bg-amber-50/20 border-b-[3px] border-b-amber-400'
+                      : isRejected
+                        ? 'border-red-200 bg-red-50/20'
+                        : job.status === 'closed' 
+                          ? 'border-[#ece8df] opacity-75 grayscale-xs' 
+                          : isMyOwn 
+                            ? 'border-[#a0522d]/40 shadow-xs border-b-[3px] border-b-[#a0522d]'
+                            : 'border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad]'
                 }`}
               >
                 <div>
                   {/* Top line with labels */}
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <span className="bg-[#fcf9f2] border border-[#e3dec9] text-[#7a766f] text-[10px] uppercase font-black px-2.5 py-1 rounded-full">
-                      💼 {job.jobType}
-                    </span>
+                  <div className="flex items-start justify-between gap-2 mb-3 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="bg-[#fcf9f2] border border-[#e3dec9] text-[#7a766f] text-[10px] uppercase font-black px-2.5 py-1 rounded-full">
+                        {job.employerType === 'farm' ? '🌾 Farm' :
+                         job.employerType === 'shelter' ? '🏠 Shelter' :
+                         job.employerType === 'individual' ? '🐾 Owner' :
+                         '🏥 Clinic'} · {job.jobType}
+                      </span>
+
+                      {/* Verification Badge */}
+                      {isPendingVerification && (
+                        <span className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
+                          ⏳ Pending Admin Verification
+                        </span>
+                      )}
+                      {isRejected && (
+                        <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                          ✕ Rejected by Admin
+                        </span>
+                      )}
+                      {isApproved && (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                          ✓ Verified
+                        </span>
+                      )}
+                    </div>
                     
                     {job.status === 'closed' ? (
                       <span className="bg-red-50 text-red-700 border border-red-200 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                         Filled / Closed
                       </span>
                     ) : (
-                      <span className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
+                      <span className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                         Accepting Entries
                       </span>
                     )}
@@ -748,14 +797,22 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                     <h3 className="text-lg font-serif font-bold text-[#3c3c3b] tracking-tight hover:text-[#a0522d] transition-colors leading-tight">
                       {job.title}
                     </h3>
-                    <div className="text-xs text-[#7a766f] font-semibold flex items-center gap-1">
-                      <span>🏥 {job.clinicName}</span>
+                    <div className="text-xs text-[#7a766f] font-semibold flex items-center gap-1 flex-wrap">
+                      <span>{job.employerType === 'farm' ? '🌾' : '🏥'} {job.clinicName}</span>
                       <span className="text-[#cdc6ad]">·</span>
                       <span className="flex items-center text-[#5a5a40]">
                         <MapPin className="w-3.5 h-3.5 mr-0.5 inline font-bold" /> {job.location}
                       </span>
                     </div>
                   </div>
+
+                  {/* Rejection Notice if rejected */}
+                  {isRejected && job.rejectedReason && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 mb-3">
+                      <div className="font-bold mb-0.5">Admin Feedback:</div>
+                      <p>{job.rejectedReason}</p>
+                    </div>
+                  )}
 
                   {/* Critical parameters cards bento snippet */}
                   <div className="grid grid-cols-2 gap-2 bg-[#fcf9f2] border border-[#e3dec9]/80 p-3 rounded-xl mb-4 text-[11px] font-bold text-[#5a5a40]">
@@ -792,7 +849,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                   {(job.clinicAddress || job.clinicWebsite || job.clinicContactPhone || job.clinicFacilities) && (
                     <div className="mt-4 p-3.5 bg-neutral-50 hover:bg-neutral-100/50 rounded-xl border border-neutral-200/60 text-xs text-[#5a5a40] space-y-2 transition-all">
                       <div className="text-[10px] font-black uppercase tracking-widest text-[#a0522d] flex items-center gap-1.5 border-b border-neutral-200/40 pb-1 mb-1.5 shadow-2xs">
-                        🏥 Clinical Hiring Party Overview
+                        {job.employerType === 'farm' ? '🌾 Farm / Employer Contact Overview' : '🏥 Clinical Hiring Party Overview'}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] leading-relaxed">
                         {job.clinicContactPhone && (
@@ -803,7 +860,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                         )}
                         {job.clinicWebsite && (
                           <div className="flex items-start gap-1 font-sans">
-                            <span className="font-bold text-[#a0522d]/95 text-[10px] uppercase tracking-wide shrink-0">🌐 Website:</span>
+                            <span className="font-bold text-[#a0522d]/95 text-[10px] uppercase tracking-wide shrink-0">🌐 Website/Social:</span>
                             <a 
                               href={job.clinicWebsite.startsWith('http') ? job.clinicWebsite : `https://${job.clinicWebsite}`} 
                               target="_blank" 
@@ -822,7 +879,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                         )}
                         {job.clinicFacilities && (
                           <div className="flex items-start gap-1 font-sans sm:col-span-2">
-                            <span className="font-bold text-[#a0522d]/95 text-[10px] uppercase tracking-wide shrink-0">🔬 Equipment:</span>
+                            <span className="font-bold text-[#a0522d]/95 text-[10px] uppercase tracking-wide shrink-0">🔬 Equipment/Livestock:</span>
                             <span className="text-[#7a766f] font-semibold italic">{job.clinicFacilities}</span>
                           </div>
                         )}
@@ -834,8 +891,8 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                 {/* Card Button footer row based on Role */}
                 <div className="border-t border-[#f4f1e9] pt-4 mt-2 flex items-center justify-between gap-3 flex-wrap">
                   {isMyOwn ? (
-                    <div className="flex items-center gap-2 w-full justify-between">
-                      {/* Clinic specific utilities */}
+                    <div className="flex items-center gap-2 w-full justify-between flex-wrap">
+                      {/* Employer specific utilities */}
                       <button
                         onClick={() => handleViewApplicants(job)}
                         className="bg-[#5a5a40] hover:bg-[#3e3e2b] text-white border-b-2 border-b-[#2a2a1d] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
@@ -844,19 +901,26 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                         <span>Manage Applicants ({applications.filter(a => a.jobId === job.id).length})</span>
                       </button>
 
-                      <button
-                        onClick={() => handleDeleteJobPost(job.id)}
-                        className="bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
-                        title="Permanently Delete Job Advertising Post"
-                      >
-                        <span>🗑️ Delete Job Ad</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {isPendingVerification && (
+                          <span className="text-xs text-amber-700 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                            Awaiting Admin Review
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleDeleteJobPost(job.id)}
+                          className="bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
+                          title="Permanently Delete Job Advertising Post"
+                        >
+                          <span>🗑️ Delete</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <>
                       {/* Candidate application capabilities */}
                       <div className="text-[10px] text-[#a49f92] font-semibold leading-none">
-                        Clinic posted • {new Date(job.createdAt).toLocaleDateString()}
+                        Posted • {new Date(job.createdAt).toLocaleDateString()}
                       </div>
 
                       {appliedForJob ? (
@@ -912,9 +976,23 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                 <X className="w-4 h-4" />
               </button>
 
-              <h2 className="text-xl font-serif font-bold text-[#3c3c3b] mb-4 flex items-center gap-2">
-                💼 Publish New Veterinarian & Helper Job
+              <h2 className="text-xl font-serif font-bold text-[#3c3c3b] mb-2 flex items-center gap-2">
+                💼 {currentUser.role === 'user' ? '🌾 Post Farm Helper / Livestock Vacancy' : 'Publish New Job / Clinic Vacancy'}
               </h2>
+              <p className="text-xs text-[#7a766f] mb-4">
+                Reach thousands of veterinarians, paravets, farm workers, and assistants across Pakistan.
+              </p>
+
+              {/* Admin Verification Notice */}
+              <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-xs text-amber-900 flex items-start gap-2.5 mb-4">
+                <span className="text-base shrink-0">🛡️</span>
+                <div>
+                  <span className="font-black block">Admin Verification Protocol</span>
+                  <span className="text-[11px] text-amber-800 leading-relaxed">
+                    To maintain strict safety and verify authentic employment across Pakistan, all job advertisements and farm helper listings are reviewed by the VetAxis Admin team before going live to candidates.
+                  </span>
+                </div>
+              </div>
 
               <form onSubmit={handleJobSubmit} className="space-y-4">
                 {formError && (
@@ -924,20 +1002,53 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                   </div>
                 )}
 
+                {/* Employer Entity Type */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#5a5a40] mb-1.5">
+                    Hiring Entity Type (*)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'farm', label: '🌾 Dairy/Livestock Farm', desc: 'Dairy, Cattle & Horse Stables' },
+                      { id: 'clinic', label: '🏥 Veterinary Clinic', desc: 'Animal Hospital & Surgery' },
+                      { id: 'shelter', label: '🏠 Shelter / NGO', desc: 'Pet Rescue & Welfare' },
+                      { id: 'individual', label: '👤 Individual / Pet Owner', desc: 'Private Farm / Helper' }
+                    ].map(type => (
+                      <button
+                        type="button"
+                        key={type.id}
+                        onClick={() => setEmployerType(type.id as any)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          employerType === type.id
+                            ? 'bg-[#fcf9f2] border-[#a0522d] ring-2 ring-[#a0522d]/20'
+                            : 'bg-white border-[#e3dec9] hover:bg-[#faf8f2]'
+                        }`}
+                      >
+                        <div className="font-bold text-xs text-[#3c3c3b]">{type.label}</div>
+                        <div className="text-[9px] text-[#7a766f] mt-0.5">{type.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Job Title */}
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-[#5a5a40] mb-1.5">
-                    Job Title (*)
+                    Job / Vacancy Title (*)
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Small Animal Surgery Assistant, Junior Veterinarian"
+                    placeholder={
+                      employerType === 'farm'
+                        ? "e.g. Dairy Farm Helper, Cattle Milking Specialist, Livestock Attendant"
+                        : "e.g. Small Animal Surgery Assistant, Junior Veterinarian, Clinic Receptionist"
+                    }
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="w-full bg-white border border-[#e3dec9] rounded-xl px-4 py-3 text-sm font-semibold text-[#3c3c3b] focus:outline-none focus:ring-1 focus:ring-[#5a5a40]"
                   />
-                  <p className="text-[10px] text-[#a49f92] mt-1 font-medium">Be specific in job headers. Generic names reduce candidate response rate.</p>
+                  <p className="text-[10px] text-[#a49f92] mt-1 font-medium">Be specific in job headers. Clear titles receive more qualified applicants.</p>
                 </div>
 
                 {/* 2-column details layout */}
@@ -954,8 +1065,8 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                     >
                       <option value="Full-time">Full-time</option>
                       <option value="Part-time">Part-time</option>
-                      <option value="Freelance">Freelance</option>
-                      <option value="Internship">Internship</option>
+                      <option value="Freelance">Freelance / On-Demand</option>
+                      <option value="Internship">Internship / Apprenticeship</option>
                     </select>
                   </div>
 
@@ -967,7 +1078,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                     <input
                       type="text"
                       required
-                      placeholder="e.g. F-8 Cantonment, Islamabad"
+                      placeholder="e.g. Manga Mandi, Lahore or F-8, Islamabad"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       className="w-full bg-white border border-[#e3dec9] rounded-xl px-4 py-3 text-sm font-semibold text-[#3c3c3b] focus:outline-none focus:ring-1 focus:ring-[#5a5a40]"
@@ -978,10 +1089,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                 {/* Detailed Hiring Party Information (Optional) */}
                 <div className="bg-[#fcf9f2] border border-[#e3dec9]/60 p-4 rounded-xl space-y-3.5">
                   <span className="block text-[#a0522d] font-black text-xs uppercase tracking-wider">
-                    🏥 Clinic / Hiring Entity Detailed info (Recommended)
+                    {employerType === 'farm' ? '🌾 Farm & Employer Contact Details (Recommended)' : '🏥 Clinic & Facility Detailed Info (Recommended)'}
                   </span>
                   <p className="text-[10px] text-[#7a766f] font-semibold leading-normal">
-                    Provide supplementary details regarding your medical facility, equipment, and contact lines so professional candidates can reach you or verify your clinic profile quickly.
+                    Provide supplementary details regarding your farm location, animals/equipment, and WhatsApp contacts so candidates can verify and reach you easily.
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

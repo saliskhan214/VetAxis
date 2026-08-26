@@ -296,34 +296,8 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'clinic' &&
         incoming().get('clinicId', '') == request.auth.uid &&
         incoming().get('clinicEmail', '') == request.auth.token.email &&
-        incoming().title is string && incoming().title.size() <= 150 &&
-        incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
-        incoming().location is string && incoming().location.size() <= 150 &&
-        incoming().salaryMin is number && incoming().salaryMin >= 0 &&
-        incoming().salaryMax is number && incoming().salaryMax >= incoming().salaryMin &&
-        incoming().experience is string && incoming().experience.size() <= 1000 &&
-        incoming().workingHours is string && incoming().workingHours.size() <= 1000 &&
-        incoming().genderPreference in ['No Preference', 'Male', 'Female'] &&
-        incoming().deadline is string && incoming().deadline.size() <= 50 &&
-        incoming().positions is number && incoming().positions >= 1 &&
-        incoming().status == 'open' &&
-        incoming().screeningQuestions is list &&
-        incoming().requiredDocuments is list &&
-        incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
-        incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
-        incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
-        incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
-        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
-      );
-
-      allow update: if isSignedIn() && (
-        (existing().get('clinicId', '') == request.auth.uid || existing().get('clinicEmail', '') == request.auth.token.email) &&
-        incoming().get('clinicId', '') == existing().get('clinicId', '') &&
-        incoming().get('createdAt', 0) == existing().get('createdAt', 0) &&
         incoming().title is string && incoming().title.size() <= 150 &&
         incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
         incoming().location is string && incoming().location.size() <= 150 &&
@@ -338,15 +312,34 @@ service cloud.firestore {
         incoming().screeningQuestions is list &&
         incoming().requiredDocuments is list &&
         incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        (!('approvalStatus' in incoming()) || incoming().approvalStatus in ['pending', 'approved', 'rejected']) &&
+        (!('posterRole' in incoming()) || incoming().posterRole in ['doctor', 'clinic', 'assistant', 'user']) &&
+        (!('employerType' in incoming()) || incoming().employerType in ['clinic', 'farm', 'individual', 'hospital']) &&
         incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
         incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
         incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
         incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
       );
 
+      allow update: if isSignedIn() && (
+        ((existing().get('clinicId', '') == request.auth.uid || existing().get('clinicEmail', '') == request.auth.token.email) &&
+          incoming().get('clinicId', '') == existing().get('clinicId', '') &&
+          incoming().get('createdAt', 0) == existing().get('createdAt', 0) &&
+          incoming().title is string && incoming().title.size() <= 150 &&
+          incoming().jobType in ['Full-time', 'Part-time', 'Freelance', 'Internship'] &&
+          incoming().location is string && incoming().location.size() <= 150 &&
+          incoming().salaryMin is number && incoming().salaryMin >= 0 &&
+          incoming().salaryMax is number && incoming().salaryMax >= incoming().salaryMin &&
+          incoming().positions is number && incoming().positions >= 1 &&
+          incoming().status in ['open', 'closed']) ||
+        isAdmin()
+      );
+
       allow delete: if isSignedIn() && (
         existing().get('clinicId', '') == request.auth.uid ||
-        existing().get('clinicEmail', '') == request.auth.token.email
+        existing().get('clinicEmail', '') == request.auth.token.email ||
+        isAdmin()
       );
     }
 

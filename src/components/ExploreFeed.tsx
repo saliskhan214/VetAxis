@@ -13,6 +13,10 @@ interface ExploreFeedProps {
   onUpdateUser: (updated: UserProfile) => void;
   activeSection?: string;
   onNavigate?: (section: string) => void;
+  highlightClinicId?: string | null;
+  highlightDoctorId?: string | null;
+  initialCity?: string | null;
+  initialFilter?: string | null;
 }
 
 const WELCOME_BANNER_SLIDE = {
@@ -44,8 +48,21 @@ const PAKISTAN_CITIES = [
   { name: 'Hyderabad', lat: 25.3960, lng: 68.3578 },
 ];
 
-export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNavigate }: ExploreFeedProps) {
-  const [activeTab, setActiveTab] = useState<UserRole>('doctor');
+export function ExploreFeed({ 
+  currentUser, 
+  onUpdateUser, 
+  activeSection, 
+  onNavigate,
+  highlightClinicId,
+  highlightDoctorId,
+  initialCity,
+  initialFilter
+}: ExploreFeedProps) {
+  const [activeTab, setActiveTab] = useState<UserRole>(() => {
+    if (highlightClinicId) return 'clinic';
+    if (highlightDoctorId) return 'doctor';
+    return 'doctor';
+  });
   const [exploreMenuOpen, setExploreMenuOpen] = useState<boolean>(false);
   const [professionals, setProfessionals] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -452,6 +469,33 @@ export function ExploreFeed({ currentUser, onUpdateUser, activeSection, onNaviga
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  // Deep linking initial state handlers
+  useEffect(() => {
+    if (initialCity) {
+      handleCitySearchSubmit(initialCity);
+    }
+    if (initialFilter) {
+      if (initialFilter.toLowerCase().includes('emergency')) {
+        setSearchTerm('emergency');
+      } else if (initialFilter.toLowerCase().includes('vaccin')) {
+        setSearchTerm('vaccin');
+      } else if (initialFilter.toLowerCase().includes('surg')) {
+        setSearchTerm('surgery');
+      }
+    }
+  }, [initialCity, initialFilter]);
+
+  // Auto-open highlighted clinic or doctor profile if requested
+  useEffect(() => {
+    const targetUid = highlightClinicId || highlightDoctorId;
+    if (targetUid && professionals.length > 0) {
+      const matched = professionals.find(p => p.uid === targetUid);
+      if (matched) {
+        handleOpenDetails(matched);
+      }
+    }
+  }, [highlightClinicId, highlightDoctorId, professionals]);
 
   const handleResetAllFilters = async () => {
     setSearchTerm('');

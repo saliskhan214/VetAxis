@@ -143,9 +143,11 @@ export enum SORT_TYPES {
 
 export interface JobPost {
   id: string;
-  clinicId: string;
-  clinicName: string;
+  clinicId: string; // poster UID
+  clinicName: string; // hiring entity / clinic / farm name
   clinicEmail: string;
+  posterRole?: UserRole;
+  employerType?: 'clinic' | 'farm' | 'individual' | 'hospital';
   title: string;
   jobType: 'Full-time' | 'Part-time' | 'Freelance' | 'Internship';
   location: string;
@@ -157,6 +159,9 @@ export interface JobPost {
   deadline: string;
   positions: number;
   status: 'open' | 'closed';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  rejectedReason?: string;
+  approvedAt?: number;
   screeningQuestions: string[];
   requiredDocuments: string[];
   minQualificationGate: 'none' | 'assistant' | 'doctor';
