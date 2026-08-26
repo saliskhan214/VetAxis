@@ -6,7 +6,7 @@
   <!-- Homepage / Main Portal -->
   <url>
     <loc>https://vetaxis360.com/</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
@@ -14,7 +14,65 @@
   <!-- Veterinary Directory & Clinic Finder -->
   <url>
     <loc>https://vetaxis360.com/?tab=explore</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- City-Specific Local Veterinary Clinic Directories -->
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Islamabad</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Rawalpindi</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Lahore</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Karachi</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Peshawar</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Faisalabad</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Multan</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;city=Quetta</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- 24/7 Emergency Animal Hospitals -->
+  <url>
+    <loc>https://vetaxis360.com/?tab=explore&amp;filter=emergency</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
@@ -22,7 +80,7 @@
   <!-- DVM Careers & Veterinary Job Board -->
   <url>
     <loc>https://vetaxis360.com/?tab=jobs</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -30,15 +88,15 @@
   <!-- Livestock Farm & Herd Health Management -->
   <url>
     <loc>https://vetaxis360.com/?tab=livestock</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
-  <!-- Lost & Found Pet Network and Pet Classifieds -->
+  <!-- Lost & Found Pet SOS Network & Pet Classifieds -->
   <url>
     <loc>https://vetaxis360.com/?tab=pets</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -46,7 +104,7 @@
   <!-- Certified Veterinary Marketplace & Medical Supplies -->
   <url>
     <loc>https://vetaxis360.com/?tab=marketplace</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
   </url>
@@ -54,7 +112,7 @@
   <!-- Veterinary Community Case Feed -->
   <url>
     <loc>https://vetaxis360.com/?tab=community</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -62,7 +120,7 @@
   <!-- Veterinary Clinical Blog & Animal Health Guides -->
   <url>
     <loc>https://vetaxis360.com/?tab=blogs</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
   </url>
@@ -70,7 +128,7 @@
   <!-- About Us Directory -->
   <url>
     <loc>https://vetaxis360.com/?tab=about</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -78,13 +136,13 @@
   <!-- Terms & Privacy -->
   <url>
     <loc>https://vetaxis360.com/?tab=terms</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
     <loc>https://vetaxis360.com/?tab=privacy</loc>
-    <lastmod>2026-08-23</lastmod>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

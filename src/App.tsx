@@ -89,6 +89,28 @@ export default function App() {
     }
   }, [currentUser?.uid]);
 
+  // Dynamic SEO meta tags and Title management per active section
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      explore: "Find Verified Veterinary Clinics, DVM Doctors & Emergency Animal Hospitals | VetAxis 360",
+      jobs: "DVM Veterinary Careers, Hospital Jobs & Staff Recruitment | VetAxis 360",
+      pet_ads: "Lost & Found Pets SOS Network, Pet Adoption & Classifieds | VetAxis 360",
+      livestock: "Livestock Herd Management, Farm Health Ledgers & Dairy Care | VetAxis 360",
+      marketplace: "Veterinary Medicine, Surgical Supplies & Pharmacy Marketplace | VetAxis 360",
+      community: "Veterinary Clinical Discussions, Case Studies & DVM Insights | VetAxis 360",
+      news: "Veterinary Clinical Guides & Animal Health Articles | VetAxis 360",
+      subscription: "Practitioner Billing, Verified Badges & Premium Tiers | VetAxis 360",
+      profile: "My Clinical Profile & Pet Medical Passports | VetAxis 360",
+      about: "About VetAxis 360 | Pakistan & Global Veterinary Platform",
+      terms: "Terms of Service | VetAxis 360",
+      privacy: "Privacy Policy & Medical Data Security | VetAxis 360"
+    };
+
+    if (titles[activeSection]) {
+      document.title = titles[activeSection];
+    }
+  }, [activeSection]);
+
   // Advanced Global Loading State
   const [isLoadingSystem, setIsLoadingSystem] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
@@ -552,13 +574,23 @@ export default function App() {
 
   if (isAuthInitializing) {
     return (
-      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 select-none">
         <div className="flex flex-col items-center gap-4 animate-pulse">
-          <div className="h-16 w-16 bg-[#004d40] rounded-2xl flex items-center justify-center shadow-lg text-[#fdfbf7] font-black text-2xl tracking-widest">
-            VA
+          <div className="h-20 w-20 bg-[#004d40] rounded-2xl flex flex-col items-center justify-center shadow-xl text-[#fdfbf7] border border-emerald-800/40 relative">
+            <div className="flex items-center justify-center gap-1 text-base select-none drop-shadow-sm">
+              <span>🐾</span>
+              <span>🐾</span>
+            </div>
+            <span className="font-black text-xl tracking-widest text-[#fdfbf7] mt-0.5 leading-none">VA</span>
           </div>
-          <h1 className="text-xl font-bold text-stone-800 tracking-tight text-center">VetAxis 360</h1>
-          <p className="text-stone-500 text-xs font-mono text-center">Securing connection to clinical network...</p>
+          <div className="text-center space-y-1">
+            <h1 className="font-serif text-2xl font-bold text-stone-800 tracking-tight flex items-center justify-center gap-2">
+              <span className="text-xl filter drop-shadow-sm">🐾</span>
+              <span>Vet<span className="text-[#a0522d]">Axis</span> 360</span>
+              <span className="text-xl filter drop-shadow-sm">🐾</span>
+            </h1>
+            <p className="text-stone-500 text-xs font-mono">Securing connection to clinical network...</p>
+          </div>
         </div>
       </div>
     );

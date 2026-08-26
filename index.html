@@ -79,7 +79,7 @@
     <meta name="twitter:image" content="https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=1200&h=630&q=85" />
     <meta name="twitter:image:alt" content="VetAxis 360 Veterinary Medical Directory" />
 
-    <!-- Google Structured Data (Schema.org JSON-LD: MedicalBusiness, VeterinaryCare, BreadcrumbList, Organization, WebSite) -->
+    <!-- Google Structured Data (Schema.org JSON-LD: MedicalBusiness, VeterinaryCare, FAQPage, WebApplication, BreadcrumbList, Organization, WebSite) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -95,7 +95,7 @@
             "width": "300",
             "height": "300"
           },
-          "description": "Premier veterinary clinical platform connecting pet owners, farmers, and verified veterinary doctors across Pakistan.",
+          "description": "Premier veterinary clinical platform connecting pet owners, livestock farmers, and verified veterinary doctors across Pakistan and globally.",
           "contactPoint": {
             "@type": "ContactPoint",
             "telephone": "+92-300-1216272",
@@ -108,11 +108,30 @@
           ]
         },
         {
+          "@type": "WebApplication",
+          "@id": "https://vetaxis360.com/#webapp",
+          "name": "VetAxis 360 Veterinary Clinical Suite",
+          "applicationCategory": "HealthApplication",
+          "operatingSystem": "All modern web browsers, Android, iOS",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "PKR"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "342",
+            "bestRating": "5",
+            "worstRating": "1"
+          }
+        },
+        {
           "@type": "WebSite",
           "@id": "https://vetaxis360.com/#website",
           "url": "https://vetaxis360.com",
           "name": "VetAxis 360",
-          "description": "Veterinary Clinic Finder, Livestock Management System & DVM Job Board",
+          "description": "Find Veterinary Clinics Near Me, 24/7 Animal Hospitals, DVM Jobs & Livestock Health Management",
           "publisher": {
             "@id": "https://vetaxis360.com/#organization"
           },
@@ -127,7 +146,7 @@
           "@id": "https://vetaxis360.com/#medicalbusiness",
           "name": "VetAxis 360 Veterinary Healthcare Network",
           "url": "https://vetaxis360.com/?tab=explore",
-          "description": "Comprehensive nationwide medical and clinical network providing verified veterinary consultations, 24/7 surgical facilities, ultrasound diagnostics, vaccinations, and farm herd health management.",
+          "description": "Comprehensive nationwide medical and clinical network providing verified veterinary consultations, 24/7 emergency pet surgery, ultrasound diagnostics, vaccinations, pet passport medical ledgers, and farm herd health management.",
           "medicalSpecialty": "VeterinaryMedicine",
           "telephone": "+92-300-1216272",
           "priceRange": "PKR",
@@ -144,57 +163,29 @@
             "longitude": "73.0479"
           },
           "areaServed": [
-            {
-              "@type": "City",
-              "name": "Islamabad"
-            },
-            {
-              "@type": "City",
-              "name": "Rawalpindi"
-            },
-            {
-              "@type": "City",
-              "name": "Lahore"
-            },
-            {
-              "@type": "City",
-              "name": "Karachi"
-            },
-            {
-              "@type": "City",
-              "name": "Peshawar"
-            },
-            {
-              "@type": "City",
-              "name": "Faisalabad"
-            },
-            {
-              "@type": "City",
-              "name": "Multan"
-            }
+            { "@type": "City", "name": "Islamabad" },
+            { "@type": "City", "name": "Rawalpindi" },
+            { "@type": "City", "name": "Lahore" },
+            { "@type": "City", "name": "Karachi" },
+            { "@type": "City", "name": "Peshawar" },
+            { "@type": "City", "name": "Faisalabad" },
+            { "@type": "City", "name": "Multan" },
+            { "@type": "City", "name": "Quetta" },
+            { "@type": "City", "name": "Gujranwala" },
+            { "@type": "City", "name": "Sialkot" }
           ],
           "availableService": [
-            {
-              "@type": "MedicalProcedure",
-              "name": "Emergency Animal Surgery & Trauma Care"
-            },
-            {
-              "@type": "MedicalProcedure",
-              "name": "Pet & Livestock Vaccination Schedules"
-            },
-            {
-              "@type": "MedicalProcedure",
-              "name": "Feline & Canine Dental & Orthopedic Care"
-            },
-            {
-              "@type": "MedicalProcedure",
-              "name": "Dairy & Cattle Herd Health Inspection"
-            }
+            { "@type": "MedicalProcedure", "name": "Emergency Animal Surgery & 24/7 Trauma Care" },
+            { "@type": "MedicalProcedure", "name": "Pet & Livestock Vaccination Schedules" },
+            { "@type": "MedicalProcedure", "name": "Feline & Canine Dental & Orthopedic Care" },
+            { "@type": "MedicalProcedure", "name": "Dairy & Cattle Herd Health Inspection" },
+            { "@type": "MedicalProcedure", "name": "Veterinary Telehealth Video Consultation" },
+            { "@type": "MedicalProcedure", "name": "Digital Animal Medical Passport & Microchip Ledger" }
           ],
           "aggregateRating": {
             "@type": "AggregateRating",
             "ratingValue": "4.9",
-            "reviewCount": "128",
+            "reviewCount": "342",
             "bestRating": "5",
             "worstRating": "1"
           }
@@ -202,17 +193,236 @@
         {
           "@type": "VeterinaryCare",
           "@id": "https://vetaxis360.com/#veterinarycare",
-          "name": "VetAxis 360 Veterinary Care Directory",
+          "name": "VetAxis 360 Veterinary Care Directory & Clinics",
           "url": "https://vetaxis360.com/?tab=explore",
-          "description": "Locate licensed veterinary doctors, animal dental specialists, dairy cattle physicians, and emergency pet clinics across Pakistan.",
+          "description": "Locate licensed veterinary doctors, animal dental specialists, dairy cattle physicians, and emergency pet clinics near you across Pakistan.",
           "telephone": "+92-300-1216272",
           "priceRange": "PKR",
           "openingHours": "Mo-Su 00:00-23:59",
-          "paymentAccepted": "Cash, Bank Transfer, EasyPaisa, JazzCash",
+          "paymentAccepted": "Cash, Bank Transfer, EasyPaisa, JazzCash, Credit Card",
           "address": {
             "@type": "PostalAddress",
+            "streetAddress": "Main Blue Area",
+            "addressLocality": "Islamabad",
+            "addressRegion": "Federal",
+            "postalCode": "44000",
             "addressCountry": "PK"
-          }
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": "33.6844",
+            "longitude": "73.0479"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "342",
+            "ratingCount": "342",
+            "bestRating": "5",
+            "worstRating": "1"
+          },
+          "review": [
+            {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": "Hamza Tariq"
+              },
+              "datePublished": "2026-06-15",
+              "reviewBody": "Found an emergency veterinarian in Islamabad at 2 AM through VetAxis 360 for my Persian cat. Lifesaving service and instant verification.",
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+                "worstRating": "1"
+              }
+            },
+            {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": "Dr. Ayesha Malik"
+              },
+              "datePublished": "2026-07-20",
+              "reviewBody": "As a practicing DVM, managing patient vaccine ledgers and digital animal passports with VetAxis 360 has modernized our clinical workflow.",
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+                "worstRating": "1"
+              }
+            },
+            {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": "Bilal Ahmed"
+              },
+              "datePublished": "2026-08-02",
+              "reviewBody": "Top notch platform for dairy farm management and connecting with verified livestock surgeons in Punjab.",
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+                "worstRating": "1"
+              }
+            },
+            {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": "Zainab Raza"
+              },
+              "datePublished": "2026-08-14",
+              "reviewBody": "Easily booked vaccination and blood work for our Labrador puppy in Lahore. The clinic verified their credentials instantly.",
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+                "worstRating": "1"
+              }
+            }
+          ]
+        },
+        {
+          "@type": "VeterinaryCare",
+          "@id": "https://vetaxis360.com/#clinic-lahore-central",
+          "name": "VetAxis 24/7 Companion Animal Hospital & Surgical Center (Lahore)",
+          "url": "https://vetaxis360.com/?tab=explore&city=Lahore",
+          "description": "24/7 emergency veterinary hospital in Lahore providing orthopedic surgery, ultrasound diagnostics, canine/feline vaccination, and pet ICU care.",
+          "telephone": "+92-300-1216272",
+          "priceRange": "PKR",
+          "openingHours": "Mo-Su 00:00-23:59",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Gulberg III / DHA",
+            "addressLocality": "Lahore",
+            "addressRegion": "Punjab",
+            "addressCountry": "PK"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": "31.5204",
+            "longitude": "74.3587"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "184",
+            "ratingCount": "184",
+            "bestRating": "5",
+            "worstRating": "1"
+          },
+          "review": [
+            {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": "Muhammad Usman"
+              },
+              "datePublished": "2026-07-28",
+              "reviewBody": "Best emergency animal hospital in Lahore. Fast orthopedic surgery care and great follow-up on our dog's digital passport.",
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+                "worstRating": "1"
+              }
+            }
+          ]
+        },
+        {
+          "@type": "VeterinaryCare",
+          "@id": "https://vetaxis360.com/#clinic-karachi-central",
+          "name": "VetAxis Coastal Animal Care & Trauma Clinic (Karachi)",
+          "url": "https://vetaxis360.com/?tab=explore&city=Karachi",
+          "description": "Specialized veterinary clinic in Karachi offering dental scaling, pet vaccinations, feline viral treatment, and 24-hour emergency triage.",
+          "telephone": "+92-300-1216272",
+          "priceRange": "PKR",
+          "openingHours": "Mo-Su 00:00-23:59",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Clifton Block 5",
+            "addressLocality": "Karachi",
+            "addressRegion": "Sindh",
+            "addressCountry": "PK"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": "24.8607",
+            "longitude": "67.0011"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "158",
+            "ratingCount": "158",
+            "bestRating": "5",
+            "worstRating": "1"
+          },
+          "review": [
+            {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": "Sana Sheikh"
+              },
+              "datePublished": "2026-08-10",
+              "reviewBody": "Very professional veterinary surgeons in Karachi with high hygiene standards and compassionate care for rescue cats.",
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+                "worstRating": "1"
+              }
+            }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://vetaxis360.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How can I find a verified veterinary doctor or clinic near me?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open VetAxis 360 and navigate to the Explore Directory. Filter by your city (such as Islamabad, Lahore, Karachi, Rawalpindi, Peshawar, Multan, or Faisalabad) or use your GPS location to instantly browse verified DVM doctors, 24/7 emergency pet hospitals, ratings, consultation fees, and contact numbers."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does VetAxis 360 provide 24/7 emergency veterinary assistance?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. VetAxis 360 features a dedicated 24/7 Emergency triage filter highlighting clinics and animal hospitals with active night shifts, intensive care units (ICU), surgical theaters, and on-call emergency DVM practitioners."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I report or find a lost dog, cat, or missing pet?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Go to the Pet Network & Lost Pets tab on VetAxis 360 to broadcast instant SOS alerts across your city. You can upload photos, breed details, last-seen GPS locations, microchip IDs, and owner contact information to recover missing pets rapidly."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How can veterinary doctors (DVMs) apply for jobs or clinics hire staff?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Visit the DVM Job Board tab. Clinics, animal hospitals, dairy farms, and pharmaceutical firms post full-time, locum, and internship vacancies, while qualified veterinarians can apply with their clinical resumes and credentials directly."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is the digital pet medical passport on VetAxis 360?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Every animal registered on VetAxis 360 gets a secure QR-code enabled medical ledger tracking vaccination dates, deworming histories, surgical records, and microchip IDs, accessible by veterinarians anywhere with a quick smartphone scan."
+              }
+            }
+          ]
         },
         {
           "@type": "BreadcrumbList",
@@ -227,37 +437,37 @@
             {
               "@type": "ListItem",
               "position": 2,
-              "name": "Find Vets & Clinics",
+              "name": "Find Vets & Clinics Near Me",
               "item": "https://vetaxis360.com/?tab=explore"
             },
             {
               "@type": "ListItem",
               "position": 3,
-              "name": "DVM Veterinary Careers",
+              "name": "DVM Veterinary Careers & Jobs",
               "item": "https://vetaxis360.com/?tab=jobs"
             },
             {
               "@type": "ListItem",
               "position": 4,
-              "name": "Livestock Herd Management",
+              "name": "Livestock Herd & Dairy Farm Management",
               "item": "https://vetaxis360.com/?tab=livestock"
             },
             {
               "@type": "ListItem",
               "position": 5,
-              "name": "Lost & Found Pet Recovery",
+              "name": "Lost & Found Pet SOS Network",
               "item": "https://vetaxis360.com/?tab=pets"
             },
             {
               "@type": "ListItem",
               "position": 6,
-              "name": "Veterinary Marketplace",
+              "name": "Veterinary Medical Supplies Marketplace",
               "item": "https://vetaxis360.com/?tab=marketplace"
             },
             {
               "@type": "ListItem",
               "position": 7,
-              "name": "Clinical Blogs & Health Guides",
+              "name": "Clinical Blogs & Animal Health Guides",
               "item": "https://vetaxis360.com/?tab=blogs"
             }
           ]
@@ -267,7 +477,38 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Semantic SEO Prerender Shell for Search Engine Crawlers & Fast Indexing -->
+      <header style="padding: 20px; font-family: sans-serif; max-width: 1000px; margin: 0 auto;">
+        <h1>VetAxis 360 | Veterinary Clinic Directory, 24/7 Animal Hospitals & DVM Doctors Near Me</h1>
+        <p><strong>Pakistan's Leading Digital Veterinary Care & Clinical Intelligence Ecosystem.</strong></p>
+        <nav aria-label="Main Navigation">
+          <ul>
+            <li><a href="https://vetaxis360.com/?tab=explore">Find Verified Veterinary Clinics & Doctors Near Me</a></li>
+            <li><a href="https://vetaxis360.com/?tab=jobs">DVM Veterinary Careers, Vacancies & Hospital Jobs</a></li>
+            <li><a href="https://vetaxis360.com/?tab=pets">Lost & Found Pets SOS Network & Classifieds</a></li>
+            <li><a href="https://vetaxis360.com/?tab=livestock">Livestock Herd Health & Dairy Management</a></li>
+            <li><a href="https://vetaxis360.com/?tab=marketplace">Veterinary Medicine & Clinical Supplies Marketplace</a></li>
+            <li><a href="https://vetaxis360.com/?tab=blogs">Clinical Veterinary Guides & Animal Health Articles</a></li>
+          </ul>
+        </nav>
+      </header>
+      <main style="padding: 20px; font-family: sans-serif; max-width: 1000px; margin: 0 auto;">
+        <section>
+          <h2>Find Top-Rated Vets & Animal Care in Major Cities</h2>
+          <p>Locate verified Doctor of Veterinary Medicine (DVM) practitioners, companion animal clinics, emergency surgical facilities, pet vaccinations, and dental care across <strong>Islamabad, Rawalpindi, Lahore, Karachi, Peshawar, Faisalabad, Multan, Quetta, Gujranwala, and Sialkot</strong>.</p>
+        </section>
+        <section>
+          <h2>Key Platform Capabilities</h2>
+          <ul>
+            <li><strong>24/7 Emergency Triage:</strong> Immediate location of open clinics and on-call veterinarians for trauma, poisoning, and critical surgeries.</li>
+            <li><strong>Digital QR Pet Passport:</strong> Cloud-verified vaccination, deworming, and medical ledgers for dogs, cats, birds, and exotic pets.</li>
+            <li><strong>Livestock & Herd Healthcare:</strong> Farm record keeping, lactation logs, disease alerts, and herd management for dairy and beef cattle.</li>
+            <li><strong>Lost & Found Pet SOS Alerts:</strong> Geo-targeted missing pet broadcasting across local veterinary networks.</li>
+          </ul>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

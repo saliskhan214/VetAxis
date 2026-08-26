@@ -48,15 +48,21 @@ export function GuestAnimalViewer({ animalRecordId, onGoToAuth, onClear }: Guest
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 text-neutral-800">
+      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 text-neutral-800 select-none">
         <div className="flex flex-col items-center gap-4 animate-pulse">
           <div className="relative flex items-center justify-center">
             <div className="absolute w-20 h-20 rounded-full border-2 border-[#5a5a40]/30 animate-ping" />
-            <div className="h-14 w-14 bg-[#5a5a40] rounded-2xl flex items-center justify-center shadow-md text-white font-serif font-black text-xl">
-              VA
+            <div className="h-16 w-16 bg-[#5a5a40] rounded-2xl flex flex-col items-center justify-center shadow-md text-white font-serif relative">
+              <div className="flex items-center justify-center gap-1 text-xs drop-shadow-sm">
+                <span>🐾</span>
+                <span>🐾</span>
+              </div>
+              <span className="font-black text-lg tracking-wider text-white mt-0.5 leading-none">VA</span>
             </div>
           </div>
-          <h2 className="text-lg font-bold font-serif text-[#5a5a40] mt-2">Checking Medical Ledger...</h2>
+          <h2 className="text-lg font-bold font-serif text-[#5a5a40] mt-2 flex items-center gap-2">
+            <span>🐾</span> Checking Medical Ledger... <span>🐾</span>
+          </h2>
           <p className="text-gray-500 text-xs font-mono tracking-wider">RETRIEVING SECURE PASS PORTAL</p>
         </div>
       </div>
