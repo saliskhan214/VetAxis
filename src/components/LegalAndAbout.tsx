@@ -11,8 +11,8 @@ import {
   CheckCircle2, 
   ArrowLeft, 
   ExternalLink,
-  Send,
-  HelpCircle
+  HelpCircle,
+  MessageSquare
 } from 'lucide-react';
 
 export const TERMS_AND_CONDITIONS_TEXT = `VetAxis 360 — Terms of Service & Clinical Platform Agreement
@@ -252,33 +252,6 @@ export function PrivacyPolicyPage({ onNavigate }: NavigablePageProps) {
           })}
         </div>
 
-        {/* Third-Party Ad Controls Links */}
-        <div className="mt-8 p-5 rounded-2xl bg-[#f5f2e9] border border-[#e3dec9] space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#5a5a40]">
-            External Opt-Out &amp; Cookie Management Tools:
-          </h3>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="https://www.google.com/settings/ads"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#e3dec9] text-xs font-bold text-[#5a5a40] hover:bg-[#faf8f2]"
-            >
-              <span>Google Ads Settings</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-            <a
-              href="https://optout.networkadvertising.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#e3dec9] text-xs font-bold text-[#5a5a40] hover:bg-[#faf8f2]"
-            >
-              <span>NAI Consumer Opt-Out</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-[#f0ecdf] flex flex-wrap items-center justify-between gap-4">
           <div className="text-xs text-[#8c8c69]">
@@ -408,12 +381,69 @@ export function AboutUsPage({ onNavigate }: NavigablePageProps) {
 // ─────────────────────────────────────────────────────────────────
 export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
-  const [submitted, setSubmitted] = useState(false);
+  const [submittedChannel, setSubmittedChannel] = useState<'whatsapp' | 'gmail' | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) return;
-    setSubmitted(true);
+  const SUPPORT_EMAIL = 'Vetaxis360@gmail.com';
+  const SUPPORT_WHATSAPP = '923001216272';
+
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      setFormError('Please enter your full name.');
+      return false;
+    }
+    if (!formData.email.trim() || !formData.email.includes('@')) {
+      setFormError('Please enter a valid email address so we can reply.');
+      return false;
+    }
+    if (!formData.message.trim()) {
+      setFormError('Please enter your message or inquiry.');
+      return false;
+    }
+    setFormError(null);
+    return true;
+  };
+
+  const handleSendWhatsApp = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!validateForm()) return;
+
+    const formattedMessage = 
+`*VetAxis 360 - Support & Inquiry*
+━━━━━━━━━━━━━━━━━━━━
+*From:* ${formData.name.trim()}
+*Email:* ${formData.email.trim()}
+*Topic:* ${formData.subject.trim() || 'General Support & Feedback'}
+
+*Message:*
+${formData.message.trim()}`;
+
+    const url = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(formattedMessage)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setSubmittedChannel('whatsapp');
+  };
+
+  const handleSendGmail = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!validateForm()) return;
+
+    const subjectLine = `[VetAxis Inquiry] ${formData.subject.trim() || 'Feedback from ' + formData.name.trim()}`;
+    const bodyContent = 
+`Hello VetAxis Support Team,
+
+Name: ${formData.name.trim()}
+Email: ${formData.email.trim()}
+Topic / Category: ${formData.subject.trim() || 'General Inquiry'}
+
+Message:
+${formData.message.trim()}
+
+---
+Sent via VetAxis 360 Web Portal`;
+
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${SUPPORT_EMAIL}&su=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(bodyContent)}`;
+    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+    setSubmittedChannel('gmail');
   };
 
   return (
@@ -436,19 +466,45 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
         {/* Left Side: Contact Information Cards */}
         <div className="space-y-4">
           <div className="bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 shadow-sm">
-            <h2 className="text-lg font-serif font-black text-[#2b2b24] mb-4">Official Contact</h2>
+            <h2 className="text-lg font-serif font-black text-[#2b2b24] mb-4">Official Channels</h2>
             <div className="space-y-4 text-xs sm:text-sm text-[#5a5a40]">
               <div className="flex items-start gap-3">
                 <Mail className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
                 <div>
                   <div className="font-bold text-[#2b2b24]">Direct Email</div>
-                  <a href="mailto:Vetaxis360@gmail.com" className="text-[#5a5a40] hover:underline font-mono font-medium">
-                    Vetaxis360@gmail.com
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#5a5a40] hover:underline font-mono font-medium block">
+                    {SUPPORT_EMAIL}
+                  </a>
+                  <a 
+                    href={`https://mail.google.com/mail/?view=cm&fs=1&to=${SUPPORT_EMAIL}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-[#a0522d] hover:underline font-bold inline-flex items-center gap-1 mt-0.5"
+                  >
+                    <span>Open in Gmail</span>
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
+                <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-[#2b2b24]">Official WhatsApp</div>
+                  <a 
+                    href={`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent('Hello VetAxis Support! I would like to inquire about the platform.')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-700 font-bold hover:underline inline-flex items-center gap-1 mt-0.5"
+                  >
+                    <span>+92 300 1216272</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <div className="text-[11px] text-stone-500 mt-0.5">Instant live chat &amp; support desk</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 pt-2 border-t border-[#f0ecdf]">
                 <HelpCircle className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
                 <div>
                   <div className="font-bold text-[#2b2b24]">Support Hours</div>
@@ -460,39 +516,68 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
           </div>
 
           <div className="bg-[#fbfaf6] rounded-3xl border border-[#e3dec9] p-5 text-xs text-[#5a5a40] space-y-2">
-            <h3 className="font-bold text-[#2b2b24]">Verified Clinic Inquiries</h3>
+            <h3 className="font-bold text-[#2b2b24]">Verified Clinic &amp; DVM Inquiries</h3>
             <p>
-              Are you a licensed veterinary hospital seeking verification or clinic management access? Contact our administrative team for expedited review.
+              Are you a licensed veterinary hospital or DVM practitioner seeking verification or clinic management access? Send a note via WhatsApp or Gmail for priority review.
             </p>
           </div>
         </div>
 
         {/* Right Side: Message Form */}
         <div className="md:col-span-2 bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 sm:p-8 shadow-sm">
-          <h2 className="text-xl font-serif font-black text-[#2b2b24] mb-2">Send an Inquiry or Feedback</h2>
-          <p className="text-xs text-[#8c8c69] mb-6">
-            Our support and compliance staff typically replies within 24 business hours.
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h2 className="text-xl font-serif font-black text-[#2b2b24]">Send an Inquiry or Feedback</h2>
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Direct to VetAxis Staff
+            </span>
+          </div>
+          <p className="text-xs text-[#8c8c69] mb-5">
+            Fill in your message below, then select whether you want to dispatch it via <strong>WhatsApp</strong> or <strong>Gmail</strong>.
           </p>
 
-          {submitted ? (
+          {submittedChannel ? (
             <div className="p-8 text-center rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3">
               <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-              <h3 className="text-base font-bold">Message Received</h3>
-              <p className="text-xs max-w-sm mx-auto">
-                Thank you for contacting VetAxis 360. Our team has received your message and will reply to <strong className="font-semibold">{formData.email}</strong> shortly.
+              <h3 className="text-base font-bold">
+                {submittedChannel === 'whatsapp' 
+                  ? 'WhatsApp Dispatch Opened!' 
+                  : 'Gmail Compose Opened!'}
+              </h3>
+              <p className="text-xs max-w-md mx-auto text-emerald-800 leading-relaxed">
+                {submittedChannel === 'whatsapp' ? (
+                  <>Your pre-filled message has been sent to the VetAxis WhatsApp Support desk (+92 300 1216272). If WhatsApp did not open automatically, check your browser pop-up permissions or tap the WhatsApp button below.</>
+                ) : (
+                  <>Your inquiry was prepared and addressed directly to <strong className="font-semibold">{SUPPORT_EMAIL}</strong>. Our support and compliance staff replies within 24 business hours.</>
+                )}
               </p>
-              <button
-                onClick={() => {
-                  setSubmitted(false);
-                  setFormData({ name: '', email: '', subject: '', message: '' });
-                }}
-                className="mt-4 px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-all cursor-pointer"
-              >
-                Send Another Note
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setSubmittedChannel(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-all cursor-pointer"
+                >
+                  Edit Message / Send Another
+                </button>
+                <button
+                  onClick={() => {
+                    setSubmittedChannel(null);
+                    setFormData({ name: '', email: '', subject: '', message: '' });
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-all cursor-pointer"
+                >
+                  Clear Form
+                </button>
+              </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
+              {formError && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold">
+                  ⚠️ {formError}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#2b2b24] mb-1">Your Full Name *</label>
@@ -500,7 +585,10 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
                     type="text"
                     required
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      if (formError) setFormError(null);
+                    }}
                     placeholder="e.g. Dr. Ayesha Khan"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
                   />
@@ -512,7 +600,10 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
                     type="email"
                     required
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (formError) setFormError(null);
+                    }}
                     placeholder="you@domain.com"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
                   />
@@ -525,7 +616,7 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
                   type="text"
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  placeholder="e.g. Clinic Verification / Technical Support"
+                  placeholder="e.g. Clinic Verification / Technical Support / Feedback"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
                 />
               </div>
@@ -536,25 +627,49 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
                   required
                   rows={4}
                   value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  placeholder="How can we assist your veterinary care needs today?"
+                  onChange={(e) => {
+                    setFormData({ ...formData, message: e.target.value });
+                    if (formError) setFormError(null);
+                  }}
+                  placeholder="Type your inquiry, support question, or feedback here..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
                 ></textarea>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <div className="text-[11px] text-[#8c8c69]">
-                  Protected under VetAxis Data Privacy.
+              {/* Direct Dispatch Options */}
+              <div className="pt-2 border-t border-[#f0ecdf] space-y-3">
+                <div className="text-[11px] font-bold uppercase text-[#5a5a40] tracking-wider">
+                  Choose How To Send:
                 </div>
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5a5a40] text-white text-xs font-black uppercase tracking-wider hover:bg-[#3e3e2b] transition-all shadow-xs cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Send Message</span>
-                </button>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* WhatsApp Option */}
+                  <button
+                    type="button"
+                    onClick={handleSendWhatsApp}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-[#25D366] hover:bg-[#1ebd5b] text-white text-xs font-black shadow-xs transition-all cursor-pointer border-b-[3px] border-b-[#128c7e]"
+                  >
+                    <MessageSquare className="w-4 h-4 shrink-0" />
+                    <span>Send via WhatsApp</span>
+                  </button>
+
+                  {/* Gmail Option */}
+                  <button
+                    type="button"
+                    onClick={handleSendGmail}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-[#EA4335] hover:bg-[#d93829] text-white text-xs font-black shadow-xs transition-all cursor-pointer border-b-[3px] border-b-[#b82a1d]"
+                  >
+                    <Mail className="w-4 h-4 shrink-0" />
+                    <span>Send via Gmail</span>
+                  </button>
+                </div>
+
+                <div className="text-[11px] text-[#8c8c69] flex items-center justify-between">
+                  <span>Messages are delivered directly to <strong>{SUPPORT_EMAIL}</strong> &amp; <strong>WhatsApp Support</strong>.</span>
+                  <span>🔒 Secure &amp; Private</span>
+                </div>
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>
