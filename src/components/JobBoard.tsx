@@ -544,7 +544,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   };
 
   // Filter lists & permissions
-  const isSystemAdmin = currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin;
+  const isSystemAdmin = currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin;
 
   const myJobPostings = jobs.filter(j => 
     (j.clinicId && j.clinicId === currentUser.uid) || 

@@ -311,7 +311,7 @@ export function Navbar({
                   {navItems
                     .filter(item => {
                       if (item.id === 'admin') {
-                        return user.email === 'saliskhan214@gmail.com' || user.isAdmin === true;
+                        return user.email?.toLowerCase() === 'vetaxis360@gmail.com' || user.email === 'saliskhan214@gmail.com' || user.isAdmin === true;
                       }
                       if (item.id === 'subscription') {
                         return user.role === 'clinic' || user.role === 'doctor';

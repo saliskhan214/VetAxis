@@ -39,8 +39,6 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             <span>Pakistan's Verified Digital Veterinary &amp; Herd Healthcare Network</span>
           </div>
           <div className="flex items-center gap-4 text-[11px] text-[#78716c]">
-            <span>PVMC Regulatory Adherence</span>
-            <span>•</span>
             <span>24/7 Emergency Directory</span>
           </div>
         </div>
@@ -63,13 +61,9 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             </p>
             <div className="pt-2 flex flex-col gap-1.5 text-[11px] text-[#78716c]">
               <div className="flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5 text-[#5a5a40]" />
-                <span>Headquarters: Islamabad, Capital Territory, Pakistan</span>
-              </div>
-              <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-[#5a5a40]" />
-                <a href="mailto:saliskhan214@gmail.com" className="hover:underline font-medium text-[#5a5a40]">
-                  saliskhan214@gmail.com
+                <a href="mailto:Vetaxis360@gmail.com" className="hover:underline font-medium text-[#5a5a40]">
+                  Vetaxis360@gmail.com
                 </a>
               </div>
             </div>

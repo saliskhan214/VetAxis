@@ -148,8 +148,8 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
   if (user && user.email) {
     const emailLower = user.email.toLowerCase().trim();
     
-    if (emailLower === 'saliskhan214@gmail.com') {
-      // Use a single stable localStorage key for Salis's subscription expiration
+    if (emailLower === 'vetaxis360@gmail.com' || emailLower === 'saliskhan214@gmail.com') {
+      // Use a single stable localStorage key for admin subscription expiration
       let expiresStr = localStorage.getItem('va_salis_sub_expires');
       let expiresMs = expiresStr ? parseInt(expiresStr, 10) : 0;
       
@@ -219,7 +219,7 @@ export function injectTemporaryPlatinum(user: UserProfile | null): UserProfile |
           if (rawSess) {
             const parsedSess = JSON.parse(rawSess);
             if (parsedSess) {
-              isAdmin = parsedSess.isAdmin === true || parsedSess.email === 'saliskhan214@gmail.com';
+              isAdmin = parsedSess.isAdmin === true || parsedSess.email?.toLowerCase() === 'vetaxis360@gmail.com' || parsedSess.email === 'saliskhan214@gmail.com';
               isSelf = parsedSess.uid === user.uid;
             }
           }
@@ -673,7 +673,7 @@ export const AuthService = {
 
       if (isFirebaseConfigured && db) {
         const currentSession = getLocalSession();
-        const isAdmin = currentSession?.isAdmin === true || currentSession?.email === 'saliskhan214@gmail.com';
+        const isAdmin = currentSession?.isAdmin === true || currentSession?.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentSession?.email === 'saliskhan214@gmail.com';
 
         if (!auth?.currentUser || (auth.currentUser.uid !== userId && !isAdmin)) {
           console.warn(`[storage] Cannot upgrade subscription in Firestore for ${userId} as Firebase Auth/admin privilege is not resolved.`);
@@ -716,7 +716,7 @@ export const AuthService = {
           location: extra.location || null,
           isVerified: false,
           emailVerified: false,
-          isAdmin: emailLower === 'saliskhan214@gmail.com' ? true : undefined
+          isAdmin: (emailLower === 'vetaxis360@gmail.com' || emailLower === 'saliskhan214@gmail.com') ? true : undefined
         };
 
         await setDoc(doc(db, 'users', uid), cleanUndefined(profile));
@@ -1035,7 +1035,7 @@ export const AuthService = {
       createdAt: Date.now(),
       isVerified: false,
       emailVerified: pendingInfo.emailVerified,
-      isAdmin: pendingInfo.email.toLowerCase().trim() === 'saliskhan214@gmail.com' ? true : undefined,
+      isAdmin: (pendingInfo.email.toLowerCase().trim() === 'vetaxis360@gmail.com' || pendingInfo.email.toLowerCase().trim() === 'saliskhan214@gmail.com') ? true : undefined,
       location: extra.location || null
     };
 
@@ -2283,7 +2283,7 @@ export const JobBoardService = {
   },
 
   async createJob(jobData: Partial<JobPost>, poster: UserProfile): Promise<JobPost> {
-    const isAutoApproved = poster.isAdmin || poster.email?.toLowerCase() === 'saliskhan214@gmail.com';
+    const isAutoApproved = poster.isAdmin || poster.email?.toLowerCase() === 'vetaxis360@gmail.com' || poster.email?.toLowerCase() === 'saliskhan214@gmail.com';
     const job: JobPost = {
       id: 'job_' + Date.now(),
       clinicId: poster.uid,

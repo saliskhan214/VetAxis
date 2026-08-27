@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Squircle Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f5f0e6"/>
+    </linearGradient>
+
+    <!-- Card Shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="125%" height="130%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#8c8270" flood-opacity="0.18"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#8c8270" flood-opacity="0.12"/>
+    </filter>
+
+    <!-- Mascot Fur Gradient -->
+    <linearGradient id="furGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ddaa75"/>
+      <stop offset="100%" stop-color="#c4935e"/>
+    </linearGradient>
+
+    <!-- Ear Inner Gradient -->
+    <linearGradient id="earInner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c48a52"/>
+      <stop offset="100%" stop-color="#ab743f"/>
+    </linearGradient>
+
+    <!-- Snout Gradient -->
+    <linearGradient id="snoutGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#faedd9"/>
+    </linearGradient>
+
+    <!-- Medallion Gradient -->
+    <linearGradient id="medallionGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b06c47"/>
+      <stop offset="100%" stop-color="#8a4f30"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Base Card Container -->
+  <rect x="36" y="36" width="440" height="440" rx="110" ry="110" fill="url(#bgGrad)" stroke="#e8dfce" stroke-width="6" filter="url(#cardShadow)"/>
+
+  <!-- Top Right Mini Paw Badge -->
+  <g transform="translate(370, 95)">
+    <circle cx="0" cy="0" r="30" fill="#ffffff" stroke="#e8dfce" stroke-width="3" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.06))"/>
+    <!-- Paw prints -->
+    <ellipse cx="-7" cy="-7" rx="3.5" ry="5" fill="#6d5d6e" transform="rotate(-15 -7 -7)"/>
+    <ellipse cx="7" cy="-7" rx="3.5" ry="5" fill="#6d5d6e" transform="rotate(15 7 -7)"/>
+    <ellipse cx="-13" cy="2" rx="3" ry="4.5" fill="#6d5d6e" transform="rotate(-35 -13 2)"/>
+    <ellipse cx="13" cy="2" rx="3" ry="4.5" fill="#6d5d6e" transform="rotate(35 13 2)"/>
+    <!-- Main pad -->
+    <path d="M-8,5 C-8,1 -5,0 0,2 C5,0 8,1 8,5 C8,10 5,12 0,12 C-5,12 -8,10 -8,5 Z" fill="#6d5d6e"/>
+  </g>
+
+  <!-- Cute Bear Mascot Center Group -->
+  <g id="bear-mascot">
+    <!-- Left Ear -->
+    <g transform="rotate(-12 185 190)">
+      <ellipse cx="185" cy="180" rx="36" ry="48" fill="url(#furGrad)"/>
+      <ellipse cx="185" cy="184" rx="22" ry="32" fill="url(#earInner)"/>
+    </g>
+
+    <!-- Right Ear -->
+    <g transform="rotate(12 327 190)">
+      <ellipse cx="327" cy="180" rx="36" ry="48" fill="url(#furGrad)"/>
+      <ellipse cx="327" cy="184" rx="22" ry="32" fill="url(#earInner)"/>
+    </g>
+
+    <!-- Bear Head -->
+    <path d="M 180 230 
+             C 170 200, 200 175, 256 175 
+             C 312 175, 342 200, 332 230 
+             C 345 265, 345 305, 315 330 
+             C 290 350, 222 350, 197 330 
+             C 167 305, 167 265, 180 230 Z" 
+          fill="url(#furGrad)" 
+          stroke="#b88350" 
+          stroke-width="2"/>
+
+    <!-- Snout / Muzzle Light Patch -->
+    <ellipse cx="256" cy="285" rx="46" ry="38" fill="url(#snoutGrad)" stroke="#eedbc4" stroke-width="1.5"/>
+
+    <!-- Left Eye -->
+    <circle cx="218" cy="245" r="13" fill="#2d2621"/>
+    <circle cx="214" cy="241" r="4.5" fill="#ffffff"/>
+    <circle cx="222" cy="249" r="2" fill="#ffffff"/>
+
+    <!-- Right Eye -->
+    <circle cx="294" cy="245" r="13" fill="#2d2621"/>
+    <circle cx="290" cy="241" r="4.5" fill="#ffffff"/>
+    <circle cx="298" cy="249" r="2" fill="#ffffff"/>
+
+    <!-- Cute Cute Nose -->
+    <path d="M 246 265 C 246 260, 252 258, 256 258 C 260 258, 266 260, 266 265 C 266 272, 256 277, 256 277 C 256 277, 246 272, 246 265 Z" fill="#2d2621"/>
+    <ellipse cx="254" cy="262" rx="3" ry="1.5" fill="#ffffff" opacity="0.6"/>
+
+    <!-- Mouth Line & Tongue -->
+    <path d="M 256 276 L 256 288" stroke="#2d2621" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Small Pink Tongue -->
+    <path d="M 251 287 C 251 298, 261 298, 261 287 Z" fill="#ff8597" stroke="#e06275" stroke-width="1.5"/>
+
+    <!-- Cheek Whiskers / Cute Dots -->
+    <circle cx="196" cy="282" r="2.5" fill="#ab743f" opacity="0.6"/>
+    <circle cx="188" cy="288" r="2.5" fill="#ab743f" opacity="0.6"/>
+    <circle cx="316" cy="282" r="2.5" fill="#ab743f" opacity="0.6"/>
+    <circle cx="324" cy="288" r="2.5" fill="#ab743f" opacity="0.6"/>
+
+    <!-- Veterinary Cross Medallion / Collar Charm -->
+    <g transform="translate(256, 350)">
+      <circle cx="0" cy="0" r="19" fill="url(#medallionGrad)" stroke="#f7efe1" stroke-width="2.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"/>
+      <!-- Medical Cross (+) -->
+      <rect x="-3.5" y="-10" width="7" height="20" rx="2" fill="#ffffff"/>
+      <rect x="-10" y="-3.5" width="20" height="7" rx="2" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

@@ -18,8 +18,8 @@ import {
 export const TERMS_AND_CONDITIONS_TEXT = `VetAxis 360 — Terms of Service & Clinical Platform Agreement
 Last Updated: June 2026
 
-Platform: VetAxis 360 (Pakistan's Digital Veterinary & Herd Intelligence Ecosystem)
-Operated by: VetAxis Healthcare Network, Islamabad, Pakistan
+Platform: VetAxis 360 (Digital Veterinary & Herd Intelligence Ecosystem)
+Operated by: VetAxis Healthcare Network
 
 1. Acceptance of Terms
 By creating an account, browsing, or utilizing any feature of VetAxis 360, you confirm that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, you must discontinue using the platform immediately. These terms apply equally to all users, including Pet Owners, Livestock Farmers, Licensed Veterinarians (DVM), Certified Clinics, and Veterinary Nursing Assistants.
@@ -35,7 +35,7 @@ To register an account or interact with commercial/medical features, users must:
 - Maintain the strict confidentiality of login credentials and immediately report any unauthorized access.
 
 4. Roles & Professional Credential Verification
-- Licensed Veterinarians (DVM): Must possess and maintain a valid registration with the Pakistan Veterinary Medical Council (PVMC) or respective provincial veterinary regulatory boards.
+- Licensed Veterinarians (DVM): Must possess and maintain a valid registration with their respective veterinary medical regulatory boards.
 - Veterinary Clinics & Hospitals: Must hold appropriate local commercial and healthcare permissions, ensure listed operating hours and emergency amenities are accurate, and maintain clinical standard operating procedures.
 - Livestock Farmers & Pet Owners: Must provide genuine health records for animals listed for adoption, sale, or community tracking.
 
@@ -48,13 +48,13 @@ To register an account or interact with commercial/medical features, users must:
 All proprietary code, branding, interface designs, and algorithmic tools remain the sole property of VetAxis 360. Users agree not to post defamatory, false, abusive, or harmful material on the Community Feed. VetAxis 360 reserves the right to moderate, delete, or suspend accounts that violate safety guidelines.
 
 7. Governing Law & Jurisdiction
-These Terms and Conditions are governed by the laws of the Islamic Republic of Pakistan. Any legal proceedings shall be subject to the exclusive jurisdiction of the competent courts in Islamabad, Pakistan.`;
+These Terms and Conditions are governed by applicable laws. Any legal proceedings shall be subject to the exclusive jurisdiction of the competent courts.`;
 
 export const PRIVACY_POLICY_TEXT = `VetAxis 360 — Privacy Policy, Cookie Disclosures & Advertising Transparency
 Last Updated: June 2026
 
 Platform: VetAxis 360 (https://vetaxis360.com)
-Data Protection Officer Contact: saliskhan214@gmail.com
+Data Protection Officer Contact: Vetaxis360@gmail.com
 
 1. Introduction & Overview
 VetAxis 360 is dedicated to safeguarding the privacy and data security of pet owners, dairy farmers, veterinarians, and clinical partners across Pakistan. This Privacy Policy outlines what information we collect, how we process it, your privacy rights, and our strict adherence to Google Search Essentials, Google AdSense Program Policies, and international data protection standards.
@@ -79,7 +79,7 @@ VetAxis 360 displays third-party advertisements served by Google AdSense to fund
 - All stored records utilize industry-standard TLS encryption and authenticated cloud access controls.
 
 5. User Rights & Data Deletion
-Users retain full control over their personal records. You may request data access, correction, or permanent account deletion directly through your profile settings or by emailing saliskhan214@gmail.com.
+Users retain full control over their personal records. You may request data access, correction, or permanent account deletion directly through your profile settings or by emailing Vetaxis360@gmail.com.
 
 6. Policy Revisions
 Any updates to this Privacy Policy will be reflected on this page with an updated timestamp. Continued use of the platform denotes acceptance of any revised policies.`;
@@ -282,7 +282,7 @@ export function PrivacyPolicyPage({ onNavigate }: NavigablePageProps) {
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-[#f0ecdf] flex flex-wrap items-center justify-between gap-4">
           <div className="text-xs text-[#8c8c69]">
-            Questions? Contact Data Officer: <strong className="text-[#5a5a40]">saliskhan214@gmail.com</strong>
+            Questions? Contact Data Officer: <strong className="text-[#5a5a40]">Vetaxis360@gmail.com</strong>
           </div>
           <button
             onClick={() => onNavigate('terms')}
@@ -374,11 +374,11 @@ export function AboutUsPage({ onNavigate }: NavigablePageProps) {
           </div>
         </div>
 
-        {/* Compliance statement */}
+        {/* Professional Standards Notice */}
         <div className="p-5 rounded-2xl bg-[#f5f2e9] border border-[#e3dec9] text-xs text-[#5a5a40] space-y-2">
-          <h4 className="font-bold text-[#2b2b24] uppercase tracking-wider">Regulatory Standards Notice:</h4>
+          <h4 className="font-bold text-[#2b2b24] uppercase tracking-wider">Professional Standards Notice:</h4>
           <p>
-            VetAxis 360 operates as an independent healthcare technology platform. We support the ethical guidelines established by the Pakistan Veterinary Medical Council (PVMC) and encourage all practicing veterinarians to maintain up-to-date regional licenses.
+            VetAxis 360 operates as an independent healthcare technology platform. We encourage all practicing veterinarians and clinical facilities to maintain up-to-date regional medical licenses and adhere to rigorous professional veterinary care standards.
           </p>
         </div>
 
@@ -442,17 +442,9 @@ export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
                 <Mail className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
                 <div>
                   <div className="font-bold text-[#2b2b24]">Direct Email</div>
-                  <a href="mailto:saliskhan214@gmail.com" className="text-[#5a5a40] hover:underline font-mono">
-                    saliskhan214@gmail.com
+                  <a href="mailto:Vetaxis360@gmail.com" className="text-[#5a5a40] hover:underline font-mono font-medium">
+                    Vetaxis360@gmail.com
                   </a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-bold text-[#2b2b24]">Headquarters</div>
-                  <div>Islamabad, Capital Territory, Pakistan</div>
                 </div>
               </div>
 

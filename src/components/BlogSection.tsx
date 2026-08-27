@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   ChevronRight,
   User,
-  Heart
+  Heart,
+  ShieldCheck
 } from 'lucide-react';
 import { BlogArticle, UserProfile } from '../types';
 import { BlogService } from '../lib/blogService';
@@ -71,7 +72,32 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
     tags: ''
   });
 
-  const isAdmin = currentUser && (currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true);
+  const isAdmin = Boolean(
+    currentUser && (
+      currentUser.isAdmin === true || 
+      currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' ||
+      currentUser.email?.toLowerCase() === 'saliskhan214@gmail.com'
+    )
+  );
+
+  const isDoctorOrClinic = Boolean(
+    currentUser && (
+      currentUser.role === 'doctor' ||
+      currentUser.role === 'clinic' ||
+      currentUser.role === 'assistant' ||
+      Boolean((currentUser as any).doctorInfo) ||
+      Boolean((currentUser as any).clinicInfo) ||
+      isAdmin
+    )
+  );
+
+  // Check if current user has permission to delete a given article
+  const canDeleteArticle = (article: BlogArticle) => {
+    if (isAdmin) return true;
+    if (!currentUser) return false;
+    const uid = currentUser.uid;
+    return Boolean(article.authorId && uid && article.authorId === uid);
+  };
 
   // Load articles
   const loadArticles = async () => {
@@ -169,9 +195,14 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
     return `${minutes || 1} min read`;
   };
 
-  // Submit new article
+  // Submit new article (Restricted to Doctors, Clinics & Admin)
   const handleSubmitArticle = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isDoctorOrClinic) {
+      alert('Article publishing is reserved exclusively for verified Doctors of Veterinary Medicine (DVM) and Certified Veterinary Clinics.');
+      return;
+    }
+
     if (!formData.title || !formData.slug || !formData.content) {
       alert('Please fill out all mandatory fields.');
       return;
@@ -185,6 +216,13 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
         .map(t => t.trim().toLowerCase())
         .filter(Boolean);
 
+      let authorDisplayName = currentUser?.name || 'Veterinary Specialist';
+      if (currentUser?.role === 'doctor' && !authorDisplayName.toLowerCase().startsWith('dr.')) {
+        authorDisplayName = `Dr. ${authorDisplayName}, DVM`;
+      } else if (currentUser?.role === 'clinic' && (currentUser as any)?.clinicInfo?.clinicName) {
+        authorDisplayName = (currentUser as any).clinicInfo.clinicName;
+      }
+
       await BlogService.publishArticle({
         title: formData.title,
         slug: formData.slug,
@@ -192,8 +230,8 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
         content: formData.content,
         imageUrl: formData.imageUrl,
         category: formData.category,
-        authorName: currentUser?.name || 'VetAxis Administrator',
-        authorId: currentUser?.uid || 'admin',
+        authorName: authorDisplayName,
+        authorId: currentUser?.uid || 'vet-author',
         tags: tagsArray,
         readTime: readTime
       });
@@ -209,7 +247,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
         tags: ''
       });
       setIsEditorOpen(false);
-      setSuccessToast('Educational guide published successfully! Indexing into dynamic sitemap.xml...');
+      setSuccessToast('Educational guide published successfully! Live on VetAxis Knowledge Hub.');
       setTimeout(() => setSuccessToast(null), 5000);
       
       // Reload list
@@ -221,8 +259,13 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
     }
   };
 
-  // Delete article (Admin Only)
+  // Delete article (Admin has absolute delete authority, Authors can delete their own)
   const handleDeleteArticle = async (article: BlogArticle) => {
+    if (!canDeleteArticle(article)) {
+      alert('You do not have permission to delete this article.');
+      return;
+    }
+
     if (!window.confirm(`Are you sure you want to permanently delete "${article.title}"? This cannot be undone.`)) {
       return;
     }
@@ -235,13 +278,14 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
         } else {
           loadArticles();
         }
-        setSuccessToast('Article successfully removed.');
+        setSuccessToast('Article permanently removed.');
         setTimeout(() => setSuccessToast(null), 3000);
       } else {
         alert('Could not delete the article.');
       }
     } catch (err) {
       console.error(err);
+      alert('Error occurred while deleting article.');
     }
   };
 
@@ -390,27 +434,32 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               <div>
                 <div className="flex items-center gap-2 text-xs font-bold text-[#a0522d] uppercase tracking-wider mb-1.5">
                   <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                  <span>Educational Hub</span>
+                  <span>Clinical & Educational Portal</span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-serif font-black text-[#5a5a40] tracking-tight">
                   Veterinary Guides & Articles
                 </h1>
                 <p className="text-stone-500 text-sm font-medium mt-1">
-                  Peer-reviewed guides, outbreak reports, and livestock management methodologies.
+                  Professional guidelines, case insights, and health protocols authored by certified Doctors & Clinics.
                 </p>
               </div>
 
-              {/* Admin write guide trigger */}
-              {isAdmin && (
+              {/* Doctor / Clinic / Admin write guide trigger */}
+              {isDoctorOrClinic ? (
                 <motion.button
-                  whileHover={{ scale: 1.03, y: -1 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setIsEditorOpen(true)}
                   className="flex items-center gap-2 bg-[#5a5a40] hover:bg-[#3e3e2b] text-white font-extrabold px-5 py-3 rounded-xl shadow-md border-b-[3px] border-b-[#3e3e2b] text-sm cursor-pointer w-full md:w-auto justify-center"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Publish New Guide</span>
+                  <span>Publish Clinical Guide</span>
                 </motion.button>
+              ) : (
+                <div className="flex items-center gap-2 bg-[#fcf9f2] border border-[#e3dec9] px-4 py-2.5 rounded-xl text-xs font-bold text-[#5a5a40] shadow-xs">
+                  <ShieldCheck className="w-4 h-4 text-[#a0522d] shrink-0" />
+                  <span>Authored by verified DVM Doctors & Clinics</span>
+                </div>
               )}
             </div>
 
@@ -469,21 +518,40 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                 <p className="text-xs font-black text-[#5a5a40] uppercase tracking-widest">Loading Repository...</p>
               </div>
             ) : filteredArticles.length === 0 ? (
-              <div className="bg-white border-2 border-dashed border-[#e3dec9] rounded-2xl py-16 text-center max-w-lg mx-auto">
-                <BookOpen className="w-12 h-12 text-[#cdc6ad] mx-auto mb-3" />
-                <h3 className="font-serif font-black text-lg text-[#5a5a40]">No Guides Found</h3>
-                <p className="text-stone-500 text-xs px-6 mt-1">
-                  We could not find any guides matching your criteria. Try adjusting your category or searching for different topics.
+              <div className="bg-white border-2 border-dashed border-[#e3dec9] rounded-2xl py-14 px-6 text-center max-w-lg mx-auto">
+                <div className="w-14 h-14 rounded-full bg-[#5a5a40]/10 flex items-center justify-center mx-auto mb-4 text-2xl">
+                  🩺
+                </div>
+                <h3 className="font-serif font-black text-lg text-[#5a5a40]">
+                  {articles.length === 0 ? 'Clinical Knowledge Repository' : 'No Guides Found'}
+                </h3>
+                <p className="text-stone-500 text-xs px-2 mt-2 leading-relaxed">
+                  {articles.length === 0
+                    ? 'No articles have been published yet. Registered Doctors of Veterinary Medicine (DVM) and certified veterinary clinics can write and publish peer-reviewed guides, outbreak alerts, and medical articles here.'
+                    : 'We could not find any guides matching your search criteria. Try adjusting your category or search terms.'}
                 </p>
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('All');
-                  }}
-                  className="mt-4 text-xs font-black text-[#a0522d] underline hover:text-[#5a5a40] bg-transparent border-none cursor-pointer"
-                >
-                  Clear all filters
-                </button>
+
+                {articles.length === 0 && isDoctorOrClinic && (
+                  <button
+                    onClick={() => setIsEditorOpen(true)}
+                    className="mt-5 inline-flex items-center gap-2 bg-[#5a5a40] hover:bg-[#3e3e2b] text-white font-extrabold px-5 py-2.5 rounded-xl shadow border-b-[3px] border-b-[#3e3e2b] text-xs cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Write the First Article</span>
+                  </button>
+                )}
+
+                {articles.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('All');
+                    }}
+                    className="mt-4 text-xs font-black text-[#a0522d] underline hover:text-[#5a5a40] bg-transparent border-none cursor-pointer"
+                  >
+                    Clear all filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -550,17 +618,17 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                             <span>{article.views} reads</span>
                           </div>
 
-                          {/* Admin Quick Delete */}
-                          {isAdmin && (
+                          {/* Admin & Author Delete */}
+                          {canDeleteArticle(article) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteArticle(article);
                               }}
-                              className="text-stone-400 hover:text-red-600 transition-colors p-1"
-                              title="Delete Guide"
+                              className="text-stone-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                              title={isAdmin ? "Delete Guide (Admin Authority)" : "Delete Your Guide"}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
                             </button>
                           )}
                         </div>
@@ -609,11 +677,11 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                   )}
                 </button>
 
-                {isAdmin && (
+                {canDeleteArticle(activeArticle) && (
                   <button
                     onClick={() => handleDeleteArticle(activeArticle)}
                     className="flex items-center gap-1 text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-black px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
-                    title="Delete Guide permanently"
+                    title={isAdmin ? "Delete Guide (Admin Authority)" : "Delete Your Guide"}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete</span>
@@ -732,7 +800,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
         )}
       </AnimatePresence>
 
-      {/* ─── FULLSCREEN WRITER EDITOR MODAL (Admin Only) ──────────────── */}
+      {/* ─── FULLSCREEN WRITER EDITOR MODAL (Doctors, Clinics & Admin) ──────────────── */}
       <AnimatePresence>
         {isEditorOpen && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -746,11 +814,11 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               <div className="sticky top-0 bg-white border-b border-[#e3dec9] px-6 py-4 flex items-center justify-between z-10">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[#5a5a40]/10 flex items-center justify-center text-sm">
-                    ✍️
+                    🩺
                   </div>
                   <div>
-                    <h2 className="text-lg font-serif font-black text-[#5a5a40]">Publish Educational Guide</h2>
-                    <p className="text-[10px] font-bold text-stone-400 uppercase">Draft and broadcast articles natively to VetAxis</p>
+                    <h2 className="text-lg font-serif font-black text-[#5a5a40]">Publish Clinical Article</h2>
+                    <p className="text-[10px] font-bold text-stone-400 uppercase">Doctor & Clinic Knowledge Portal · Live Indexing</p>
                   </div>
                 </div>
 

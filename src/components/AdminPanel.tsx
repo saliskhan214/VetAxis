@@ -645,7 +645,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     };
   }, [users, farms, pendingPayments, promotionalAds, jobs]);
 
-  if (currentUser.email !== 'saliskhan214@gmail.com' && !currentUser.isAdmin) {
+  const isSystemAdmin = currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin;
+
+  if (!isSystemAdmin) {
     return (
       <div className="p-12 text-center max-w-md mx-auto my-12 bg-white rounded-2xl border border-red-100 shadow-sm">
         <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-3" />

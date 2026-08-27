@@ -360,7 +360,7 @@ export function SubscriptionPortal({
                 Your card on file will automatically renew the monthly cycle.
               </div>
               <div className="flex items-center gap-3 flex-wrap">
-                {(currentUser.email?.toLowerCase().trim() === 'saliskhan214@gmail.com' || currentUser.email?.toLowerCase().trim() === 'bunnykhan329@gmail.com') && (
+                {(currentUser.email?.toLowerCase().trim() === 'vetaxis360@gmail.com' || currentUser.email?.toLowerCase().trim() === 'saliskhan214@gmail.com' || currentUser.email?.toLowerCase().trim() === 'bunnykhan329@gmail.com') && (
                   <button
                     type="button"
                     onClick={() => {

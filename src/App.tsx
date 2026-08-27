@@ -843,7 +843,7 @@ export default function App() {
               />
             )}
 
-            {activeSection === 'admin' && currentUser && (currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
+            {activeSection === 'admin' && currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
               <AdminPanel currentUser={currentUser} />
             )}
 
