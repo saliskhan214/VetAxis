@@ -67,6 +67,7 @@ export function Navbar({
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },
     { id: 'jobs', label: 'Job Board', icon: '💼' },
+    { id: 'news', label: 'Guides & News', icon: '📰' },
     { id: 'subscription', label: 'Subscription Portal', icon: '💳' },
     { id: 'admin', label: 'Admin Panel', icon: '🛠️' },
   ];

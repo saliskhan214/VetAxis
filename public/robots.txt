@@ -10,9 +10,11 @@ Allow: /?tab=marketplace
 Allow: /?tab=community
 Allow: /?tab=livestock
 Allow: /?tab=blogs
+Allow: /?tab=news
 Allow: /?tab=about
 Allow: /?tab=terms
 Allow: /?tab=privacy
+Allow: /?tab=contact
 
 # Disallow authenticated/administrative portals
 Disallow: /?tab=admin

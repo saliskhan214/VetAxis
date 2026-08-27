@@ -1,149 +1,578 @@
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { 
+  ShieldCheck, 
+  FileText, 
+  Lock, 
+  Info, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  CheckCircle2, 
+  ArrowLeft, 
+  ExternalLink,
+  Send,
+  HelpCircle
+} from 'lucide-react';
 
-export const TERMS_AND_CONDITIONS_TEXT = `VetAxis — Terms & Conditions
+export const TERMS_AND_CONDITIONS_TEXT = `VetAxis 360 — Terms of Service & Clinical Platform Agreement
 Last Updated: June 2026
 
-Platform: VetAxis (Web Application)
-Operated by: VetAxis Team, Pakistan
+Platform: VetAxis 360 (Pakistan's Digital Veterinary & Herd Intelligence Ecosystem)
+Operated by: VetAxis Healthcare Network, Islamabad, Pakistan
 
 1. Acceptance of Terms
-By creating an account, browsing, or using any feature of VetAxis, you confirm that you have read, understood, and agree to be bound by these Terms & Conditions. If you do not agree, you must stop using the platform immediately.
-These terms apply to all users regardless of role — Pet Owner, Veterinarian, Clinic, or Vet Assistant.
+By creating an account, browsing, or utilizing any feature of VetAxis 360, you confirm that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, you must discontinue using the platform immediately. These terms apply equally to all users, including Pet Owners, Livestock Farmers, Licensed Veterinarians (DVM), Certified Clinics, and Veterinary Nursing Assistants.
 
-2. Who We Are
-VetAxis is an online platform that connects pet owners with veterinary professionals and clinics in Pakistan. We are a technology platform only. We do not provide veterinary services, medical advice, or animal care directly. We facilitate connections between independent users.
+2. Nature of Platform & Medical Disclaimer
+VetAxis 360 is an independent technology directory, farm ledger, and clinical management ecosystem. VetAxis 360 does not directly dispense medical prescriptions, perform surgeries, or provide direct emergency clinical diagnosis. All veterinary advice, clinical procedures, treatments, and prescriptions are provided strictly by independent, licensed veterinary professionals. In acute animal emergencies, users must physically transport animals to verified 24/7 veterinary hospitals.
 
-3. Eligibility
-To use VetAxis you must:
-- Be at least 18 years of age, or have verifiable parental or guardian consent
-- Provide accurate, truthful, and complete registration information
-- Have the legal capacity to enter into a binding agreement under Pakistani law
-- Not have been previously suspended or removed from VetAxis for violations
+3. User Eligibility & Account Integrity
+To register an account or interact with commercial/medical features, users must:
+- Be at least 18 years of age or possess legal parental/guardian consent.
+- Provide truthful, accurate, and verifiable identity and practice credentials.
+- Refrain from impersonating medical professionals, registered clinics, or government regulatory bodies.
+- Maintain the strict confidentiality of login credentials and immediately report any unauthorized access.
 
-4. Account Registration & Security
-4.1 You are responsible for maintaining the confidentiality of your login credentials. Any activity that occurs under your account is your sole responsibility.
-4.2 You agree to provide accurate information during signup including your real name, valid email address, and correct role selection.
-4.3 You must notify VetAxis immediately if you suspect unauthorized access to your account.
-4.4 VetAxis reserves the right to suspend or terminate accounts where false, misleading, or fraudulent information is detected.
-4.5 One person or entity may only maintain one active account. Duplicate accounts may be removed without notice.
+4. Roles & Professional Credential Verification
+- Licensed Veterinarians (DVM): Must possess and maintain a valid registration with the Pakistan Veterinary Medical Council (PVMC) or respective provincial veterinary regulatory boards.
+- Veterinary Clinics & Hospitals: Must hold appropriate local commercial and healthcare permissions, ensure listed operating hours and emergency amenities are accurate, and maintain clinical standard operating procedures.
+- Livestock Farmers & Pet Owners: Must provide genuine health records for animals listed for adoption, sale, or community tracking.
 
-5. Role-Specific Responsibilities
-VetAxis operates a multi-role system. Each role carries specific obligations.
+5. Marketplace & Pet Classifieds Policies
+- All listings in the Veterinary Marketplace and Pet Classifieds must comply with animal welfare standards and the Prevention of Cruelty to Animals Act.
+- Endangered species, poached wildlife, prohibited narcotics, expired vaccines, and counterfeit pharmaceuticals are strictly prohibited and will result in immediate permanent account termination and referral to regulatory authorities.
+- VetAxis 360 acts as a directory platform; transactions and handoffs between buyers, sellers, and adopters occur directly between the respective parties.
 
-5.1 Pet Owners
-- You are responsible for the accuracy of any information you post including lost pet reports, adoption listings, and community posts.
-- You acknowledge that contacting a vet or clinic through the platform does not constitute a formal medical consultation.
-- You must not misrepresent the health, age, breed, or condition of any animal you list for adoption or sale.
+6. Intellectual Property & Community Conduct
+All proprietary code, branding, interface designs, and algorithmic tools remain the sole property of VetAxis 360. Users agree not to post defamatory, false, abusive, or harmful material on the Community Feed. VetAxis 360 reserves the right to moderate, delete, or suspend accounts that violate safety guidelines.
 
-5.2 Veterinarians & Doctors
-- By registering as a Veterinarian, you confirm that you hold a valid, current veterinary license issued by the Pakistan Veterinary Medical Council (PVMC) or relevant provincial authority.
-- You are solely responsible for any professional advice, diagnosis, or treatment you provide to users, whether on or off the platform.
-- VetAxis is not liable for any professional decisions you make or any outcomes resulting from them.
-- You must keep your profile information, qualifications, and contact details accurate and up to date.
+7. Governing Law & Jurisdiction
+These Terms and Conditions are governed by the laws of the Islamic Republic of Pakistan. Any legal proceedings shall be subject to the exclusive jurisdiction of the competent courts in Islamabad, Pakistan.`;
 
-5.3 Clinics
-- You confirm that your clinic operates under valid business registration and applicable veterinary health regulations in Pakistan.
-- You take full responsibility for the accuracy of your listed facilities, services, address, and operating hours.
-- Job postings made by your clinic must be genuine, lawful, and comply with Pakistan's labour laws.
-- You are responsible for all interactions with applicants and clients initiated through the platform.
+export const PRIVACY_POLICY_TEXT = `VetAxis 360 — Privacy Policy, Cookie Disclosures & Advertising Transparency
+Last Updated: June 2026
 
-5.4 Vet Assistants
-- You confirm that any qualifications, certifications, or experience listed on your profile are accurate and verifiable.
-- Misrepresentation of credentials is grounds for immediate account termination and may be reported to relevant authorities.
+Platform: VetAxis 360 (https://vetaxis360.com)
+Data Protection Officer Contact: saliskhan214@gmail.com
 
-6. The Marketplace & Pet Ads
-6.1 Only Veterinarians and Clinics may list products in the Accessories Marketplace. Pet Owners, Assistants, and all other authenticated users may post in the Pet Ads section.
-6.2 All listings must be accurate. Sellers are prohibited from listing counterfeit, stolen, prohibited, or misrepresented products or animals.
-6.3 VetAxis is a platform only. We are not a party to any transaction between buyers and sellers. Any dispute arising from a purchase, sale, or adoption is strictly between the involved parties.
-6.4 VetAxis does not guarantee the quality, safety, legality, or availability of any listed item or animal.
-6.5 The sale or listing of endangered, protected, or illegally obtained animals is strictly prohibited and may be reported to the relevant Pakistani wildlife or law enforcement authority.
-6.6 All WhatsApp-based contact initiated through the platform is between users directly. VetAxis has no visibility into or responsibility for those communications.
+1. Introduction & Overview
+VetAxis 360 is dedicated to safeguarding the privacy and data security of pet owners, dairy farmers, veterinarians, and clinical partners across Pakistan. This Privacy Policy outlines what information we collect, how we process it, your privacy rights, and our strict adherence to Google Search Essentials, Google AdSense Program Policies, and international data protection standards.
 
-7. Community Feed
-7.1 You are solely responsible for every post, comment, or reaction you make in the community feed.
-7.2 Posts must not contain false information, hate speech, harassment, sexually explicit content, spam, or content that violates Pakistani law including the Prevention of Electronic Crimes Act 2016 (PECA).
-7.3 Lost pet and adoption posts must be genuine. Posting fabricated lost pet emergencies or fraudulent adoption listings is a serious violation and grounds for immediate account removal.
-7.4 VetAxis reserves the right to remove any content at its discretion without prior notice.
-7.5 Posts are automatically removed after 30 days. VetAxis does not archive or preserve removed content.
+2. Information We Collect
+We collect information to provide, maintain, and improve our veterinary healthcare services:
+- Personal Account Data: Name, email address, phone number (for WhatsApp contact if opted in), city, and user role (Pet Owner, Doctor, Clinic, Farmer).
+- Animal Health & Farm Records: Pet vaccination records, livestock ear-tag ledgers, lactation statistics, and medical logs inputted by owners or verified clinicians.
+- Device, Log & Geolocation Data: Browser type, operating system, IP address, approximate city/region (used solely for locating nearest clinics and emergency triage), and timestamped session diagnostics.
 
-8. Verified Badge & Premium Tiers
-8.1 The VetAxis Verified Badge is awarded at our discretion following a review of submitted credentials. A verified badge does not constitute an endorsement of the professional's competence, quality of service, or legal compliance.
-8.2 Premium membership tiers (Silver, Gold, Platinum) are subscription-based paid services. Fees are as listed at the time of subscription and are subject to change with 30 days' notice.
-8.3 Payments are non-refundable unless a billing error is confirmed by VetAxis.
-8.4 VetAxis reserves the right to revoke a verified badge or suspend a premium membership if a user is found to have violated these terms, misrepresented credentials, or caused harm to other users.
-8.5 Tier benefits are subject to change. Continued use of the platform after a change in tier benefits constitutes acceptance of the updated offering.
+3. Google AdSense, Third-Party Vendors & Advertising Cookies
+VetAxis 360 displays third-party advertisements served by Google AdSense to fund platform infrastructure and free community veterinary services.
+- Google, as a third-party vendor, uses cookies (including the DoubleClick DART cookie) to serve ads on our site based on users' visits to VetAxis 360 and other sites on the Internet.
+- Users may opt out of personalized advertising by visiting Google Ads Settings (https://www.google.com/settings/ads) or through the Network Advertising Initiative opt-out page (https://optout.networkadvertising.org).
+- Third-party vendors and ad networks may also collect anonymous traffic metrics via cookies and web beacons to gauge ad effectiveness.
+- We strictly enforce clear spatial separation between editorial/navigation elements and ad units to prevent accidental clicks, adhering to Google Ad Placement Policies.
 
-9. Job Board
-9.1 Job postings must be genuine, lawful employment opportunities. Fake job listings, scam postings, or listings designed to harvest personal data are strictly prohibited.
-9.2 Clinics and Veterinarians posting jobs are responsible for conducting lawful, non-discriminatory hiring processes in compliance with Pakistani employment law.
-9.3 VetAxis is not an employment agency and is not a party to any employment relationship formed through the platform.
-9.4 Applicants submit their information at their own discretion. VetAxis is not responsible for how hiring parties handle submitted CVs, documents, or personal data outside the platform.
+4. How We Use & Protect Your Information
+- Facilitating direct appointments between pet owners and licensed DVM doctors.
+- Processing digital QR pet passports and farm management analytics.
+- Private contact details of pet owners are never sold, rented, or broadcast to third-party telemarketers.
+- All stored records utilize industry-standard TLS encryption and authenticated cloud access controls.
 
-10. Prohibited Conduct
-All users are prohibited from:
-- Posting false, misleading, or fraudulent information of any kind.
-- Impersonating another person, professional, or organization.
-- Using the platform for any unlawful purpose under Pakistani law.
-- Scraping, copying, or redistributing platform data without written permission.
-- Attempting to reverse engineer, hack, or disrupt the platform or its data.
-- Harassing, threatening, or abusing other users.
-- Creating multiple accounts to evade a suspension or ban.
-- Using VetAxis to promote competing platforms or services without consent.
-- Posting unsolicited advertisements outside of designated listing sections.
+5. User Rights & Data Deletion
+Users retain full control over their personal records. You may request data access, correction, or permanent account deletion directly through your profile settings or by emailing saliskhan214@gmail.com.
 
-11. Intellectual Property
-11.1 All platform design, code, branding, copy, and structure is the intellectual property of VetAxis. You may not copy, reproduce, or distribute any part of it without written permission.
-11.2 By posting content on VetAxis (profile information, posts, listings, reviews), you grant VetAxis a non-exclusive, royalty-free licence to display, store, and use that content for the purpose of operating the platform.
-11.3 You retain ownership of your own content. You confirm that any content you post does not infringe on the intellectual property rights of any third party.
+6. Policy Revisions
+Any updates to this Privacy Policy will be reflected on this page with an updated timestamp. Continued use of the platform denotes acceptance of any revised policies.`;
 
-12. Privacy & Data
-12.1 User data including names, email addresses, phone numbers, profile pictures, and location information is stored and used solely to operate the platform.
-12.2 Contact details of Pet Owners are kept private and not displayed to other users. Professional contact details are displayed as part of the professional profile.
-12.3 VetAxis does not sell user data to third parties.
-12.4 Location data is used only to provide distance-based search results. It is not stored permanently or shared beyond its immediate functional use.
-12.5 By using VetAxis you consent to the storage and processing of your data as described here and in our Privacy Policy.
-
-13. Disclaimers & Limitation of Liability
-13.1 VetAxis is provided on an "as is" and "as available" basis. We make no warranties, express or implied, regarding the platform's reliability, accuracy, or fitness for a particular purpose.
-13.2 VetAxis is not a veterinary service provider. Nothing on this platform constitutes professional veterinary or medical advice. Always consult a licensed veterinarian for animal health concerns.
-13.3 VetAxis is not liable for any direct, indirect, incidental, or consequential damages arising from your use of the platform, including but not limited to losses arising from transactions, professional decisions, or data loss.
-13.4 We are not responsible for the conduct of any user on or off the platform. Any disputes between users must be resolved directly between the parties involved.
-13.5 VetAxis makes no guarantees regarding the continued availability of the platform and may suspend, modify, or discontinue services at any time.
-
-14. Reviews & Ratings
-14.1 Reviews submitted on VetAxis must be based on genuine, first-hand experience with the reviewed professional or clinic.
-14.2 Fake, incentivized, or malicious reviews are prohibited. VetAxis reserves the right to remove any review it determines to be fraudulent or abusive.
-14.3 Professionals may not post reviews of themselves or instruct others to do so.
-14.4 Review content must not contain defamatory, discriminatory, or legally actionable statements. Users who post such content are personally liable for any legal consequences.
-
-15. Termination
-15.1 VetAxis reserves the right to suspend or permanently terminate any account at any time for violation of these terms, without prior notice or liability.
-15.2 You may delete your account at any time through your profile settings. Deletion removes your public profile but VetAxis may retain certain records for legal compliance purposes.
-15.3 Upon termination, your right to use the platform ceases immediately. Any active premium subscription will not be refunded unless a billing error is confirmed.
-
-16. Governing Law & Disputes
-16.1 These Terms & Conditions are governed by and construed in accordance with the laws of the Islamic Republic of Pakistan.
-16.2 Any dispute arising from the use of VetAxis shall first be attempted to be resolved through direct communication with the VetAxis team.
-16.3 If a dispute cannot be resolved informally, it shall be subject to the exclusive jurisdiction of the courts of Islamabad, Pakistan.
-
-17. Changes to These Terms
-VetAxis reserves the right to update these Terms & Conditions at any time. Changes will be posted on the platform with an updated date. Continued use of the platform after changes are posted constitutes your acceptance of the revised terms. It is your responsibility to review these terms periodically.`;
-
-export const ABOUT_US_TEXT = `VetAxis is Pakistan's premier fully-integrated digital veterinary ecosystem. Our platform bridges the gap between active livestock breeders, independent pet owners, licensed veterinarians, qualified nursing assistants, and comprehensive clinics.
+export const ABOUT_US_TEXT = `VetAxis 360 is Pakistan's premier fully-integrated digital veterinary healthcare and clinical intelligence ecosystem. Our platform bridges the gap between active livestock breeders, independent pet owners, licensed veterinarians, qualified nursing assistants, and comprehensive clinics.
 
 Our Core Mission
-We provide a unified directory and digital infrastructure designed to meet the unique challenges of livestock husbandry and companion pet animal care across Pakistan. From rural dairy and poultry farming communities to urban veterinary centers, VetAxis acts as a vital channel connecting stakeholders to certified services.
+We provide a unified directory and digital infrastructure designed to meet the unique challenges of livestock husbandry and companion pet animal care across Pakistan. From rural dairy and poultry farming communities to urban veterinary centers, VetAxis 360 acts as a vital channel connecting stakeholders to certified services.
 
 Key Service Pillars:
 - Verified Practitioner Profiles: Ensuring every doctor holds proper licenses for practice.
 - Proximity-based Mapping: Instantly locating the nearest clinical facilities or home emergency veterinarians.
 - Comprehensive Marketplace: Access to authenticated accessories, feed supplies, and verified vaccines.
 - Integrated Job Portals: Streamlining hiring and training for veterinarians and nursing personnel.
-- Self-Serve Billboard Ads: Empowering clinical facilities to deploy beautiful, real-time outreach campaign displays.
+- Farm Analytics Engine: Digital ledgers, lactation logging, and vaccination timelines for commercial herd owners.`;
 
-Our Commitment:
-Using standard location matrices, secure credential checking, and client feedback registries, we strive to build confidence and excellence in animal healthcare services. VetAxis does not provide medical services directly—we empower independent practitioners and clinics across Pakistan with advanced digital capabilities.`;
+interface NavigablePageProps {
+  onNavigate: (section: string) => void;
+}
 
+// ─────────────────────────────────────────────────────────────────
+// DEDICATED FULL-PAGE: TERMS OF SERVICE
+// ─────────────────────────────────────────────────────────────────
+export function TermsOfServicePage({ onNavigate }: NavigablePageProps) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 select-text">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <button
+          onClick={() => onNavigate('explore')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#e3dec9] text-[#5a5a40] hover:bg-[#fcfbf9] text-xs font-bold transition-all shadow-xs cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Explore</span>
+        </button>
+        <span className="text-xs font-bold text-[#8c8c69] bg-[#f5f2e9] px-3 py-1 rounded-full border border-[#e3dec9]">
+          Legal Document
+        </span>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] p-6 sm:p-10 shadow-sm">
+        <div className="flex items-center gap-3.5 pb-6 border-b border-[#f0ecdf]">
+          <div className="w-12 h-12 rounded-2xl bg-[#f5f2e9] border border-[#e3dec9] flex items-center justify-center text-[#5a5a40] shrink-0">
+            <FileText className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-serif font-black text-[#2b2b24]">
+              Terms of Service &amp; Clinical Platform Agreement
+            </h1>
+            <p className="text-xs font-semibold text-[#8c8c69] mt-0.5">
+              Official agreement governing the use of VetAxis 360 in Pakistan
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-6 text-[#4a4a38] text-sm sm:text-base leading-relaxed">
+          {TERMS_AND_CONDITIONS_TEXT.split('\n\n').map((paragraph, idx) => {
+            const isHeading = paragraph.match(/^(\d+\.|[A-Z\s]+:)/);
+            if (isHeading) {
+              return (
+                <h2 key={idx} className="text-base sm:text-lg font-serif font-black text-[#2b2b24] pt-4 border-t border-[#f7f5ed] first:border-t-0 first:pt-0">
+                  {paragraph}
+                </h2>
+              );
+            }
+            if (paragraph.startsWith('-')) {
+              return (
+                <ul key={idx} className="list-disc pl-6 space-y-2 text-sm text-[#4a4a38]">
+                  {paragraph.split('\n').map((bullet, bIdx) => (
+                    <li key={bIdx}>{bullet.replace(/^-\s*/, '')}</li>
+                  ))}
+                </ul>
+              );
+            }
+            return (
+              <p key={idx} className="whitespace-pre-wrap">
+                {paragraph}
+              </p>
+            );
+          })}
+        </div>
+
+        {/* Action navigation footer */}
+        <div className="mt-10 pt-6 border-t border-[#f0ecdf] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#8c8c69]">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Enforced by VetAxis Healthcare Network</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onNavigate('privacy')}
+              className="text-xs font-bold text-[#5a5a40] hover:underline cursor-pointer"
+            >
+              View Privacy Policy →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DEDICATED FULL-PAGE: PRIVACY POLICY (AdSense & Cookie Compliant)
+// ─────────────────────────────────────────────────────────────────
+export function PrivacyPolicyPage({ onNavigate }: NavigablePageProps) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 select-text">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <button
+          onClick={() => onNavigate('explore')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#e3dec9] text-[#5a5a40] hover:bg-[#fcfbf9] text-xs font-bold transition-all shadow-xs cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Explore</span>
+        </button>
+        <span className="text-xs font-bold text-[#8c8c69] bg-[#f5f2e9] px-3 py-1 rounded-full border border-[#e3dec9]">
+          Privacy &amp; Cookie Disclosure
+        </span>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] p-6 sm:p-10 shadow-sm">
+        <div className="flex items-center gap-3.5 pb-6 border-b border-[#f0ecdf]">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-serif font-black text-[#2b2b24]">
+              Privacy Policy &amp; Advertising Disclosures
+            </h1>
+            <p className="text-xs font-semibold text-[#8c8c69] mt-0.5">
+              Compliant with Google AdSense, Search Essentials &amp; International Standards
+            </p>
+          </div>
+        </div>
+
+        {/* Highlights banner */}
+        <div className="my-6 p-4 rounded-2xl bg-[#fbfaf6] border border-[#e3dec9] flex items-start gap-3 text-xs text-[#5a5a40] leading-relaxed">
+          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-[#2b2b24]">User Control Guarantee:</strong> We do not sell your personal animal or clinical data. Third-party advertising partners like Google utilize standard advertising cookies to provide relevant services, which you can opt out of at any time.
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-6 text-[#4a4a38] text-sm sm:text-base leading-relaxed">
+          {PRIVACY_POLICY_TEXT.split('\n\n').map((paragraph, idx) => {
+            const isHeading = paragraph.match(/^(\d+\.|[A-Z\s]+:)/);
+            if (isHeading) {
+              return (
+                <h2 key={idx} className="text-base sm:text-lg font-serif font-black text-[#2b2b24] pt-4 border-t border-[#f7f5ed] first:border-t-0 first:pt-0">
+                  {paragraph}
+                </h2>
+              );
+            }
+            if (paragraph.startsWith('-')) {
+              return (
+                <ul key={idx} className="list-disc pl-6 space-y-2 text-sm text-[#4a4a38]">
+                  {paragraph.split('\n').map((bullet, bIdx) => (
+                    <li key={bIdx}>{bullet.replace(/^-\s*/, '')}</li>
+                  ))}
+                </ul>
+              );
+            }
+            return (
+              <p key={idx} className="whitespace-pre-wrap">
+                {paragraph}
+              </p>
+            );
+          })}
+        </div>
+
+        {/* Third-Party Ad Controls Links */}
+        <div className="mt-8 p-5 rounded-2xl bg-[#f5f2e9] border border-[#e3dec9] space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#5a5a40]">
+            External Opt-Out &amp; Cookie Management Tools:
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href="https://www.google.com/settings/ads"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#e3dec9] text-xs font-bold text-[#5a5a40] hover:bg-[#faf8f2]"
+            >
+              <span>Google Ads Settings</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href="https://optout.networkadvertising.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#e3dec9] text-xs font-bold text-[#5a5a40] hover:bg-[#faf8f2]"
+            >
+              <span>NAI Consumer Opt-Out</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 pt-6 border-t border-[#f0ecdf] flex flex-wrap items-center justify-between gap-4">
+          <div className="text-xs text-[#8c8c69]">
+            Questions? Contact Data Officer: <strong className="text-[#5a5a40]">saliskhan214@gmail.com</strong>
+          </div>
+          <button
+            onClick={() => onNavigate('terms')}
+            className="text-xs font-bold text-[#5a5a40] hover:underline cursor-pointer"
+          >
+            Read Terms of Service →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DEDICATED FULL-PAGE: ABOUT US
+// ─────────────────────────────────────────────────────────────────
+export function AboutUsPage({ onNavigate }: NavigablePageProps) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 select-text">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <button
+          onClick={() => onNavigate('explore')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#e3dec9] text-[#5a5a40] hover:bg-[#fcfbf9] text-xs font-bold transition-all shadow-xs cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Explore</span>
+        </button>
+        <span className="text-xs font-bold text-[#5a5a40] bg-[#f5f2e9] px-3 py-1 rounded-full border border-[#e3dec9]">
+          Platform Overview
+        </span>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] p-6 sm:p-10 shadow-sm space-y-8">
+        <div className="flex items-center gap-4 pb-6 border-b border-[#f0ecdf]">
+          <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-[#5a5a40] to-[#3e3e2b] text-white flex items-center justify-center shadow-md shrink-0">
+            <Info className="w-7 h-7" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-serif font-black text-[#2b2b24]">
+              About VetAxis <span className="text-[#8c8c69]">360</span>
+            </h1>
+            <p className="text-xs sm:text-sm font-semibold text-[#8c8c69] mt-0.5">
+              Pakistan's Leading Digital Veterinary Care &amp; Clinical Intelligence Ecosystem
+            </p>
+          </div>
+        </div>
+
+        {/* Mission Statement Callout */}
+        <div className="p-6 rounded-2xl bg-[#fcfbf7] border border-[#e3dec9] border-l-4 border-l-[#5a5a40]">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[#5a5a40] mb-2">Our Mission</h2>
+          <p className="text-[#373735] text-sm sm:text-base leading-relaxed font-medium">
+            To revolutionize veterinary and agricultural animal healthcare across Pakistan through accessible digital infrastructure, connecting livestock farmers and pet families with certified Doctors of Veterinary Medicine (DVM), emergency hospital networks, and verified medical resources.
+          </p>
+        </div>
+
+        {/* Feature Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-5 rounded-2xl bg-[#fbfaf6] border border-[#e3dec9]">
+            <div className="text-2xl mb-2">🩺</div>
+            <h3 className="text-base font-serif font-black text-[#2b2b24]">Doctor &amp; Clinic Finder</h3>
+            <p className="text-xs text-[#5a5a40] mt-1 leading-relaxed">
+              Geo-targeted directory of licensed veterinarians, surgical hospitals, and 24/7 emergency trauma centers across all major Pakistani cities.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-[#fbfaf6] border border-[#e3dec9]">
+            <div className="text-2xl mb-2">🐄</div>
+            <h3 className="text-base font-serif font-black text-[#2b2b24]">Livestock &amp; Dairy Ledgers</h3>
+            <p className="text-xs text-[#5a5a40] mt-1 leading-relaxed">
+              Cloud-backed herd tracking, digital ear-tag management, lactation schedules, and automated disease alerts for commercial and rural breeders.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-[#fbfaf6] border border-[#e3dec9]">
+            <div className="text-2xl mb-2">🐾</div>
+            <h3 className="text-base font-serif font-black text-[#2b2b24]">Pet Rescue &amp; SOS Network</h3>
+            <p className="text-xs text-[#5a5a40] mt-1 leading-relaxed">
+              Instant geo-alert broadcasting for missing animals, ethical pet adoption registries, and digital QR pet vaccination passports.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-[#fbfaf6] border border-[#e3dec9]">
+            <div className="text-2xl mb-2">💼</div>
+            <h3 className="text-base font-serif font-black text-[#2b2b24]">Veterinary Careers &amp; Jobs</h3>
+            <p className="text-xs text-[#5a5a40] mt-1 leading-relaxed">
+              Dedicated career hub linking clinical hospitals with qualified DVM graduates, house job applicants, and certified veterinary nursing assistants.
+            </p>
+          </div>
+        </div>
+
+        {/* Compliance statement */}
+        <div className="p-5 rounded-2xl bg-[#f5f2e9] border border-[#e3dec9] text-xs text-[#5a5a40] space-y-2">
+          <h4 className="font-bold text-[#2b2b24] uppercase tracking-wider">Regulatory Standards Notice:</h4>
+          <p>
+            VetAxis 360 operates as an independent healthcare technology platform. We support the ethical guidelines established by the Pakistan Veterinary Medical Council (PVMC) and encourage all practicing veterinarians to maintain up-to-date regional licenses.
+          </p>
+        </div>
+
+        {/* Next navigation actions */}
+        <div className="pt-6 border-t border-[#f0ecdf] flex flex-wrap items-center justify-between gap-4">
+          <button
+            onClick={() => onNavigate('contact')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5a5a40] text-white text-xs font-bold hover:bg-[#3e3e2b] transition-all shadow-xs cursor-pointer"
+          >
+            <Mail className="w-4 h-4" />
+            <span>Contact Our Team</span>
+          </button>
+
+          <div className="flex gap-4 text-xs font-bold text-[#5a5a40]">
+            <button onClick={() => onNavigate('terms')} className="hover:underline cursor-pointer">Terms of Service</button>
+            <span>•</span>
+            <button onClick={() => onNavigate('privacy')} className="hover:underline cursor-pointer">Privacy Policy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DEDICATED FULL-PAGE: CONTACT & SUPPORT
+// ─────────────────────────────────────────────────────────────────
+export function ContactSupportPage({ onNavigate }: NavigablePageProps) {
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email || !formData.message) return;
+    setSubmitted(true);
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 select-text">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <button
+          onClick={() => onNavigate('explore')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#e3dec9] text-[#5a5a40] hover:bg-[#fcfbf9] text-xs font-bold transition-all shadow-xs cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Explore</span>
+        </button>
+        <span className="text-xs font-bold text-[#5a5a40] bg-[#f5f2e9] px-3 py-1 rounded-full border border-[#e3dec9]">
+          Support &amp; Inquiries
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Left Side: Contact Information Cards */}
+        <div className="space-y-4">
+          <div className="bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 shadow-sm">
+            <h2 className="text-lg font-serif font-black text-[#2b2b24] mb-4">Official Contact</h2>
+            <div className="space-y-4 text-xs sm:text-sm text-[#5a5a40]">
+              <div className="flex items-start gap-3">
+                <Mail className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-[#2b2b24]">Direct Email</div>
+                  <a href="mailto:saliskhan214@gmail.com" className="text-[#5a5a40] hover:underline font-mono">
+                    saliskhan214@gmail.com
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <MapPin className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-[#2b2b24]">Headquarters</div>
+                  <div>Islamabad, Capital Territory, Pakistan</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <HelpCircle className="w-4 h-4 text-[#8c8c69] shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-[#2b2b24]">Support Hours</div>
+                  <div>Mon – Sat: 9:00 AM – 7:00 PM PKT</div>
+                  <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">Emergency SOS Online 24/7</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#fbfaf6] rounded-3xl border border-[#e3dec9] p-5 text-xs text-[#5a5a40] space-y-2">
+            <h3 className="font-bold text-[#2b2b24]">Verified Clinic Inquiries</h3>
+            <p>
+              Are you a licensed veterinary hospital seeking verification or clinic management access? Contact our administrative team for expedited review.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Side: Message Form */}
+        <div className="md:col-span-2 bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 sm:p-8 shadow-sm">
+          <h2 className="text-xl font-serif font-black text-[#2b2b24] mb-2">Send an Inquiry or Feedback</h2>
+          <p className="text-xs text-[#8c8c69] mb-6">
+            Our support and compliance staff typically replies within 24 business hours.
+          </p>
+
+          {submitted ? (
+            <div className="p-8 text-center rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3">
+              <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+              <h3 className="text-base font-bold">Message Received</h3>
+              <p className="text-xs max-w-sm mx-auto">
+                Thank you for contacting VetAxis 360. Our team has received your message and will reply to <strong className="font-semibold">{formData.email}</strong> shortly.
+              </p>
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setFormData({ name: '', email: '', subject: '', message: '' });
+                }}
+                className="mt-4 px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-all cursor-pointer"
+              >
+                Send Another Note
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#2b2b24] mb-1">Your Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Dr. Ayesha Khan"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2b2b24] mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="you@domain.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2b2b24] mb-1">Topic / Subject</label>
+                <input
+                  type="text"
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  placeholder="e.g. Clinic Verification / Technical Support"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2b2b24] mb-1">Your Message *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  placeholder="How can we assist your veterinary care needs today?"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#e3dec9] bg-[#fcfbf9] text-xs font-medium text-[#2b2b24] focus:outline-hidden focus:ring-2 focus:ring-[#5a5a40]"
+                ></textarea>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-[11px] text-[#8c8c69]">
+                  Protected under VetAxis Data Privacy.
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#5a5a40] text-white text-xs font-black uppercase tracking-wider hover:bg-[#3e3e2b] transition-all shadow-xs cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send Message</span>
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODAL VIEW (For inline quick popups when needed)
+// ─────────────────────────────────────────────────────────────────
 interface LegalModalProps {
   isOpen: boolean;
   type: 'terms' | 'about';
@@ -154,8 +583,8 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
   if (!isOpen) return null;
 
   const content = type === 'terms' ? TERMS_AND_CONDITIONS_TEXT : ABOUT_US_TEXT;
-  const title = type === 'terms' ? 'VetAxis — Terms & Conditions' : 'About VetAxis';
-  const subtitle = type === 'terms' ? 'Last Updated: June 2026' : 'Pakistan\'s Premier Veterinary Clinical Network';
+  const title = type === 'terms' ? 'VetAxis — Terms of Service' : 'About VetAxis 360';
+  const subtitle = type === 'terms' ? 'Last Updated: June 2026' : 'Pakistan\'s Premier Veterinary Network';
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[99999] overflow-y-auto">
@@ -186,7 +615,6 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
         {/* Scrollable Content Body */}
         <div className="p-4 sm:p-6 md:p-8 overflow-y-auto space-y-4 select-text">
           {content.split('\n\n').map((paragraph, idx) => {
-            // Stylize numbered headings in terms and conditions (e.g., "1. Acceptance of Terms" or sub-clauses)
             const isHeading = paragraph.match(/^(\d+\.|[A-Z\s]+:)/);
             if (isHeading) {
               return (
@@ -195,7 +623,6 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
                 </h4>
               );
             }
-            // If bullet list
             if (paragraph.startsWith('-')) {
               return (
                 <ul key={idx} className="list-disc pl-5 space-y-2 text-xs md:text-sm font-semibold text-[#5a5a40] leading-relaxed">
@@ -218,9 +645,9 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="btn-tactile-3d bg-[#5a5a40] border-[#3e3e2b] text-white hover:bg-[#3e3e2b] text-xs font-black uppercase tracking-wider px-5 sm:px-6 py-2 sm:py-2.5 cursor-pointer"
+            className="bg-[#5a5a40] border-[#3e3e2b] text-white hover:bg-[#3e3e2b] text-xs font-black uppercase tracking-wider px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl cursor-pointer"
           >
-            Acknowledge & Close
+            Acknowledge &amp; Close
           </button>
         </div>
       </motion.div>

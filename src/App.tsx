@@ -24,6 +24,9 @@ import { GuestAnimalViewer } from './components/GuestAnimalViewer';
 import { ClinicManagement } from './components/ClinicManagement';
 import { AboutUsDirectory } from './components/AboutUsDirectory';
 import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
+import { BlogSection } from './components/BlogSection';
+import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage } from './components/LegalAndAbout';
+import { Footer } from './components/Footer';
 import PageNotFound from './components/PageNotFound';
 
 export default function App() {
@@ -110,10 +113,22 @@ export default function App() {
     }
 
     if (tabParam) {
-      const validSections = ['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'news'];
+      const validSections = [
+        'explore', 'community', 'marketplace', 'pet_ads', 'jobs', 
+        'livestock', 'profile', 'subscription', 'admin', 'news', 
+        'blogs', 'articles', 'about', 'about_us', 'terms', 
+        'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
+        'support', 'clinic_management'
+      ];
       let targetSection = tabParam.toLowerCase();
       if (targetSection === 'pets') targetSection = 'pet_ads';
-      if (validSections.includes(targetSection)) {
+      if (targetSection === 'blogs' || targetSection === 'articles') targetSection = 'news';
+      if (targetSection === 'about_us') targetSection = 'about';
+      if (targetSection === 'terms_of_service') targetSection = 'terms';
+      if (targetSection === 'privacy_policy') targetSection = 'privacy';
+      if (targetSection === 'support') targetSection = 'contact';
+
+      if (validSections.includes(targetSection) || validSections.includes(tabParam.toLowerCase())) {
         setActiveSection(targetSection);
       } else {
         setActiveSection('not_found');
@@ -148,7 +163,8 @@ export default function App() {
       profile: "My Clinical Profile & Pet Medical Passports | VetAxis 360",
       about: "About VetAxis 360 | Pakistan & Global Veterinary Platform",
       terms: "Terms of Service | VetAxis 360",
-      privacy: "Privacy Policy & Medical Data Security | VetAxis 360"
+      privacy: "Privacy Policy & Medical Data Security | VetAxis 360",
+      contact: "Contact & Support | VetAxis 360"
     };
 
     if (titles[activeSection]) {
@@ -340,14 +356,31 @@ export default function App() {
   };
 
   const handleNavigate = (section: string) => {
-    triggerLoading(`Opening ${section.replace('_', ' ').toUpperCase()}...`, 600);
-    setActiveSection(section);
+    let normalized = section.toLowerCase();
+    if (normalized === 'pets') normalized = 'pet_ads';
+    if (normalized === 'blogs' || normalized === 'articles') normalized = 'news';
+    if (normalized === 'about_us') normalized = 'about';
+    if (normalized === 'terms_of_service') normalized = 'terms';
+    if (normalized === 'privacy_policy') normalized = 'privacy';
+    if (normalized === 'support') normalized = 'contact';
+
+    triggerLoading(`Opening ${normalized.replace('_', ' ').toUpperCase()}...`, 400);
+    setActiveSection(normalized);
     // Clear highlight tags during manual user shifts
     setHighlightPostId(null);
     setHighlightJobId(null);
     setHighlightApplicationId(null);
     setHighlightFarmId(null);
     setHighlightAppointmentId(null);
+
+    // Sync URL without full page reload for Google Search and external deep-linking
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', normalized);
+      window.history.pushState({}, '', url.toString());
+    } catch (e) {
+      console.warn('Could not update browser history:', e);
+    }
   };
 
   // Real-time Auth connection tracker to prevent race conditions on startup
@@ -822,16 +855,35 @@ export default function App() {
               />
             )}
 
-            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management'].includes(activeSection) && (
+            {activeSection === 'news' && (
+              <BlogSection currentUser={currentUser} />
+            )}
+
+            {activeSection === 'about' && (
+              <AboutUsPage onNavigate={handleNavigate} />
+            )}
+
+            {activeSection === 'terms' && (
+              <TermsOfServicePage onNavigate={handleNavigate} />
+            )}
+
+            {activeSection === 'privacy' && (
+              <PrivacyPolicyPage onNavigate={handleNavigate} />
+            )}
+
+            {activeSection === 'contact' && (
+              <ContactSupportPage onNavigate={handleNavigate} />
+            )}
+
+            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      {/* FOOTER METRICS RAIL - Natural Tones Theme */}
-      <footer className="py-4 mt-8 bg-[#fdfbf7] w-full">
-      </footer>
+      {/* COMPLIANT GLOBAL FOOTER NAVIGATION */}
+      <Footer onNavigate={handleNavigate} activeSection={activeSection} />
 
       {/* Floating Popup Toast Alerts System */}
       <div className="fixed bottom-5 right-5 z-[1000] flex flex-col gap-3 max-w-sm w-[90%] pointer-events-none">

@@ -477,25 +477,29 @@
     </script>
   </head>
   <body>
-    <div id="root">
-      <!-- Semantic SEO Prerender Shell for Search Engine Crawlers & Fast Indexing -->
-      <header style="padding: 20px; font-family: sans-serif; max-width: 1000px; margin: 0 auto;">
-        <h1>VetAxis 360 | Veterinary Clinic Directory, 24/7 Animal Hospitals & DVM Doctors Near Me</h1>
-        <p><strong>Pakistan's Leading Digital Veterinary Care & Clinical Intelligence Ecosystem.</strong></p>
+    <!-- 
+      SEO & Search Engine Prerender Layer:
+      Fully accessible to Googlebot, Bing, AdSense, and non-JS crawlers without creating 
+      flash-of-unstyled-text for human users.
+    -->
+    <noscript>
+      <header style="padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1000px; margin: 0 auto; color: #1c1917;">
+        <h1>VetAxis 360 | Veterinary Clinic Directory, 24/7 Animal Hospitals &amp; DVM Doctors Near Me</h1>
+        <p><strong>Pakistan's Leading Digital Veterinary Care &amp; Clinical Intelligence Ecosystem.</strong></p>
         <nav aria-label="Main Navigation">
           <ul>
-            <li><a href="https://vetaxis360.com/?tab=explore">Find Verified Veterinary Clinics & Doctors Near Me</a></li>
-            <li><a href="https://vetaxis360.com/?tab=jobs">DVM Veterinary Careers, Vacancies & Hospital Jobs</a></li>
-            <li><a href="https://vetaxis360.com/?tab=pets">Lost & Found Pets SOS Network & Classifieds</a></li>
-            <li><a href="https://vetaxis360.com/?tab=livestock">Livestock Herd Health & Dairy Management</a></li>
-            <li><a href="https://vetaxis360.com/?tab=marketplace">Veterinary Medicine & Clinical Supplies Marketplace</a></li>
-            <li><a href="https://vetaxis360.com/?tab=blogs">Clinical Veterinary Guides & Animal Health Articles</a></li>
+            <li><a href="https://vetaxis360.com/?tab=explore">Find Verified Veterinary Clinics &amp; Doctors Near Me</a></li>
+            <li><a href="https://vetaxis360.com/?tab=jobs">DVM Veterinary Careers, Vacancies &amp; Hospital Jobs</a></li>
+            <li><a href="https://vetaxis360.com/?tab=pets">Lost &amp; Found Pets SOS Network &amp; Classifieds</a></li>
+            <li><a href="https://vetaxis360.com/?tab=livestock">Livestock Herd Health &amp; Dairy Management</a></li>
+            <li><a href="https://vetaxis360.com/?tab=marketplace">Veterinary Medicine &amp; Clinical Supplies Marketplace</a></li>
+            <li><a href="https://vetaxis360.com/?tab=news">Clinical Veterinary Guides &amp; Animal Health Articles</a></li>
           </ul>
         </nav>
       </header>
-      <main style="padding: 20px; font-family: sans-serif; max-width: 1000px; margin: 0 auto;">
+      <main style="padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1000px; margin: 0 auto; color: #1c1917;">
         <section>
-          <h2>Find Top-Rated Vets & Animal Care in Major Cities</h2>
+          <h2>Find Top-Rated Vets &amp; Animal Care in Major Cities</h2>
           <p>Locate verified Doctor of Veterinary Medicine (DVM) practitioners, companion animal clinics, emergency surgical facilities, pet vaccinations, and dental care across <strong>Islamabad, Rawalpindi, Lahore, Karachi, Peshawar, Faisalabad, Multan, Quetta, Gujranwala, and Sialkot</strong>.</p>
         </section>
         <section>
@@ -503,8 +507,8 @@
           <ul>
             <li><strong>24/7 Emergency Triage:</strong> Immediate location of open clinics and on-call veterinarians for trauma, poisoning, and critical surgeries.</li>
             <li><strong>Digital QR Pet Passport:</strong> Cloud-verified vaccination, deworming, and medical ledgers for dogs, cats, birds, and exotic pets.</li>
-            <li><strong>Livestock & Herd Healthcare:</strong> Farm record keeping, lactation logs, disease alerts, and herd management for dairy and beef cattle.</li>
-            <li><strong>Lost & Found Pet SOS Alerts:</strong> Geo-targeted missing pet broadcasting across local veterinary networks.</li>
+            <li><strong>Livestock &amp; Herd Healthcare:</strong> Farm record keeping, lactation logs, disease alerts, and herd management for dairy and beef cattle.</li>
+            <li><strong>Lost &amp; Found Pet SOS Alerts:</strong> Geo-targeted missing pet broadcasting across local veterinary networks.</li>
           </ul>
         </section>
         <footer style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; font-size: 13px;">
@@ -517,6 +521,74 @@
           </p>
         </footer>
       </main>
+    </noscript>
+
+    <!-- Main React Mount Root: Beautiful instant styled loader displayed seamlessly until React boots -->
+    <div id="root">
+      <div id="initial-app-loader" style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #fcfbf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; z-index: 99999; padding: 24px; text-align: center; color: #1c1917;">
+        
+        <style>
+          @keyframes loaderPulse {
+            0%, 100% { transform: scale(1); opacity: 0.95; }
+            50% { transform: scale(1.05); opacity: 1; }
+          }
+          @keyframes loaderRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes loaderBar {
+            0% { width: 10%; transform: translateX(-20%); }
+            50% { width: 70%; transform: translateX(30%); }
+            100% { width: 10%; transform: translateX(110%); }
+          }
+          @keyframes subtleFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-4px); }
+          }
+          .loader-pulse-logo {
+            animation: subtleFloat 3s ease-in-out infinite;
+          }
+          .loader-spin-ring {
+            animation: loaderRotate 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          }
+          .loader-progress-bar {
+            animation: loaderBar 1.8s ease-in-out infinite;
+          }
+        </style>
+
+        <div class="loader-pulse-logo" style="position: relative; width: 88px; height: 88px; margin-bottom: 24px; display: flex; align-items: center; justify-content: center;">
+          <!-- Outer subtle rotating emerald orbit -->
+          <div class="loader-spin-ring" style="position: absolute; inset: -6px; border-radius: 28px; border: 2px dashed rgba(90, 90, 64, 0.35);"></div>
+          
+          <!-- Inner brand icon container -->
+          <div style="width: 100%; height: 100%; border-radius: 24px; background: linear-gradient(135deg, #5a5a40 0%, #3e3e2b 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px -8px rgba(90, 90, 64, 0.45); border: 1px solid rgba(255, 255, 255, 0.25);">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="none"/>
+              <!-- Stethoscope / Medical Veterinary Cross & Heart SVG -->
+              <path d="M12 6v12M6 12h12" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="4 4"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Typography Branding -->
+        <h2 style="margin: 0 0 6px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: #1c1917;">
+          VetAxis <span style="color: #5a5a40; font-weight: 700;">360</span>
+        </h2>
+        
+        <p style="margin: 0 0 28px 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: #78716c;">
+          Clinical Veterinary Intelligence
+        </p>
+
+        <!-- Progress Indicator -->
+        <div style="width: 180px; height: 4px; background-color: rgba(90, 90, 64, 0.12); border-radius: 9999px; overflow: hidden; position: relative;">
+          <div class="loader-progress-bar" style="position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, #5a5a40, #8c8c69); border-radius: 9999px;"></div>
+        </div>
+
+        <p style="margin: 14px 0 0 0; font-size: 12px; color: #a8a29e; font-weight: 500;">
+          Connecting care network...
+        </p>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
