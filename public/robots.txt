@@ -12,6 +12,7 @@ Allow: /apple-touch-icon.png
 Allow: /manifest.json
 Allow: /sitemap.xml
 Allow: /ads.txt
+Allow: /google*.html
 
 User-agent: Googlebot-Image
 Allow: /
