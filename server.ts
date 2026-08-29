@@ -861,6 +861,18 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     }
   });
 
+  // Google Site Verification static handler (Supports direct GSC crawler verification)
+  app.get("/google707ec5232c268176.html", (req, res) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send("google-site-verification: google707ec5232c268176.html");
+  });
+
+  app.get("/google:code.html", (req, res) => {
+    const code = req.params.code;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send(`google-site-verification: google${code}.html`);
+  });
+
   // GET /api/sitemap/stats endpoint for diagnostics
   app.get("/api/sitemap/stats", async (req, res) => {
     try {
