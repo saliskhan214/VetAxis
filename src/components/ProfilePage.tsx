@@ -36,6 +36,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   const [facilities, setFacilities] = useState<string>(currentUser.facilities || '');
   const [address, setAddress] = useState<string>(currentUser.address || '');
   const [doctorCity, setDoctorCity] = useState<string>(currentUser.address || 'Islamabad');
+  const [offersHomeVisit, setOffersHomeVisit] = useState<boolean>(currentUser.offersHomeVisit ?? false);
+  const [homeVisitCharges, setHomeVisitCharges] = useState<string>(currentUser.homeVisitCharges || '');
   const [latitudeStr, setLatitudeStr] = useState<string>(currentUser.location?.lat ? String(currentUser.location.lat) : '');
   const [longitudeStr, setLongitudeStr] = useState<string>(currentUser.location?.lng ? String(currentUser.location.lng) : '');
 
@@ -75,7 +77,10 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   const [adTitle, setAdTitle] = useState<string>('');
   const [adDescription, setAdDescription] = useState<string>('');
   const [adSponsor, setAdSponsor] = useState<string>(currentUser.name || '');
-  const [adCtaText, setAdCtaText] = useState<string>('Visit Clinic');
+  const [adCtaPreset, setAdCtaPreset] = useState<'whatsapp' | 'profile' | 'call' | 'custom'>('whatsapp');
+  const [adContactPhone, setAdContactPhone] = useState<string>(currentUser.phone || '');
+  const [adCustomUrl, setAdCustomUrl] = useState<string>('');
+  const [adCtaText, setAdCtaText] = useState<string>('Chat on WhatsApp');
   const [adCtaUrl, setAdCtaUrl] = useState<string>('');
   const [adIcon, setAdIcon] = useState<string>('🏥');
   const [adGradient, setAdGradient] = useState<string>('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
@@ -107,8 +112,11 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   useEffect(() => {
     if (currentUser.uid) {
       loadActiveAds();
+      if (currentUser.phone && !adContactPhone) {
+        setAdContactPhone(currentUser.phone);
+      }
     }
-  }, [currentUser.uid, currentUser.promoAdsUsed]);
+  }, [currentUser.uid, currentUser.promoAdsUsed, currentUser.phone]);
 
   useEffect(() => {
     const allowed = currentUser.subscriptionTier === 'Silver' ? 3 : currentUser.subscriptionTier === 'Gold' ? 5 : currentUser.subscriptionTier === 'Platinum' ? 10 : 0;
@@ -124,10 +132,32 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
   const remainingPromoSlots = Math.max(0, maxAllowedPromo - (currentUser.promoAdsUsed || 0));
   const hasRemainingPromo = currentUser.subscriptionTier ? (remainingPromoSlots > 0) : false;
 
+  const getComputedCtaUrl = () => {
+    const cleanPhone = (adContactPhone || currentUser?.phone || '').replace(/\D/g, '');
+    if (adCtaPreset === 'whatsapp') {
+      const formattedPhone = cleanPhone.startsWith('92') ? cleanPhone : cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone;
+      const msg = `Hi ${adSponsor || currentUser.name}, I saw your ad on VetAxis ("${adTitle || 'Special Offer'}") and would like to inquire.`;
+      return formattedPhone ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}` : '';
+    } else if (adCtaPreset === 'profile') {
+      return `profile:${currentUser.uid}`;
+    } else if (adCtaPreset === 'call') {
+      const formattedPhone = cleanPhone.startsWith('92') ? cleanPhone : cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone;
+      return formattedPhone ? `tel:+${formattedPhone}` : '';
+    } else {
+      return adCustomUrl.trim();
+    }
+  };
+
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim() || !adCtaUrl.trim()) {
+    if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim()) {
       setError('Please fill in all the required campaign parameters.');
+      return;
+    }
+
+    const computedUrl = getComputedCtaUrl();
+    if (!computedUrl) {
+      setError('Please provide a valid destination phone or link for the ad.');
       return;
     }
 
@@ -167,7 +197,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       setSuccess(null);
 
       // Simulate network processing delay (ad registration & payment clearance)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const isApprovedImmediately = isAdFree || adPaymentMethod === 'card';
 
@@ -176,7 +206,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         title: adTitle,
         description: adDescription,
         ctaText: adCtaText,
-        ctaUrl: adCtaUrl,
+        ctaUrl: computedUrl,
+        ctaType: adCtaPreset,
+        ownerPhone: adContactPhone || currentUser.phone || '',
         bgGradient: adGradient,
         badge: isAdFree ? `${currentUser.subscriptionTier} Promo` : 'Premium Billboard Sponsor',
         icon: adIcon,
@@ -210,8 +242,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
       setAdTitle('');
       setAdDescription('');
       setAdSponsor(currentUser.name || '');
-      setAdCtaText('Visit Clinic');
-      setAdCtaUrl('');
+      setAdCtaPreset('whatsapp');
+      setAdCtaText('Chat on WhatsApp');
+      setAdCustomUrl('');
       setAdIcon('🏥');
       setAdGradient('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
       setAdCardName('');
@@ -426,7 +459,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
     try {
       const payload: Partial<UserProfile> = {
         name: name.trim(),
-        phone: phone.trim()
+        phone: phone.trim(),
+        offersHomeVisit: (currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant') ? Boolean(offersHomeVisit) : false,
+        homeVisitCharges: (currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant') ? homeVisitCharges.trim() : ''
       };
 
       if (currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') {
@@ -644,6 +679,8 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                       setFacilities(currentUser.facilities || '');
                       setAddress(currentUser.address || '');
                       setDoctorCity(currentUser.address || 'Islamabad');
+                      setOffersHomeVisit(currentUser.offersHomeVisit ?? false);
+                      setHomeVisitCharges(currentUser.homeVisitCharges || '');
                       setLatitudeStr(currentUser.location?.lat ? String(currentUser.location.lat) : '');
                       setLongitudeStr(currentUser.location?.lng ? String(currentUser.location.lng) : '');
                       setError(null);
@@ -850,6 +887,59 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                   </div>
                 )}
 
+                {/* HOME VISIT & ON-SITE CALLS SETTINGS */}
+                {(currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant') && (
+                  <div className="bg-[#fcf9f2] p-5 rounded-2xl border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] space-y-3.5 text-left transition-all">
+                    <div className="flex items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase text-[#373735] tracking-wide flex items-center gap-1.5">
+                            <span>🏠</span> <span>Home Visit & Farm On-Site Calls</span>
+                          </span>
+                          {offersHomeVisit && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 animate-fadeIn">
+                              Tag Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#7a766f] font-semibold leading-relaxed">
+                          Allow pet owners and farmers to request doorstep medical checkups, vaccinations, and on-farm emergency visits. This shows a high-visibility <strong className="text-emerald-700 font-bold">"🏠 Home Visit"</strong> badge on your profile card on the home page.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1 sm:mt-0">
+                        <input 
+                          type="checkbox"
+                          checked={offersHomeVisit}
+                          onChange={(e) => setOffersHomeVisit(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 shadow-inner"></div>
+                      </label>
+                    </div>
+
+                    {offersHomeVisit && (
+                      <div className="pt-3 border-t border-[#e3dec9] space-y-1.5 animate-fadeIn">
+                        <label className="text-xs font-bold text-[#373735] block">
+                          Home Visit Coverage Area / Rates / Availability Note (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control bg-white text-xs font-medium"
+                          placeholder="e.g. Doorstep vaccinations, farm calls within 25km radius, or 24/7 on-call visits"
+                          value={homeVisitCharges}
+                          onChange={(e) => setHomeVisitCharges(e.target.value)}
+                          disabled={loading}
+                          maxLength={180}
+                        />
+                        <p className="text-[10.5px] text-[#7a766f] flex items-center gap-1.5 font-medium">
+                          <span>💡</span>
+                          <span>Farmers & pet owners will be able to click directly on your card to request a home visit via WhatsApp or call.</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </form>
 
               {/* DANGER ZONE - ACCOUNT DELETION */}
@@ -1049,6 +1139,53 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                           />
                         </div>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* READ-ONLY HOME VISIT AVAILABILITY STATUS */}
+                {(currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant') && (
+                  <div className="bg-white p-4 rounded-2xl border border-[#e3dec9]/70 space-y-2 text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#f4f1e9] pb-2">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none">
+                          Directory Tag Status
+                        </span>
+                        <h4 className="text-xs font-serif font-black text-[#373735] flex items-center gap-1.5">
+                          <span>🏠</span> <span>Home Visit & On-Site Service Tag</span>
+                        </h4>
+                      </div>
+                      <div>
+                        {currentUser.offersHomeVisit ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-2xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Home Visit Available</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-2xs font-bold bg-stone-100 text-stone-600 border border-stone-200">
+                            <span>✕</span>
+                            <span>In-Clinic / Not Active</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {currentUser.offersHomeVisit ? (
+                      <div className="text-[11px] text-[#5a5a40] space-y-1">
+                        <p className="font-semibold text-stone-700">
+                          {currentUser.homeVisitCharges ? (
+                            <span><strong>Coverage & Notes:</strong> {currentUser.homeVisitCharges}</span>
+                          ) : (
+                            <span>Available for on-site farm visits and doorstep pet appointments.</span>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-[#7a766f]">
+                          ✓ Displayed with prominent "🏠 Home Visit" badge on home page directory cards.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10.5px] text-[#7a766f] font-medium">
+                        Click "Edit Profile" above to activate the Home Visit tag so farmers and pet owners can easily discover your on-site services.
+                      </p>
                     )}
                   </div>
                 )}

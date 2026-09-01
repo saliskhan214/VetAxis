@@ -3,7 +3,7 @@ import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd
 import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
-import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw } from 'lucide-react';
+import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 import { InteractiveClinicMap } from './InteractiveClinicMap';
 
@@ -67,6 +67,7 @@ export function ExploreFeed({
   const [professionals, setProfessionals] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [homeVisitOnly, setHomeVisitOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
   // Nearest sorting & geographic filter popup states
   const [doctorLocationModalOpen, setDoctorLocationModalOpen] = useState<boolean>(false);
@@ -77,7 +78,10 @@ export function ExploreFeed({
   const [adTitle, setAdTitle] = useState<string>('');
   const [adDescription, setAdDescription] = useState<string>('');
   const [adSponsor, setAdSponsor] = useState<string>('');
-  const [adCtaText, setAdCtaText] = useState<string>('Visit Clinic');
+  const [adCtaPreset, setAdCtaPreset] = useState<'whatsapp' | 'profile' | 'call' | 'custom'>('whatsapp');
+  const [adContactPhone, setAdContactPhone] = useState<string>(currentUser.phone || '');
+  const [adCustomUrl, setAdCustomUrl] = useState<string>('');
+  const [adCtaText, setAdCtaText] = useState<string>('Chat on WhatsApp');
   const [adCtaUrl, setAdCtaUrl] = useState<string>('');
   const [adIcon, setAdIcon] = useState<string>('🏥');
   const [adGradient, setAdGradient] = useState<string>('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
@@ -95,6 +99,11 @@ export function ExploreFeed({
   const [adSuccess, setAdSuccess] = useState<string | null>(null);
   const adCreatorRef = useRef<HTMLDivElement>(null);
 
+  // Billboard active click showcase & quick contact modal
+  const [activeContactAdModal, setActiveContactAdModal] = useState<any | null>(null);
+  const [adAdvertiserProfile, setAdAdvertiserProfile] = useState<UserProfile | null>(null);
+  const [loadingAdProfile, setLoadingAdProfile] = useState<boolean>(false);
+
   const [activeAds, setActiveAds] = useState<any[]>([]);
   const [deletingAdId, setDeletingAdId] = useState<string | null>(null);
 
@@ -111,8 +120,11 @@ export function ExploreFeed({
   useEffect(() => {
     if (currentUser?.uid) {
       loadActiveAds();
+      if (currentUser.phone && !adContactPhone) {
+        setAdContactPhone(currentUser.phone);
+      }
     }
-  }, [currentUser?.uid, currentUser?.promoAdsUsed]);
+  }, [currentUser?.uid, currentUser?.promoAdsUsed, currentUser?.phone]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -140,11 +152,124 @@ export function ExploreFeed({
     setTimeout(() => setAdSuccess(null), 8500);
   };
 
+  const handleSelectCtaPreset = (preset: 'whatsapp' | 'profile' | 'call' | 'custom') => {
+    setAdCtaPreset(preset);
+    if (preset === 'whatsapp') {
+      setAdCtaText('Chat on WhatsApp');
+    } else if (preset === 'profile') {
+      setAdCtaText('Visit Clinic');
+    } else if (preset === 'call') {
+      setAdCtaText('Call Helpline');
+    } else if (preset === 'custom') {
+      setAdCtaText('Visit Website');
+    }
+  };
+
+  // Compute destination URL for preset
+  const getComputedCtaUrl = () => {
+    const cleanPhone = (adContactPhone || currentUser?.phone || '').replace(/\D/g, '');
+    if (adCtaPreset === 'whatsapp') {
+      const formattedPhone = cleanPhone.startsWith('92') ? cleanPhone : cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone;
+      const msg = `Hi ${adSponsor || currentUser.name}, I saw your ad on VetAxis ("${adTitle || 'Special Offer'}") and would like to inquire.`;
+      return formattedPhone ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}` : '';
+    } else if (adCtaPreset === 'profile') {
+      return `profile:${currentUser.uid}`;
+    } else if (adCtaPreset === 'call') {
+      const formattedPhone = cleanPhone.startsWith('92') ? cleanPhone : cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone;
+      return formattedPhone ? `tel:+${formattedPhone}` : '';
+    } else {
+      return adCustomUrl.trim();
+    }
+  };
+
+  const handleOpenAdvertiserProfile = async (ownerUid: string) => {
+    if (!ownerUid) return;
+    let target = professionals.find(p => p.uid === ownerUid);
+    if (!target) {
+      try {
+        target = await AuthService.fetchUserProfile(ownerUid);
+      } catch (e) {
+        console.error('Error fetching advertiser profile', e);
+      }
+    }
+    if (target) {
+      setSelectedProfile(target);
+      setActiveContactAdModal(null);
+    } else {
+      alert('Advertiser profile details could not be loaded.');
+    }
+  };
+
+  const handleAdCtaClick = async (slide: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!slide || slide.type === 'welcome') return;
+
+    const url = slide.ctaUrl || '';
+    const ctaType = slide.ctaType || (url.startsWith('profile:') ? 'profile' : url.startsWith('tel:') ? 'call' : url.includes('wa.me') ? 'whatsapp' : 'custom');
+
+    if (ctaType === 'profile' || url.startsWith('profile:')) {
+      const uid = url.replace('profile:', '').trim() || slide.ownerUid;
+      await handleOpenAdvertiserProfile(uid);
+      return;
+    }
+
+    if (ctaType === 'call' || url.startsWith('tel:')) {
+      const cleanTel = url.startsWith('tel:') ? url : `tel:${url.replace(/[^\d+]/g, '')}`;
+      window.location.href = cleanTel;
+      return;
+    }
+
+    if (ctaType === 'whatsapp' || url.includes('wa.me') || url.includes('whatsapp.com')) {
+      const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (url) {
+      const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      openContactModalForSlide(slide);
+    }
+  };
+
+  const openContactModalForSlide = async (slide: any) => {
+    if (!slide || slide.type === 'welcome') return;
+    setActiveContactAdModal(slide);
+    setLoadingAdProfile(true);
+    try {
+      let prof = professionals.find(p => p.uid === slide.ownerUid);
+      if (!prof && slide.ownerUid) {
+        prof = await AuthService.fetchUserProfile(slide.ownerUid);
+      }
+      setAdAdvertiserProfile(prof || null);
+    } catch (err) {
+      console.error('Failed loading profile for ad contact modal', err);
+      setAdAdvertiserProfile(null);
+    } finally {
+      setLoadingAdProfile(false);
+    }
+  };
+
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
-    if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim() || !adCtaUrl.trim()) {
+    if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim()) {
       setAdError('Please fill in all the required campaign parameters.');
+      return;
+    }
+
+    const computedUrl = getComputedCtaUrl();
+    if (!computedUrl) {
+      if (adCtaPreset === 'whatsapp') {
+        setAdError('Please enter a valid WhatsApp phone number.');
+      } else if (adCtaPreset === 'call') {
+        setAdError('Please enter a valid phone number for the clinic hotline.');
+      } else if (adCtaPreset === 'custom') {
+        setAdError('Please enter a valid website or booking URL.');
+      } else {
+        setAdError('Please configure a valid contact action destination.');
+      }
       return;
     }
 
@@ -172,7 +297,7 @@ export function ExploreFeed({
       setAdSuccess(null);
 
       // Simulate network processing delay (ad registration & payment clearance)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const isApprovedImmediately = isAdFree;
 
@@ -181,7 +306,9 @@ export function ExploreFeed({
         title: adTitle,
         description: adDescription,
         ctaText: adCtaText,
-        ctaUrl: adCtaUrl,
+        ctaUrl: computedUrl,
+        ctaType: adCtaPreset,
+        ownerPhone: adContactPhone || currentUser.phone || '',
         bgGradient: adGradient,
         badge: isAdFree ? `${currentUser.subscriptionTier} Promo` : 'Premium Billboard Sponsor',
         icon: adIcon,
@@ -216,8 +343,9 @@ export function ExploreFeed({
       setAdTitle('');
       setAdDescription('');
       setAdSponsor(currentUser.name || '');
-      setAdCtaText('Visit Clinic');
-      setAdCtaUrl('');
+      setAdCtaPreset('whatsapp');
+      setAdCtaText('Chat on WhatsApp');
+      setAdCustomUrl('');
       setAdIcon('🏥');
       setAdGradient('from-[#1c2e24] via-[#2d4a39] to-[#1c2e24]');
       setAdCardName('');
@@ -378,6 +506,10 @@ export function ExploreFeed({
         couponCode: ad.couponCode || '',
         ctaText: ad.ctaText,
         ctaUrl: ad.ctaUrl,
+        ctaType: ad.ctaType,
+        ownerPhone: ad.ownerPhone,
+        ownerEmail: ad.ownerEmail,
+        ownerRole: ad.ownerRole,
         bgGradient: ad.bgGradient || "from-[#574c3c] via-[#433b2f] to-[#574c3c]",
         borderColors: "border-[#433b2f] border-b-[#2a241c]",
         badge: ad.badge || "Sponsored",
@@ -500,6 +632,7 @@ export function ExploreFeed({
   const handleResetAllFilters = async () => {
     setSearchTerm('');
     setCityFilterActive('');
+    setHomeVisitOnly(false);
     setSortBy(SORT_TYPES.HIGHEST);
     if (currentUser.location) {
       setLocLoading(true);
@@ -620,12 +753,25 @@ export function ExploreFeed({
   // Sorted and filtered list
   const filteredProfessionals = ExploreService.sortUsers(
     professionals.filter((p) => {
+      // Filter by Home Visit only if toggle active
+      if (homeVisitOnly && !p.offersHomeVisit) {
+        return false;
+      }
+
       const search = searchTerm.toLowerCase();
       const matchesSearch = (
         p.name.toLowerCase().includes(search) ||
         (p.expertise || '').toLowerCase().includes(search) ||
         (p.facilities || '').toLowerCase().includes(search) ||
-        (p.address || '').toLowerCase().includes(search)
+        (p.address || '').toLowerCase().includes(search) ||
+        (p.homeVisitCharges || '').toLowerCase().includes(search) ||
+        (p.offersHomeVisit && (
+          'home visit'.includes(search) ||
+          'visit'.includes(search) ||
+          'doorstep'.includes(search) ||
+          'farm visit'.includes(search) ||
+          'on-site'.includes(search)
+        ))
       );
       if (!matchesSearch) return false;
 
@@ -779,18 +925,33 @@ export function ExploreFeed({
                   </div>
                 </div>
 
-                {/* CTA Link out (WITH COGNITIVE HEIGHT HIGHLIGHT) */}
-                <div className="shrink-0 flex flex-col gap-2 min-w-[180px] md:min-w-[200px]" style={{ transform: "translateZ(35px)" }}>
-                  <a
-                    href={currentSlide.ctaUrl.startsWith('http') ? currentSlide.ctaUrl : `https://${currentSlide.ctaUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer decoration-none shadow-md"
+                {/* CTA Link out & Quick Contact Action */}
+                <div className="shrink-0 flex flex-col gap-2 min-w-[190px] md:min-w-[210px]" style={{ transform: "translateZ(35px)" }}>
+                  <button
+                    type="button"
+                    onClick={(e) => handleAdCtaClick(currentSlide, e)}
+                    className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer shadow-md"
                   >
-                    <span>{currentSlide.ctaText}</span>
+                    <span>
+                      {currentSlide.ctaType === 'whatsapp' || currentSlide.ctaUrl?.includes('wa.me') ? '💬 ' :
+                       currentSlide.ctaType === 'call' || currentSlide.ctaUrl?.startsWith('tel:') ? '📞 ' :
+                       currentSlide.ctaType === 'profile' || currentSlide.ctaUrl?.startsWith('profile:') ? '🩺 ' : '🔗 '}
+                      {currentSlide.ctaText || 'Connect'}
+                    </span>
                     <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
-                  </a>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openContactModalForSlide(currentSlide);
+                    }}
+                    className="bg-black/30 hover:bg-black/45 text-white/95 hover:text-white border border-white/20 px-3 py-1.5 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 w-full text-center cursor-pointer backdrop-blur-xs"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span>Quick Contact & Details</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -882,6 +1043,22 @@ export function ExploreFeed({
               );
             })}
           </div>
+          
+          {/* Quick Home Visit Tag Filter */}
+          <button
+            type="button"
+            onClick={() => setHomeVisitOnly(!homeVisitOnly)}
+            className={`py-2.5 px-4 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border border-b-[3px] shadow-xs select-none ${
+              homeVisitOnly 
+                ? 'bg-emerald-600 text-white border-emerald-700 border-b-emerald-900 shadow-md' 
+                : 'bg-[#faf9f6] text-[#373735] hover:text-emerald-800 border-[#e3dec9] border-b-[#cdc6ad] hover:bg-emerald-50/50'
+            }`}
+            title="Toggle to view only doctors and clinics who offer Home Visits and On-Site Farm Calls"
+          >
+            <span>🏠</span>
+            <span>Home Visits {homeVisitOnly ? '✓' : ''}</span>
+          </button>
+
           {(currentUser?.role === 'clinic' || currentUser?.role === 'doctor') && (
             <button
               type="button"
@@ -1018,36 +1195,181 @@ export function ExploreFeed({
                   <p className="text-[9px] text-[#a49f92] font-semibold">Keep it high-value, crisp, and direct to the client's needs.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Button CTA text label */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">CTA Button Slogan</label>
+                {/* CONTACT ACTION PRESET SELECTOR */}
+                <div className="space-y-3 bg-[#fcf9f2] p-4.5 rounded-2xl border border-[#e3dec9]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10.5px] font-black uppercase tracking-wider text-[#5a5a40] flex items-center gap-1.5">
+                      <span>🎯 Contact Action Preset</span>
+                      <span className="text-[9px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">Smart Routing</span>
+                    </label>
+                    <span className="text-[9.5px] text-[#7a766f] font-semibold">Choose how patients reach you</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    {[
+                      { id: 'whatsapp', name: 'WhatsApp Inquiries', icon: '💬', badge: 'Recommended', desc: 'Direct WhatsApp Chat' },
+                      { id: 'profile', name: 'Visit Profile', icon: '🩺', badge: 'In-App', desc: 'Open VetAxis Profile' },
+                      { id: 'call', name: 'Call Helpline', icon: '📞', badge: 'Instant Call', desc: 'Dial Clinic Phone' },
+                      { id: 'custom', name: 'Website / Booking', icon: '🌐', badge: 'External', desc: 'Custom Web Link' },
+                    ].map((preset) => (
+                      <button
+                        type="button"
+                        key={preset.id}
+                        onClick={() => handleSelectCtaPreset(preset.id as any)}
+                        className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                          adCtaPreset === preset.id
+                            ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-300 shadow-xs'
+                            : 'bg-white border-[#e3dec9] hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg">{preset.icon}</span>
+                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                              adCtaPreset === preset.id ? 'bg-amber-200 text-amber-950' : 'bg-stone-100 text-stone-600'
+                            }`}>
+                              {preset.badge}
+                            </span>
+                          </div>
+                          <h4 className="text-xs font-black text-stone-900 leading-snug pt-0.5">{preset.name}</h4>
+                          <p className="text-[9px] text-[#7a766f] font-semibold leading-tight">{preset.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Dynamic inputs based on preset */}
+                  <div className="pt-2 space-y-2.5">
+                    {adCtaPreset === 'whatsapp' && (
+                      <div className="space-y-2 bg-white p-3.5 rounded-xl border border-emerald-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                            <span>💬 Clinic WhatsApp Phone Number</span>
+                          </label>
+                          <span className="text-[9px] text-emerald-700 font-bold">Auto-configured wa.me link</span>
+                        </div>
+                        <input
+                          type="tel"
+                          value={adContactPhone}
+                          onChange={(e) => setAdContactPhone(e.target.value)}
+                          placeholder="e.g. 03001234567 or +923001234567"
+                          className="form-control text-xs bg-emerald-50/30 border-emerald-300"
+                          required
+                        />
+                        <p className="text-[9.5px] text-emerald-900/80 font-medium bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
+                          💡 Users clicking your billboard ad will instantly open WhatsApp with an auto-filled greeting: <em>"Hi {adSponsor || currentUser.name}, I saw your ad on VetAxis..."</em>
+                        </p>
+                      </div>
+                    )}
+
+                    {adCtaPreset === 'profile' && (
+                      <div className="bg-white p-3.5 rounded-xl border border-blue-200 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-blue-900 text-xs font-bold">
+                          <ShieldCheck className="w-4 h-4 text-blue-600" />
+                          <span>In-App Profile Integration (Auto-Linked)</span>
+                        </div>
+                        <p className="text-[10px] text-blue-800/90 leading-relaxed font-semibold">
+                          Your ad connects directly to your verified VetAxis profile (<strong>{currentUser.name}</strong>). When users click the button, they will instantly view your ratings, credentials, customer reviews, offered services, and direct booking modal.
+                        </p>
+                      </div>
+                    )}
+
+                    {adCtaPreset === 'call' && (
+                      <div className="space-y-2 bg-white p-3.5 rounded-xl border border-amber-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                            <span>📞 Clinic Helpline / Phone Number</span>
+                          </label>
+                          <span className="text-[9px] text-amber-700 font-bold">Direct Phone Call</span>
+                        </div>
+                        <input
+                          type="tel"
+                          value={adContactPhone}
+                          onChange={(e) => setAdContactPhone(e.target.value)}
+                          placeholder="e.g. 03001234567 or +923001234567"
+                          className="form-control text-xs bg-amber-50/30 border-amber-300"
+                          required
+                        />
+                        <p className="text-[9.5px] text-stone-500 font-semibold">
+                          Clicking the ad button triggers the user's phone dialer to directly call your clinic hotline.
+                        </p>
+                      </div>
+                    )}
+
+                    {adCtaPreset === 'custom' && (
+                      <div className="space-y-2 bg-white p-3.5 rounded-xl border border-purple-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black uppercase tracking-wider text-purple-900 flex items-center gap-1">
+                            <span>🌐 External Website or Google Maps Link</span>
+                          </label>
+                          <span className="text-[9px] text-purple-700 font-bold">Custom Web URL</span>
+                        </div>
+                        <input
+                          type="url"
+                          value={adCustomUrl}
+                          onChange={(e) => setAdCustomUrl(e.target.value)}
+                          placeholder="e.g. https://yourclinic.com or https://maps.google.com/..."
+                          className="form-control text-xs bg-purple-50/30 border-purple-300"
+                          required
+                        />
+                        <p className="text-[9.5px] text-stone-500 font-semibold">
+                          Directs visitors to your external appointment booking page or Google Maps address.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Button CTA text slogan selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">CTA Button Slogan Text</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <select
                       value={adCtaText}
                       onChange={(e) => setAdCtaText(e.target.value)}
-                      className="form-control text-xs bg-white"
+                      className="form-control text-xs bg-white font-bold"
                       required
                     >
-                      <option value="Visit Clinic">Visit Clinic</option>
-                      <option value="WhatsApp Support">WhatsApp Support</option>
-                      <option value="Book Free Session">Book Free Session</option>
-                      <option value="Call Helpline">Call Helpline</option>
-                      <option value="Claim Discount">Claim Discount</option>
-                      <option value="Get Direction">Get Direction</option>
+                      {adCtaPreset === 'whatsapp' && (
+                        <>
+                          <option value="Chat on WhatsApp">💬 Chat on WhatsApp</option>
+                          <option value="WhatsApp Inquiries">💬 WhatsApp Inquiries</option>
+                          <option value="Book on WhatsApp">💬 Book on WhatsApp</option>
+                          <option value="Claim Offer on WhatsApp">💬 Claim Offer on WhatsApp</option>
+                        </>
+                      )}
+                      {adCtaPreset === 'profile' && (
+                        <>
+                          <option value="Visit Clinic">🩺 Visit Clinic</option>
+                          <option value="View Vet Profile">🩺 View Vet Profile</option>
+                          <option value="See Reviews & Services">🩺 See Reviews & Services</option>
+                          <option value="Book Consultation">🩺 Book Consultation</option>
+                        </>
+                      )}
+                      {adCtaPreset === 'call' && (
+                        <>
+                          <option value="Call Helpline">📞 Call Helpline</option>
+                          <option value="Call Clinic Hotline">📞 Call Clinic Hotline</option>
+                          <option value="Emergency Call">📞 Emergency Call</option>
+                          <option value="Speak with Doctor">📞 Speak with Doctor</option>
+                        </>
+                      )}
+                      {adCtaPreset === 'custom' && (
+                        <>
+                          <option value="Visit Website">🌐 Visit Website</option>
+                          <option value="Book Online">🌐 Book Online</option>
+                          <option value="Get Directions">📍 Get Directions</option>
+                          <option value="Claim Discount">🎁 Claim Discount</option>
+                        </>
+                      )}
                     </select>
-                  </div>
-
-                  {/* CTA URL destination or hotline number */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">Destination URL or Hotline</label>
                     <input
                       type="text"
-                      value={adCtaUrl}
-                      onChange={(e) => setAdCtaUrl(e.target.value)}
-                      placeholder="e.g. tel:+923001234567 or vetaxis.pk/hopetal"
+                      value={adCtaText}
+                      onChange={(e) => setAdCtaText(e.target.value)}
+                      placeholder="Or type custom button text..."
                       className="form-control text-xs bg-white"
-                      maxLength={120}
-                      required
+                      maxLength={35}
                     />
                   </div>
                 </div>
@@ -1393,10 +1715,22 @@ export function ExploreFeed({
       </AnimatePresence>
 
       {/* ACTIVE FILTER BADGES */}
-      {(searchTerm || cityFilterActive || currentUser.location) && (
+      {(searchTerm || cityFilterActive || homeVisitOnly || currentUser.location) && (
         <div className="flex flex-wrap items-center gap-2 bg-[#fdfcf7] border border-[#e3dec9] p-3.5 rounded-2xl animate-fadeIn">
           <span className="text-[10px] text-[#7a766f] font-black uppercase tracking-wider mr-1">Active Filters:</span>
           
+          {homeVisitOnly && (
+            <span className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-[11px] font-bold px-3 py-1 rounded-xl border border-emerald-200 transition-colors">
+              <span>🏠 Filter: Home Visits Only</span>
+              <button 
+                onClick={() => setHomeVisitOnly(false)} 
+                className="hover:text-red-600 font-extrabold focus:outline-none cursor-pointer p-0 bg-transparent border-none text-[11px]"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
           {searchTerm && (
             <span className="inline-flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 text-[11px] font-bold px-3 py-1 rounded-xl border border-stone-300 transition-colors">
               <span>Search: "{searchTerm}"</span>
@@ -1788,6 +2122,46 @@ export function ExploreFeed({
                   </motion.div>
                 )}
 
+                {/* Home Visit Service Highlights */}
+                {selectedProfile.offersHomeVisit && (
+                  <div className="mb-6 p-4.5 bg-emerald-50/70 border border-emerald-200 border-b-[4px] border-b-emerald-400 rounded-3xl text-left space-y-2.5 shadow-xs animate-fadeIn">
+                    <div className="flex items-center justify-between gap-2 border-b border-emerald-200/80 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🏠</span>
+                        <h4 className="font-serif font-black text-sm text-emerald-950 uppercase tracking-tight">
+                          Home Visit & On-Site Farm Calls Available
+                        </h4>
+                      </div>
+                      <span className="bg-emerald-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-2xs">
+                        Active Tag
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-900 font-semibold leading-relaxed">
+                      This {selectedProfile.role === 'clinic' ? 'veterinary medical center' : 'licensed doctor'} provides doorstep appointments, on-farm visits, and mobile emergency care for pet owners and farmers.
+                    </p>
+                    {selectedProfile.homeVisitCharges && (
+                      <div className="text-xs font-bold text-emerald-950 bg-white/80 border border-emerald-200 p-2.5 rounded-xl">
+                        <span className="text-[9px] font-black uppercase text-emerald-700 block tracking-wider">Coverage / Service Note</span>
+                        <span>{selectedProfile.homeVisitCharges}</span>
+                      </div>
+                    )}
+                    {selectedProfile.phone && (
+                      <div className="pt-1">
+                        <a
+                          href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Hi Dr. ${selectedProfile.name}, I found your listing on VetAxis with 'Home Visit Available' and would like to request an on-site visit for my pet/livestock.`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black py-2.5 px-4 rounded-xl shadow-sm inline-flex items-center justify-center gap-2 transition-all cursor-pointer border-b-[3px] border-emerald-900"
+                        >
+                          <span>💬 Request Home Visit via WhatsApp</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Information details */}
                 <div className="space-y-4 mb-6 text-left">
                   <h4 className="font-serif font-black text-base text-[#373735] flex items-center gap-1.5">
@@ -2073,6 +2447,203 @@ export function ExploreFeed({
                 </div>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* INTERACTIVE AD QUICK CONTACT & SHOWCASE MODAL */}
+      <AnimatePresence>
+        {activeContactAdModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[9999] overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] max-w-lg w-full p-5 sm:p-7 shadow-2xl relative space-y-5 text-left my-auto"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-[#f4f1e9] pb-4">
+                <div className="space-y-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-200">
+                    <span>{activeContactAdModal.icon || '📢'}</span>
+                    <span>{activeContactAdModal.badge || 'Sponsored Offer'}</span>
+                  </span>
+                  <h3 className="font-serif font-black text-lg sm:text-xl text-[#373735]">
+                    {activeContactAdModal.title}
+                  </h3>
+                  <p className="text-xs font-bold text-amber-800 flex items-center gap-1">
+                    <span>🏢 {activeContactAdModal.sponsorName}</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 inline" />
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveContactAdModal(null)}
+                  className="p-1.5 px-3 rounded-full hover:bg-stone-100 transition-all cursor-pointer border border-stone-200 text-stone-500 font-bold text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Offer Details */}
+              <div className="bg-[#fcf9f2] p-4 rounded-2xl border border-[#e3dec9] space-y-2.5">
+                <p className="text-xs text-stone-700 leading-relaxed font-semibold">
+                  {activeContactAdModal.description}
+                </p>
+                {activeContactAdModal.couponCode && (
+                  <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-dashed border-amber-300">
+                    <span className="text-xs font-mono font-black text-amber-900">
+                      Coupon: {activeContactAdModal.couponCode}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeContactAdModal.couponCode || '');
+                        alert(`📋 Copied coupon code "${activeContactAdModal.couponCode}"!`);
+                      }}
+                      className="text-[10px] font-extrabold bg-amber-50 hover:bg-amber-100 text-amber-900 px-3 py-1 rounded-lg border border-amber-200 cursor-pointer"
+                    >
+                      Copy Code 📋
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Home Visit Tag Highlight if advertiser offers it */}
+              {adAdvertiserProfile?.offersHomeVisit && (
+                <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded-2xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-serif font-black text-emerald-900 flex items-center gap-1.5">
+                      <span>🏠</span> <span>Home Visit & On-Site Care Available</span>
+                    </span>
+                    <span className="text-[9px] font-black uppercase bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-800 font-semibold">
+                    {adAdvertiserProfile.homeVisitCharges || 'This doctor/clinic provides doorstep veterinary calls and livestock farm visits.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Contact Action Channels Grid */}
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40]">
+                  Direct Contact & Consultation Channels
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* 1. WhatsApp Chat */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const phone = (adAdvertiserProfile?.phone || activeContactAdModal.ownerPhone || '').replace(/\D/g, '');
+                      const formattedPhone = phone.startsWith('92') ? phone : phone.startsWith('0') ? '92' + phone.slice(1) : phone;
+                      const msg = `Hi ${activeContactAdModal.sponsorName}, I saw your ad on VetAxis ("${activeContactAdModal.title}") and would like to connect.`;
+                      const url = formattedPhone ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}` : activeContactAdModal.ctaUrl;
+                      window.open(url.startsWith('http') ? url : `https://${url}`, '_blank');
+                    }}
+                    className="p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center gap-3 transition-all cursor-pointer shadow-sm text-left"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg">
+                      💬
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-black block leading-tight">WhatsApp Inquiries</span>
+                      <span className="text-[9px] text-emerald-100 font-semibold block truncate">Direct instant chat</span>
+                    </div>
+                  </button>
+
+                  {/* 2. Direct Call */}
+                  {(adAdvertiserProfile?.phone || activeContactAdModal.ownerPhone) && (
+                    <a
+                      href={`tel:${adAdvertiserProfile?.phone || activeContactAdModal.ownerPhone}`}
+                      className="p-3 bg-[#5a5a40] hover:bg-[#3e3e2b] text-white rounded-2xl flex items-center gap-3 transition-all cursor-pointer shadow-sm text-left decoration-none"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg">
+                        📞
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-black block leading-tight">Call Helpline</span>
+                        <span className="text-[9px] text-stone-200 font-semibold block truncate">
+                          {adAdvertiserProfile?.phone || activeContactAdModal.ownerPhone}
+                        </span>
+                      </div>
+                    </a>
+                  )}
+
+                  {/* 3. In-App Profile & Reviews */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAdvertiserProfile(activeContactAdModal.ownerUid)}
+                    className="p-3 bg-white hover:bg-stone-50 border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left shadow-xs"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0 text-lg">
+                      🩺
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-black text-stone-900 block leading-tight">View Full Profile</span>
+                      <span className="text-[9px] text-[#7a766f] font-semibold block truncate">Ratings, reviews & services</span>
+                    </div>
+                  </button>
+
+                  {/* 4. Google Maps Directions (if address exists) */}
+                  {(adAdvertiserProfile?.address || adAdvertiserProfile?.location) && (
+                    <a
+                      href={
+                        adAdvertiserProfile?.location?.lat && adAdvertiserProfile?.location?.lng
+                          ? `https://www.google.com/maps?q=${adAdvertiserProfile.location.lat},${adAdvertiserProfile.location.lng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adAdvertiserProfile?.address || '')}`
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-3 bg-white hover:bg-stone-50 border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left shadow-xs decoration-none"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-900 flex items-center justify-center shrink-0 text-lg">
+                        📍
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-black text-stone-900 block leading-tight">Get Directions</span>
+                        <span className="text-[9px] text-[#7a766f] font-semibold block truncate">
+                          {adAdvertiserProfile?.address || 'View on Google Maps'}
+                        </span>
+                      </div>
+                    </a>
+                  )}
+
+                  {/* 5. Custom Link (if custom url exists) */}
+                  {activeContactAdModal.ctaUrl && !activeContactAdModal.ctaUrl.startsWith('profile:') && !activeContactAdModal.ctaUrl.startsWith('tel:') && !activeContactAdModal.ctaUrl.includes('wa.me') && (
+                    <a
+                      href={activeContactAdModal.ctaUrl.startsWith('http') ? activeContactAdModal.ctaUrl : `https://${activeContactAdModal.ctaUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-3 bg-white hover:bg-stone-50 border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left shadow-xs decoration-none col-span-1 sm:col-span-2"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-900 flex items-center justify-center shrink-0 text-lg">
+                        🌐
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-black text-stone-900 block leading-tight">Visit Custom Link / Booking</span>
+                        <span className="text-[9px] text-purple-800 font-mono font-bold block truncate">
+                          {activeContactAdModal.ctaUrl}
+                        </span>
+                      </div>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setActiveContactAdModal(null)}
+                  className="btn-tactile-3d-secondary py-2 px-5 text-xs font-bold"
+                >
+                  Close Details
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

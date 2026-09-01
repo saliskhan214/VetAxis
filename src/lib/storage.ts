@@ -307,6 +307,8 @@ function populateInitialSeeds() {
         expertise: 'Feline Specialist, General Surgery',
         createdAt: Date.now() - 5 * 24 * 3600000,
         isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Available on-call for doorstep emergency & routine vaccinations',
         avgRating: 4.8,
         totalReviews: 12,
         reviews: [
@@ -344,6 +346,8 @@ function populateInitialSeeds() {
         address: 'Khyber Road, Peshawar Cantonment',
         createdAt: Date.now() - 30 * 24 * 3600000,
         isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Mobile vet van & on-site farm calls across Peshawar district',
         location: {
           lat: 34.0151,
           lng: 71.5249,
@@ -636,6 +640,40 @@ export const AuthService = {
       }
     } catch {}
     return [];
+  },
+
+  fetchUserProfile: async (uid: string): Promise<UserProfile | null> => {
+    if (!uid) return null;
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, 'users', uid);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data() as UserProfile;
+          const u = { ...data, uid: data.uid || snap.id };
+          return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
+        }
+      } catch (err) {
+        console.warn(`[storage] Firestore fetchUserProfile error for ${uid}:`, err);
+      }
+    }
+    try {
+      const local = secureGetItem(LOCAL_USERS_KEY);
+      if (local) {
+        const list = JSON.parse(local) as UserProfile[];
+        const found = list.find(u => u.uid === uid);
+        if (found) return injectPresence(injectTemporaryPlatinum(found)) as UserProfile;
+      }
+      const session = getLocalSession();
+      if (session && session.uid === uid) {
+        return injectPresence(injectTemporaryPlatinum(session)) as UserProfile;
+      }
+    } catch {}
+    return null;
+  },
+
+  getUserProfile: async (uid: string): Promise<UserProfile | null> => {
+    return AuthService.fetchUserProfile(uid);
   },
 
   upgradeUserSubscription: async (userId: string, tier: 'Silver' | 'Gold' | 'Platinum' | 'General') => {

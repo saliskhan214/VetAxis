@@ -88,6 +88,8 @@ service cloud.firestore {
         (!('subscriptionTier' in incoming()) || incoming().subscriptionTier in ['Silver', 'Gold', 'Platinum'] || incoming().subscriptionTier == null) &&
         (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt is number || incoming().subscriptionExpiresAt == null) &&
         (!('emailVerified' in incoming()) || incoming().emailVerified is bool) &&
+        (!('offersHomeVisit' in incoming()) || incoming().offersHomeVisit is bool) &&
+        (!('homeVisitCharges' in incoming()) || (incoming().homeVisitCharges is string && incoming().homeVisitCharges.size() <= 200)) &&
         (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
         (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
         (!('location' in incoming()) || incoming().location == null || (
@@ -111,6 +113,8 @@ service cloud.firestore {
           (!('isAdmin' in incoming()) || incoming().isAdmin == existing().get('isAdmin', false)) && // Guard: cannot self-admin
           (!('promoAdsUsed' in incoming()) || incoming().promoAdsUsed is number) &&
           (!('emailVerified' in incoming()) || (incoming().emailVerified is bool && (incoming().emailVerified == existing().emailVerified || incoming().emailVerified == request.auth.token.email_verified))) &&
+          (!('offersHomeVisit' in incoming()) || incoming().offersHomeVisit is bool) &&
+          (!('homeVisitCharges' in incoming()) || (incoming().homeVisitCharges is string && incoming().homeVisitCharges.size() <= 200)) &&
           incoming().name is string && incoming().name.size() <= 80 &&
           (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
           (!('expertise' in incoming()) || (incoming().expertise is string && incoming().expertise.size() <= 200)) &&
@@ -505,7 +509,9 @@ service cloud.firestore {
         incoming().pricePaid is number && incoming().pricePaid in [0, 1000, 1500] &&
         incoming().durationDays is number && incoming().durationDays in [3, 7] &&
         incoming().expiresAt is number &&
-        incoming().createdAt is number
+        incoming().createdAt is number &&
+        (!('ctaType' in incoming()) || incoming().ctaType in ['whatsapp', 'profile', 'call', 'custom']) &&
+        (!('ownerPhone' in incoming()) || incoming().ownerPhone is string)
       );
 
       allow delete: if isSignedIn() && (
@@ -524,7 +530,9 @@ service cloud.firestore {
         incoming().title is string && incoming().title.size() <= 155 &&
         incoming().description is string && incoming().description.size() <= 1000 &&
         incoming().ctaText is string && incoming().ctaText.size() <= 100 &&
-        incoming().ctaUrl is string && incoming().ctaUrl.size() <= 550
+        incoming().ctaUrl is string && incoming().ctaUrl.size() <= 550 &&
+        (!('ctaType' in incoming()) || incoming().ctaType in ['whatsapp', 'profile', 'call', 'custom']) &&
+        (!('ownerPhone' in incoming()) || incoming().ownerPhone is string)
       );
     }
 

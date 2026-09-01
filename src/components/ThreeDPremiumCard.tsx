@@ -239,6 +239,12 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                       👑 {tier} Member
                     </span>
                   )}
+                  {profile.offersHomeVisit && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] text-[8px] font-black uppercase tracking-wider border select-none bg-emerald-100/90 text-emerald-900 border-emerald-300 shadow-2xs">
+                      <span>🏠</span>
+                      <span>Home Visit</span>
+                    </span>
+                  )}
                   {profile.isOnline ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[6px] text-[8px] font-black uppercase tracking-wider border select-none bg-[#edf6ef] text-emerald-700 border-emerald-200">
                       <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -304,13 +310,27 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
                   <div className={`truncate max-w-[280px] ${tier === 'Platinum' ? 'text-neutral-300' : 'text-[#373735]'}`}>{profile.address}</div>
                 </div>
               )}
+              {profile.offersHomeVisit && (
+                <div className={`pt-1 flex items-center gap-1.5 text-[10.5px] font-bold ${
+                  tier === 'Platinum' ? 'text-emerald-300' : tier === 'Gold' ? 'text-emerald-950 font-black' : 'text-emerald-800'
+                }`}>
+                  <span className="text-xs shrink-0">🚗</span>
+                  <span className="truncate">{profile.homeVisitCharges || 'Available for Doorstep & Farm Visits'}</span>
+                </div>
+              )}
 
             </div>
           </div>
 
           {/* Footer segment */}
           <div className={`mt-5 pt-4 border-t flex items-center justify-between ${tier === 'Platinum' ? 'border-[#3e4147]' : 'border-neutral-100'}`}>
-            <div />
+            {profile.offersHomeVisit ? (
+              <span className="inline-flex items-center gap-1 text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-600/10 text-emerald-800 border border-emerald-300/60">
+                <span>🏠</span> <span>Doorstep Care</span>
+              </span>
+            ) : (
+              <div />
+            )}
 
             <span className={`text-xs font-black flex items-center gap-1 transition-transform ${hovered ? 'translate-x-1' : ''} ${
               tier === 'Gold' ? 'text-amber-950' :

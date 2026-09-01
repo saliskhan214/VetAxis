@@ -43,6 +43,8 @@ export interface UserProfile {
   isOnline?: boolean;
   lastSeen?: number; // timestamp in milliseconds
   isAdmin?: boolean;
+  offersHomeVisit?: boolean; // Doctors & Clinics can offer home visit / farm call services
+  homeVisitCharges?: string; // Optional rate or coverage details (e.g. 'Available on-call / Doorstep vaccinations')
 }
 
 export interface ManualPayment {
@@ -303,6 +305,8 @@ export interface PromotionalAd {
   couponCode?: string;
   ctaText: string;
   ctaUrl: string;
+  ctaType?: 'whatsapp' | 'profile' | 'call' | 'custom';
+  ownerPhone?: string;
   bgGradient: string;
   badge: string;
   icon?: string;
