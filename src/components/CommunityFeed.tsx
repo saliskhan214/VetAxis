@@ -1,9 +1,10 @@
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
 import { CommunityService, NotificationService, LocationService, secureGetItem } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import VeterinaryNewsBrief from './VeterinaryNewsBrief';
 import { BlogSection } from './BlogSection';
+import { AdContainer } from './AdContainer';
 import { 
   Sparkles, MessageCircle, AlertCircle, Heart, ThumbsUp, AlertTriangle, 
   ShieldCheck, TrendingUp, Users, Megaphone, Navigation, CreditCard, 
@@ -151,7 +152,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
             el.classList.remove('ring-red-500', 'ring-4', 'scale-[1.02]');
           }, 3000);
         } else {
-          triggerToast("Locating post on active stream...", "success");
+          triggerToast("Locating community post...", "success");
         }
       }, 150);
     }
@@ -914,11 +915,11 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
             </form>
           </div>
 
-          {/* STREAM SECTION & CITY LOCALIZE FILTER PANEL */}
+          {/* DISCUSSION TOPICS & CITY LOCALIZE FILTER PANEL */}
           <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between text-left">
             <div className="flex flex-wrap gap-2 bg-white border border-[#e3dec9] p-2 rounded-2xl shadow-sm flex-1">
               {[
-                { id: 'all', label: '🌐 All Streams', activeClass: 'bg-[#5a5a40] border-[#5a5a40] border-b-[3px] border-b-[#3e3e2b] text-white font-extrabold' },
+                { id: 'all', label: '🌐 All Topics', activeClass: 'bg-[#5a5a40] border-[#5a5a40] border-b-[3px] border-b-[#3e3e2b] text-white font-extrabold' },
                 { id: 'emergency', label: '🚨 Emergency Alerts', activeClass: 'bg-red-600 border-red-700 border-b-[3px] border-b-red-800 text-white font-extrabold' },
                 { id: 'ask_vet', label: '💬 Ask-A-Vet Q&A Hub', activeClass: 'bg-amber-600 border-amber-700 border-b-[3px] border-b-amber-800 text-white font-extrabold' },
                 { id: 'lost', label: '🔴 Missing Pets', activeClass: 'bg-[#df4747] border-[#c23838] border-b-[3px] border-b-[#9e2a2a] text-white font-extrabold' },
@@ -963,7 +964,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
             </div>
           </div>
 
-          {/* MAIN CHRONOLOGICAL POST STREAM */}
+          {/* MAIN CHRONOLOGICAL POST FEED */}
           <div className="space-y-6">
             {loading ? (
               <div className="space-y-5 animate-pulse">
@@ -980,13 +981,13 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                 <span className="text-4xl text-[#cdc6ad]">🌿</span>
                 <h3 className="font-serif font-black text-[#5a5a40] text-lg mt-3">Feed Empty</h3>
                 <p className="text-xs text-[#a49f92] font-semibold mt-1">
-                  No professional postings currently parsed under this stream. Share yours!
+                  No community postings currently found under this topic. Share yours!
                 </p>
               </motion.div>
             ) : (
               <div className="space-y-5 text-left">
                 <AnimatePresence mode="popLayout">
-                  {filteredPosts.map((post) => {
+                  {filteredPosts.map((post, postIdx) => {
                     const isAuthor = 
                       (post.authorUid && post.authorUid === currentUser.uid) ||
                       (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
@@ -997,21 +998,21 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     const warned = post.reactions?.['❗']?.includes(currentUser.email);
 
                     return (
-                      <motion.div
-                        key={post.id}
-                        id={`post-${post.id}`}
-                        layout
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className={`bg-white rounded-3xl border ${
-                          highlightPostId === post.id
-                            ? 'border-amber-500 ring-4 ring-amber-500/20 shadow-xl scale-[1.01] z-10'
-                            : post.isBoosted 
-                              ? 'border-red-500 ring-2 ring-red-500/10 shadow-lg' 
-                              : 'border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm'
-                        } p-6 space-y-4 hover:shadow-md transition-all relative overflow-hidden`}
-                      >
+                      <React.Fragment key={post.id}>
+                        <motion.div
+                          id={`post-${post.id}`}
+                          layout
+                          initial={{ opacity: 0, y: 30 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className={`bg-white rounded-3xl border ${
+                            highlightPostId === post.id
+                              ? 'border-amber-500 ring-4 ring-amber-500/20 shadow-xl scale-[1.01] z-10'
+                              : post.isBoosted 
+                                ? 'border-red-500 ring-2 ring-red-500/10 shadow-lg' 
+                                : 'border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm'
+                          } p-6 space-y-4 hover:shadow-md transition-all relative overflow-hidden`}
+                        >
                         
                         {/* Premium Boost Radar Animation Grid */}
                         {post.isBoosted && (
@@ -1135,7 +1136,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                                   : 'bg-[#f4f1e9] border-[#e3dec9] text-[#5a5a40]'
                               }`}
                             >
-                              {post.category === 'ask_vet' ? '💬 Ask-A-Vet Q&A' : `${post.category} Stream Entry`}
+                              {post.category === 'ask_vet' ? '💬 Ask-A-Vet Q&A' : `${post.category} Topic`}
                             </span>
 
                             {post.isBoosted ? (
@@ -1360,7 +1361,17 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                           </div>
                         )}
 
-                      </motion.div>
+                        </motion.div>
+
+                        {/* Compliant In-Feed Google AdSense Unit every 3-4 posts */}
+                        {(postIdx + 1) % 4 === 0 && (
+                          <AdContainer 
+                            format="in-feed" 
+                            adLabel="Advertisement" 
+                            className="shadow-sm my-6"
+                          />
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </AnimatePresence>
@@ -1421,6 +1432,15 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                 ))
               )}
             </div>
+          </div>
+
+          {/* Google AdSense Community Sidebar Unit */}
+          <div className="w-full">
+            <AdContainer 
+              format="rectangle" 
+              adLabel="Advertisement" 
+              className="shadow-sm"
+            />
           </div>
 
         </div>

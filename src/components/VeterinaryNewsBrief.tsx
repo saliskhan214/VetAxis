@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Newspaper, RefreshCw, AlertTriangle, ExternalLink, Calendar, Clock, BookOpen } from 'lucide-react';
+import { AdContainer } from './AdContainer';
 
 interface NewsItem {
   id: string;
@@ -308,6 +309,15 @@ export default function VeterinaryNewsBrief() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Policy-Compliant Google AdSense Placement for News & Clinical Updates */}
+      <div className="pt-2">
+        <AdContainer 
+          format="horizontal" 
+          adLabel="SPONSORED LINKS" 
+          className="shadow-xs"
+        />
+      </div>
     </div>
   );
 }

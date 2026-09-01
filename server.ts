@@ -861,6 +861,12 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     }
   });
 
+  // Google AdSense ads.txt endpoint
+  app.get("/ads.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.status(200).send("google.com, pub-7801443420941774, DIRECT, f08c47fec0942fa0\n");
+  });
+
   // Google Site Verification static handler (Supports direct GSC crawler verification)
   app.get("/google707ec5232c268176.html", (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");

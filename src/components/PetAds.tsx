@@ -1,8 +1,9 @@
-import { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import { UserProfile, PetAd } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X } from 'lucide-react';
+import { AdContainer } from './AdContainer';
 
 interface PetAdsProps {
   currentUser: UserProfile;
@@ -1043,7 +1044,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
-          {filteredAds.map((ad) => {
+          {filteredAds.map((ad, adIdx) => {
             const isOwner = ad.ownerEmail === currentUser.email;
             const tier = ad.ownerSubscriptionTier || (ad.isPremium ? 'Silver' : undefined);
 
@@ -1079,13 +1080,13 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
 
             const isHighlighted = highlightAdId === ad.id;
             return (
-              <motion.div
-                key={ad.id}
-                id={`pet-ad-${ad.id}`}
-                layout
-                whileHover={{ y: -5 }}
-                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
-              >
+              <React.Fragment key={ad.id}>
+                <motion.div
+                  id={`pet-ad-${ad.id}`}
+                  layout
+                  whileHover={{ y: -5 }}
+                  className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
+                >
                 <div>
                   <div className={headerGradient}>
                     {ad.image ? (
@@ -1187,6 +1188,18 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
                 </div>
 
               </motion.div>
+
+              {/* Policy-Compliant Google AdSense Unit inside Pet Classifieds Grid */}
+              {(adIdx + 1) % 6 === 0 && (
+                <div className="col-span-1 h-full flex flex-col justify-center">
+                  <AdContainer 
+                    format="rectangle" 
+                    adLabel="Advertisement" 
+                    className="h-full min-h-[340px] flex flex-col justify-between m-0"
+                  />
+                </div>
+              )}
+            </React.Fragment>
             );
           })}
         </div>

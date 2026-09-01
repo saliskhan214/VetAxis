@@ -3,6 +3,7 @@ import { UserProfile, Product } from '../types';
 import { MarketplaceService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
+import { AdContainer } from './AdContainer';
 
 interface MarketplaceProps {
   currentUser: UserProfile;
@@ -479,7 +480,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredProducts.map((p) => {
+          {filteredProducts.map((p, pIdx) => {
             const isOwner = p.ownerEmail === currentUser.email;
             const tier = p.ownerSubscriptionTier || (p.isPremium ? 'Silver' : undefined);
 
@@ -515,13 +516,13 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
 
             const isHighlighted = highlightProductId === p.id;
             return (
-              <motion.div
-                key={p.id}
-                id={`product-${p.id}`}
-                layout
-                whileHover={{ y: -5 }}
-                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
-              >
+              <React.Fragment key={p.id}>
+                <motion.div
+                  id={`product-${p.id}`}
+                  layout
+                  whileHover={{ y: -5 }}
+                  className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
+                >
                 <div>
                   {/* Thumbnail Banner */}
                   <div className={headerGradient}>
@@ -605,6 +606,18 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
                 </div>
 
               </motion.div>
+
+              {/* Policy-Compliant Google AdSense Placement inside Product Grid */}
+              {(pIdx + 1) % 6 === 0 && (
+                <div className="col-span-1 h-full flex flex-col justify-center">
+                  <AdContainer 
+                    format="rectangle" 
+                    adLabel="Advertisement" 
+                    className="h-full min-h-[320px] flex flex-col justify-between m-0"
+                  />
+                </div>
+              )}
+            </React.Fragment>
             );
           })}
         </div>

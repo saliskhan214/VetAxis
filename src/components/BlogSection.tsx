@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { BlogArticle, UserProfile } from '../types';
 import { BlogService } from '../lib/blogService';
+import { AdContainer } from './AdContainer';
 
 interface BlogSectionProps {
   currentUser: UserProfile | null;
@@ -638,6 +639,15 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                 ))}
               </div>
             )}
+
+            {/* Policy-Compliant Google AdSense Placement for Guides & Veterinary Articles */}
+            <div className="pt-8">
+              <AdContainer 
+                format="horizontal" 
+                adLabel="Advertisement" 
+                className="shadow-xs"
+              />
+            </div>
           </motion.div>
         ) : (
           // ─── ARTICLE DETAILED VIEW ───────────────────────────────────────
@@ -737,6 +747,15 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                 {renderMarkdownText(activeArticle.content)}
               </div>
 
+              {/* Policy-Compliant In-Article Google AdSense Unit */}
+              <div className="my-8">
+                <AdContainer 
+                  format="in-article" 
+                  adLabel="Advertisement" 
+                  className="shadow-xs"
+                />
+              </div>
+
               {/* Tags footer */}
               {activeArticle.tags && activeArticle.tags.length > 0 && (
                 <div className="border-t border-[#f4f1e9] pt-6 mt-10">
@@ -795,6 +814,15 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                   </div>
                 </div>
               )}
+
+              {/* Sidebar AdSense Placement */}
+              <div className="w-full">
+                <AdContainer 
+                  format="rectangle" 
+                  adLabel="Advertisement" 
+                  className="shadow-xs"
+                />
+              </div>
             </div>
           </motion.div>
         )}
