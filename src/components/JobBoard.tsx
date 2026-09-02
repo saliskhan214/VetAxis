@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { UserProfile, JobPost, JobApplication, UserRole } from '../types';
 import { JobBoardService, NotificationService } from '../lib/storage';
+import { AdContainer } from './AdContainer';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Briefcase, Search, MapPin, DollarSign, Calendar, Clock, UserCheck, 
@@ -946,6 +947,18 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
               </motion.div>
             );
           })}
+        </div>
+      )}
+
+      {/* Policy-Compliant Google AdSense Placement Separated from Job Listings */}
+      {filteredJobs.length > 0 && (
+        <div className="pt-6">
+          <AdContainer 
+            format="horizontal" 
+            adLabel="Advertisement" 
+            adTitle="Veterinary Career & Staffing Sponsor Network"
+            className="shadow-xs"
+          />
         </div>
       )}
 

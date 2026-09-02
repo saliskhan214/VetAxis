@@ -1363,13 +1363,16 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
                         </motion.div>
 
-                        {/* Compliant In-Feed Google AdSense Unit every 3-4 posts */}
+                        {/* Compliant In-Feed Google AdSense Unit every 4 posts */}
                         {(postIdx + 1) % 4 === 0 && (
-                          <AdContainer 
-                            format="in-feed" 
-                            adLabel="Advertisement" 
-                            className="shadow-sm my-6"
-                          />
+                          <div className="w-full my-8">
+                            <AdContainer 
+                              format="in-feed" 
+                              adLabel="Advertisement" 
+                              adTitle="Community Sponsor"
+                              className="shadow-sm m-0"
+                            />
+                          </div>
                         )}
                       </React.Fragment>
                     );
@@ -1439,6 +1442,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
             <AdContainer 
               format="rectangle" 
               adLabel="Advertisement" 
+              adTitle="Veterinary Practice & Services Sponsor"
               className="shadow-sm"
             />
           </div>

@@ -26,6 +26,7 @@ import { AboutUsDirectory } from './components/AboutUsDirectory';
 import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
 import { BlogSection } from './components/BlogSection';
 import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage } from './components/LegalAndAbout';
+import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
 import { Footer } from './components/Footer';
 import PageNotFound from './components/PageNotFound';
 
@@ -66,6 +67,7 @@ export default function App() {
   const [initialCity, setInitialCity] = useState<string | null>(null);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
   const [initialPetType, setInitialPetType] = useState<string | null>(null);
+  const [initialClinicalTool, setInitialClinicalTool] = useState<string | undefined>(undefined);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
 
@@ -82,6 +84,7 @@ export default function App() {
     const cityParam = params.get('city');
     const filterParam = params.get('filter');
     const petTypeParam = params.get('type');
+    const toolParam = params.get('tool');
 
     if (clinicParam) {
       setHighlightClinicId(clinicParam);
@@ -98,6 +101,11 @@ export default function App() {
     } else if (adParam) {
       setHighlightAdId(adParam);
       setActiveSection('pet_ads');
+    }
+
+    if (toolParam) {
+      setInitialClinicalTool(toolParam);
+      setActiveSection('clinical_tools');
     }
 
     if (cityParam) {
@@ -118,7 +126,8 @@ export default function App() {
         'livestock', 'profile', 'subscription', 'admin', 'news', 
         'blogs', 'articles', 'about', 'about_us', 'terms', 
         'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
-        'support', 'clinic_management'
+        'support', 'clinic_management', 'clinical_tools', 'clinical_suite',
+        'calculators', 'tools'
       ];
       let targetSection = tabParam.toLowerCase();
       if (targetSection === 'pets') targetSection = 'pet_ads';
@@ -127,6 +136,7 @@ export default function App() {
       if (targetSection === 'terms_of_service') targetSection = 'terms';
       if (targetSection === 'privacy_policy') targetSection = 'privacy';
       if (targetSection === 'support') targetSection = 'contact';
+      if (targetSection === 'calculators' || targetSection === 'tools' || targetSection === 'clinical_suite') targetSection = 'clinical_tools';
 
       if (validSections.includes(targetSection) || validSections.includes(tabParam.toLowerCase())) {
         setActiveSection(targetSection);
@@ -152,6 +162,8 @@ export default function App() {
   // Dynamic SEO meta tags and Title management per active section
   useEffect(() => {
     const titles: Record<string, string> = {
+      clinical_tools: "Veterinary Drug Dosage & Fluid Rate Calculators | VetAxis 360",
+      clinical_suite: "Veterinary Clinical Calculation Suite & Multi-Species Solvers | VetAxis 360",
       explore: "Find Verified Veterinary Clinics, DVM Doctors & Emergency Animal Hospitals | VetAxis 360",
       jobs: "DVM Veterinary Careers, Hospital Jobs & Staff Recruitment | VetAxis 360",
       pet_ads: "Lost & Found Pets SOS Network, Pet Adoption & Classifieds | VetAxis 360",
@@ -167,8 +179,24 @@ export default function App() {
       contact: "Contact & Support | VetAxis 360"
     };
 
+    const descriptions: Record<string, string> = {
+      clinical_tools: "Calculate veterinary drug doses (mg/kg), AAHA IV fluid therapy drip rates, pet daily calorie portions, toxic emergency alerts, and cattle calving timelines.",
+      clinical_suite: "Evidence-based veterinary calculations, Plumb's pharmacology, AAHA hydration resuscitation, and dairy farm economics optimizer.",
+      explore: "Find certified veterinary clinics, 24/7 emergency pet doctors, and DVM specialists across Islamabad, Lahore, Karachi, Rawalpindi, and Peshawar.",
+      jobs: "Browse latest veterinary surgeon, dairy farm consultant, and pet hospital job vacancies across Pakistan.",
+      pet_ads: "Report lost dogs & cats, adopt rescue animals, and broadcast missing pet emergency alerts nationwide.",
+      livestock: "Manage dairy cattle and buffalo herds, milk yield records, vaccination schedules, and disease alerts.",
+      marketplace: "Buy and sell authentic veterinary pharmaceutical drugs, surgical instruments, diagnostic equipment, and animal feeds."
+    };
+
     if (titles[activeSection]) {
       document.title = titles[activeSection];
+    }
+    if (descriptions[activeSection]) {
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.setAttribute('content', descriptions[activeSection]);
+      }
     }
   }, [activeSection]);
 
@@ -859,6 +887,14 @@ export default function App() {
               <BlogSection currentUser={currentUser} />
             )}
 
+            {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
+              <VeterinaryClinicalSuite 
+                currentUser={currentUser}
+                onNavigate={handleNavigate}
+                initialTool={initialClinicalTool}
+              />
+            )}
+
             {activeSection === 'about' && (
               <AboutUsPage onNavigate={handleNavigate} />
             )}
@@ -875,7 +911,7 @@ export default function App() {
               <ContactSupportPage onNavigate={handleNavigate} />
             )}
 
-            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
+            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>

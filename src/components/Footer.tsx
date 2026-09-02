@@ -77,6 +77,14 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             <ul className="space-y-2">
               <li>
                 <button
+                  onClick={(e) => handleNavClick('clinical_tools', e)}
+                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-emerald-800 ${activeSection === 'clinical_tools' ? 'underline' : ''}`}
+                >
+                  🧮 Vet &amp; Pet Calculators
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={(e) => handleNavClick('explore', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'explore' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >

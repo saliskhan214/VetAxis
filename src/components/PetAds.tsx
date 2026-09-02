@@ -1080,13 +1080,13 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
 
             const isHighlighted = highlightAdId === ad.id;
             return (
-              <React.Fragment key={ad.id}>
-                <motion.div
-                  id={`pet-ad-${ad.id}`}
-                  layout
-                  whileHover={{ y: -5 }}
-                  className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
-                >
+              <motion.div
+                key={ad.id}
+                id={`pet-ad-${ad.id}`}
+                layout
+                whileHover={{ y: -5 }}
+                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
+              >
                 <div>
                   <div className={headerGradient}>
                     {ad.image ? (
@@ -1188,20 +1188,20 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
                 </div>
 
               </motion.div>
-
-              {/* Policy-Compliant Google AdSense Unit inside Pet Classifieds Grid */}
-              {(adIdx + 1) % 6 === 0 && (
-                <div className="col-span-1 h-full flex flex-col justify-center">
-                  <AdContainer 
-                    format="rectangle" 
-                    adLabel="Advertisement" 
-                    className="h-full min-h-[340px] flex flex-col justify-between m-0"
-                  />
-                </div>
-              )}
-            </React.Fragment>
             );
           })}
+        </div>
+      )}
+
+      {/* Policy-Compliant Google AdSense Placement Separated from Classified Grid */}
+      {filteredAds.length > 0 && (
+        <div className="pt-6">
+          <AdContainer 
+            format="horizontal" 
+            adLabel="Advertisement" 
+            adTitle="Pet & Veterinary Services Sponsor Network"
+            className="shadow-xs"
+          />
         </div>
       )}
 

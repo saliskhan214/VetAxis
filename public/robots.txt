@@ -40,6 +40,8 @@ Allow: /favicon-512.png
 Allow: /logo.png
 Allow: /manifest.json
 Allow: /?tab=explore
+Allow: /?tab=clinical_tools
+Allow: /?tab=clinical_suite
 Allow: /?tab=jobs
 Allow: /?tab=pets
 Allow: /?tab=marketplace

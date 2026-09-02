@@ -516,13 +516,13 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
 
             const isHighlighted = highlightProductId === p.id;
             return (
-              <React.Fragment key={p.id}>
-                <motion.div
-                  id={`product-${p.id}`}
-                  layout
-                  whileHover={{ y: -5 }}
-                  className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
-                >
+              <motion.div
+                key={p.id}
+                id={`product-${p.id}`}
+                layout
+                whileHover={{ y: -5 }}
+                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
+              >
                 <div>
                   {/* Thumbnail Banner */}
                   <div className={headerGradient}>
@@ -606,20 +606,20 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
                 </div>
 
               </motion.div>
-
-              {/* Policy-Compliant Google AdSense Placement inside Product Grid */}
-              {(pIdx + 1) % 6 === 0 && (
-                <div className="col-span-1 h-full flex flex-col justify-center">
-                  <AdContainer 
-                    format="rectangle" 
-                    adLabel="Advertisement" 
-                    className="h-full min-h-[320px] flex flex-col justify-between m-0"
-                  />
-                </div>
-              )}
-            </React.Fragment>
             );
           })}
+        </div>
+      )}
+
+      {/* Policy-Compliant Google AdSense Placement Separated from Product Grid */}
+      {filteredProducts.length > 0 && (
+        <div className="pt-6">
+          <AdContainer 
+            format="horizontal" 
+            adLabel="Advertisement" 
+            adTitle="Veterinary Supplies & Equipment Sponsors"
+            className="shadow-xs"
+          />
         </div>
       )}
 

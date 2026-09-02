@@ -311,10 +311,11 @@ export default function VeterinaryNewsBrief() {
       </AnimatePresence>
 
       {/* Policy-Compliant Google AdSense Placement for News & Clinical Updates */}
-      <div className="pt-2">
+      <div className="pt-4">
         <AdContainer 
           format="horizontal" 
-          adLabel="SPONSORED LINKS" 
+          adLabel="Sponsored Links" 
+          adTitle="Veterinary News & Science Network"
           className="shadow-xs"
         />
       </div>

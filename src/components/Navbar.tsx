@@ -61,6 +61,7 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
+    { id: 'clinical_tools', label: 'Vet & Pet Calculators', icon: '🧮' },
     { id: 'clinic_management', label: 'Clinic Management', icon: '🏥' },
     { id: 'livestock', label: 'Farm Management', icon: '🐄' },
     { id: 'community', label: 'Community', icon: '💬' },
@@ -75,7 +76,7 @@ export function Navbar({
   return (
     <>
       <nav className="sticky top-0 z-[200] max-w-7xl mx-auto w-[95%] mt-4 rounded-2xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] bg-white/90 backdrop-blur-md px-4 md:px-8 h-18 flex items-center justify-between shadow-[0_10px_30px_-10px_rgba(90,90,64,0.15)]">
-        <div className="flex items-center gap-6 md:gap-10">
+        <div className="flex items-center gap-4 md:gap-6">
           <motion.button
             whileHover={{ scale: 1.05, y: -1 }}
             whileTap={{ scale: 0.95 }}

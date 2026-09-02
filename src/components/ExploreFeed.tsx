@@ -884,12 +884,14 @@ export function ExploreFeed({
               // SPONSORED CAMPAIGN SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
               <div className="w-full relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6" style={{ transformStyle: "preserve-3d" }}>
                 <div className="space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
-                  <span 
-                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
-                    style={{ transform: "translateZ(30px)" }}
-                  >
-                    📌 {currentSlide.badge} • Sponsored Campaign
-                  </span>
+                  <div className="flex items-center gap-2" style={{ transform: "translateZ(30px)" }}>
+                    <span className="inline-flex px-3 py-1 bg-amber-400 text-stone-950 rounded-lg text-[10px] font-black tracking-widest uppercase shadow-sm">
+                      SPONSORED ADVERTISEMENT
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-200 uppercase tracking-wider">
+                      &bull; {currentSlide.sponsorName}
+                    </span>
+                  </div>
                   <h2 
                     className="text-xl md:text-3xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
                     style={{ transform: "translateZ(45px)" }}
@@ -905,7 +907,7 @@ export function ExploreFeed({
                   </p>
                   <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
                     <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
-                      {currentSlide.sponsorName}
+                      Promoted by: {currentSlide.sponsorName}
                     </span>
                     {currentSlide.couponCode && (
                       <button
@@ -931,12 +933,13 @@ export function ExploreFeed({
                     type="button"
                     onClick={(e) => handleAdCtaClick(currentSlide, e)}
                     className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer shadow-md"
+                    title={`Visit ${currentSlide.sponsorName} external sponsored link`}
                   >
                     <span>
-                      {currentSlide.ctaType === 'whatsapp' || currentSlide.ctaUrl?.includes('wa.me') ? '💬 ' :
-                       currentSlide.ctaType === 'call' || currentSlide.ctaUrl?.startsWith('tel:') ? '📞 ' :
-                       currentSlide.ctaType === 'profile' || currentSlide.ctaUrl?.startsWith('profile:') ? '🩺 ' : '🔗 '}
-                      {currentSlide.ctaText || 'Connect'}
+                      {currentSlide.ctaType === 'whatsapp' || currentSlide.ctaUrl?.includes('wa.me') ? '💬 WhatsApp Sponsor' :
+                       currentSlide.ctaType === 'call' || currentSlide.ctaUrl?.startsWith('tel:') ? '📞 Call Sponsor' :
+                       currentSlide.ctaType === 'profile' || currentSlide.ctaUrl?.startsWith('profile:') ? '🩺 View Doctor Profile' : 
+                       (currentSlide.ctaText ? `🔗 ${currentSlide.ctaText}` : '🔗 Visit Sponsor Link')}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
                   </button>
@@ -950,7 +953,7 @@ export function ExploreFeed({
                     className="bg-black/30 hover:bg-black/45 text-white/95 hover:text-white border border-white/20 px-3 py-1.5 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 w-full text-center cursor-pointer backdrop-blur-xs"
                   >
                     <Sparkles className="w-3 h-3 text-amber-400" />
-                    <span>Quick Contact & Details</span>
+                    <span>Sponsor Details & Contact</span>
                   </button>
                 </div>
               </div>

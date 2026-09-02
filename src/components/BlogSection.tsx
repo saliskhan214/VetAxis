@@ -645,6 +645,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               <AdContainer 
                 format="horizontal" 
                 adLabel="Advertisement" 
+                adTitle="Educational Veterinary Sponsor Network"
                 className="shadow-xs"
               />
             </div>
@@ -748,10 +749,11 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               </div>
 
               {/* Policy-Compliant In-Article Google AdSense Unit */}
-              <div className="my-8">
+              <div className="my-10">
                 <AdContainer 
                   format="in-article" 
                   adLabel="Advertisement" 
+                  adTitle="Featured Veterinary Partner"
                   className="shadow-xs"
                 />
               </div>
@@ -820,6 +822,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                 <AdContainer 
                   format="rectangle" 
                   adLabel="Advertisement" 
+                  adTitle="Clinical Research & Services Sponsor"
                   className="shadow-xs"
                 />
               </div>
