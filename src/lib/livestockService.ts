@@ -12,6 +12,7 @@ import {
 
 import { db, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
 import { LivestockFarm, LivestockAnimal, LivestockBatch, LivestockTask, IndividualAnimalRecord, HerdLevelMasterRecord } from '../types';
+import { broadcastDataUpdate } from './tabSync';
 
 const LOCAL_FARMS_KEY = 'va_farms';
 const LOCAL_ANIMALS_KEY = 'va_animals';
@@ -192,6 +193,7 @@ export const LivestockService = {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('vetaxis-sync-complete'));
       }
+      broadcastDataUpdate('livestock');
     } catch (e) {
       console.error("Error setting sync timestamp", e);
     }
@@ -311,6 +313,7 @@ export const LivestockService = {
       try {
         await setDoc(doc(db, 'livestock_farms', newFarm.id), cleanUndefined(newFarm));
         mergeCachedItems(LOCAL_FARMS_KEY, [newFarm]);
+        broadcastDataUpdate('livestock', { farmId: newFarm.id });
         return newFarm;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `livestock_farms/${newFarm.id}`);
@@ -319,8 +322,10 @@ export const LivestockService = {
       const list: LivestockFarm[] = JSON.parse(localStorage.getItem(LOCAL_FARMS_KEY) || '[]');
       list.push(newFarm);
       localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(list));
+      broadcastDataUpdate('livestock', { farmId: newFarm.id });
       return newFarm;
     }
+    broadcastDataUpdate('livestock', { farmId: newFarm.id });
     return newFarm;
   },
 
@@ -365,6 +370,7 @@ export const LivestockService = {
         localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(list));
       }
     }
+    broadcastDataUpdate('livestock', { farmId });
   },
 
   async deleteFarm(farmId: string): Promise<void> {
@@ -387,6 +393,7 @@ export const LivestockService = {
 
     const tasks = await this.fetchAllTasks();
     localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks.filter(t => t.farmId !== farmId)));
+    broadcastDataUpdate('livestock', { farmId });
   },
 
   // ─────────────────────────────────────────────────────────────────

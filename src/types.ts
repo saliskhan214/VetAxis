@@ -172,6 +172,8 @@ export interface JobPost {
   clinicWebsite?: string;
   clinicContactPhone?: string;
   clinicFacilities?: string;
+  agreedToSafetyTerms?: boolean;
+  agreedToSafetyTermsTimestamp?: number;
 }
 
 export interface JobApplication {
@@ -192,6 +194,8 @@ export interface JobApplication {
     references?: string;
   };
   status: 'Pending' | 'Reviewed' | 'Shortlisted' | 'Rejected' | 'Hired';
+  agreedToSafetyProtocol?: boolean;
+  agreedToSafetyProtocolTimestamp?: number;
   createdAt: number;
 }
 
@@ -200,12 +204,39 @@ export interface VetNotification {
   userId: string;
   senderId: string;
   senderName: string;
-  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action';
+  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action' | 'broadcast';
   targetId: string;
-  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment';
+  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment' | 'broadcast';
   message: string;
   read: boolean;
   createdAt: number;
+}
+
+export interface BroadcastNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'announcement' | 'alert' | 'update' | 'promo';
+  priority?: 'normal' | 'high' | 'urgent';
+  authorId: string;
+  authorName: string;
+  authorEmail: string;
+  createdAt: number;
+  actionUrl?: string;
+  actionLabel?: string;
+}
+
+export interface WebPushSubscriptionRecord {
+  id: string;
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  userId?: string;
+  userRole?: string;
+  createdAt: number;
+  updatedAt?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -1,13 +1,15 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { UserProfile, JobPost, JobApplication, UserRole } from '../types';
 import { JobBoardService, NotificationService } from '../lib/storage';
+import { useTabRevalidation } from '../lib/tabSync';
 import { AdContainer } from './AdContainer';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Briefcase, Search, MapPin, DollarSign, Calendar, Clock, UserCheck, 
   FileText, CheckCircle, AlertCircle, Plus, Users, Ban, Eye, Clipboard, 
-  X, ChevronRight, Check, Award
+  X, ChevronRight, Check, Award, ShieldCheck, ShieldAlert, AlertTriangle, ExternalLink
 } from 'lucide-react';
+import { LegalModal } from './LegalAndAbout';
 
 interface JobBoardProps {
   currentUser: UserProfile;
@@ -76,6 +78,12 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applyLoading, setApplyLoading] = useState<boolean>(false);
 
+  // Safety & Legal agreement state
+  const [safetyModalOpen, setSafetyModalOpen] = useState<boolean>(false);
+  const [legalModalType, setLegalModalType] = useState<'safety' | 'terms'>('safety');
+  const [employerAgreedSafety, setEmployerAgreedSafety] = useState<boolean>(false);
+  const [candidateAgreedSafety, setCandidateAgreedSafety] = useState<boolean>(false);
+
   // Clinic viewing applicants dashboard
   const [viewingJobApplicants, setViewingJobApplicants] = useState<JobPost | null>(null);
   const [currentJobApps, setCurrentJobApps] = useState<JobApplication[]>([]);
@@ -137,13 +145,6 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
     }
   }, [localHighlightJobId, jobs]);
 
-  useEffect(() => {
-    loadJobs();
-    if (currentUser.role === 'clinic' && !highlightJobId && !highlightApplicationId) {
-      setActiveTab('my_postings');
-    }
-  }, []);
-
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -160,6 +161,19 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadJobs();
+    if (currentUser.role === 'clinic' && !highlightJobId && !highlightApplicationId) {
+      setActiveTab('my_postings');
+    }
+  }, []);
+
+  // Automatically refresh jobs and applications when tab is reopened, refocused, or updated in another tab
+  useTabRevalidation({
+    entity: 'jobs',
+    onRevalidate: loadJobs,
+  });
 
   const loadAllApplications = async () => {
     setLoadingAllApps(true);
@@ -259,6 +273,11 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       return;
     }
 
+    if (!employerAgreedSafety) {
+      setFormError('You must review and agree to the Employer Safety Protocol & Safe Harbor terms.');
+      return;
+    }
+
     setSubmitLoading(true);
 
     try {
@@ -284,7 +303,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
         clinicContactPhone: clinicContactPhone.trim() || undefined,
         clinicFacilities: clinicFacilities.trim() || undefined,
         employerType: employerType || (currentUser.role === 'clinic' ? 'clinic' : currentUser.role === 'user' ? 'farm' : 'individual'),
-        posterRole: currentUser.role
+        posterRole: currentUser.role,
+        agreedToSafetyTerms: true,
+        agreedToSafetyTermsTimestamp: Date.now()
       };
 
       const created = await JobBoardService.createJob(payload, currentUser);
@@ -314,6 +335,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       setClinicFacilities(currentUser.facilities || '');
       setScreeningQuestions(['']);
       setRequiredDocs(['CV']);
+      setEmployerAgreedSafety(false);
 
     } catch (err: any) {
       setFormError(err.message || 'Failed to submit job posting.');
@@ -403,6 +425,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
     setDegreeText('');
     setLicenseNumber('');
     setReferences('');
+    setCandidateAgreedSafety(false);
     setApplyError(null);
   };
 
@@ -436,6 +459,11 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       return;
     }
 
+    if (!candidateAgreedSafety) {
+      setApplyError('You must review and agree to the Candidate Safety Protocol and Platform Disclaimer before submitting your application.');
+      return;
+    }
+
     setApplyLoading(true);
     setApplyError(null);
 
@@ -447,7 +475,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
           degreeLinkOrText: degreeText.trim() || undefined,
           licenseNumber: licenseNumber.trim() || undefined,
           references: references.trim() || undefined
-        }
+        },
+        agreedToSafetyProtocol: true,
+        agreedToSafetyProtocolTimestamp: Date.now()
       };
 
       const createdApp = await JobBoardService.applyForJob(payload, currentUser, selectedJobToApply);
@@ -631,6 +661,76 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
           <Plus className="w-5 h-5" />
           <span>{currentUser.role === 'user' ? '🌾 Post Farm Helper / Job Ad' : 'Publish Job Listing'}</span>
         </motion.button>
+      </div>
+
+      {/* EMPLOYMENT SAFETY & LEGAL SHIELD ADVISORY BANNER */}
+      <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-900 shrink-0">
+              <ShieldAlert className="w-5 h-5 text-amber-800" />
+            </div>
+            <div>
+              <h3 className="font-serif font-black text-sm text-[#2b2b24] flex items-center gap-2">
+                <span>Careers Safety Protocol &amp; Safe Harbor</span>
+                <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  Legal Disclaimer
+                </span>
+              </h3>
+              <p className="text-[11px] text-[#7a766f] font-semibold">
+                VetAxis 360 is solely an open directory &amp; technological notice board. Screening, vetting, and conduct are 100% the responsibility of employers and candidates.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalType('safety');
+                setSafetyModalOpen(true);
+              }}
+              className="cursor-pointer bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+              <span>Safety Protocol</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalType('terms');
+                setSafetyModalOpen(true);
+              }}
+              className="cursor-pointer bg-white hover:bg-stone-100 text-stone-700 border border-stone-300 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5"
+            >
+              <span>Platform Terms</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#f4f1e9] text-[11px]">
+          <div className="flex items-start gap-2 bg-[#fcfbf7] p-2.5 rounded-xl border border-[#ece8df]">
+            <span className="text-sm shrink-0">🚫</span>
+            <div>
+              <strong className="block text-stone-800 font-bold">Zero Advance Fees</strong>
+              <span className="text-stone-600">Never pay money to apply. Legitimate clinics never charge job applicants.</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 bg-[#fcfbf7] p-2.5 rounded-xl border border-[#ece8df]">
+            <span className="text-sm shrink-0">🔍</span>
+            <div>
+              <strong className="block text-stone-800 font-bold">Mandatory Due Diligence</strong>
+              <span className="text-stone-600">Employers must inspect physical PVMC degrees &amp; CNIC identity cards.</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 bg-[#fcfbf7] p-2.5 rounded-xl border border-[#ece8df]">
+            <span className="text-sm shrink-0">⚖️</span>
+            <div>
+              <strong className="block text-stone-800 font-bold">Absolute Safe Harbor</strong>
+              <span className="text-stone-600">Employers &amp; employees assume all risk; VetAxis 360 is held harmless.</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* TABS SELECTOR */}
@@ -1374,6 +1474,45 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                   </div>
                 </div>
 
+                {/* Mandatory Employer Due Diligence & Safe Harbor Agreement */}
+                <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 text-stone-800 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <ShieldAlert className="w-5 h-5 text-amber-800 shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs">
+                      <div className="font-black text-amber-950 flex flex-wrap items-center justify-between gap-2">
+                        <span>Mandatory Employer Safety &amp; Due Diligence Agreement</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLegalModalType('safety');
+                            setSafetyModalOpen(true);
+                          }}
+                          className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <span>Review Safety Protocol</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <p className="text-stone-600 leading-relaxed text-[11px]">
+                        VetAxis 360 acts solely as a technological notice directory and does not conduct police background checks or character investigations. As an employer or farm owner, you agree that you are solely and exclusively responsible for inspecting original PVMC registration certificates, recording national identity (CNIC) documents, verifying clinical references, and managing clinic security. VetAxis 360 bears zero liability for candidate conduct, malpractice, or disputes.
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 pt-2.5 border-t border-amber-200/80 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={employerAgreedSafety}
+                      onChange={(e) => setEmployerAgreedSafety(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-amber-400 text-[#a0522d] focus:ring-[#a0522d] cursor-pointer shrink-0"
+                    />
+                    <span className="text-[11px] font-bold text-stone-900 leading-snug">
+                      I have read, understood, and strictly agree to the Employer Safety Protocol &amp; Safe Harbor Terms. I assume all legal and operational responsibility for screening candidates, and agree to hold VetAxis 360 harmless.
+                    </span>
+                  </label>
+                </div>
+
                 {/* Submit button drawer */}
                 <div className="border-t border-[#f4f1e9] pt-4 flex gap-3 justify-end leading-none">
                   <button
@@ -1556,6 +1695,45 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                   )}
                 </div>
 
+                {/* Mandatory Candidate Safety Protocol & Platform Shield Agreement */}
+                <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 text-stone-800 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <ShieldAlert className="w-5 h-5 text-amber-800 shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs">
+                      <div className="font-black text-amber-950 flex flex-wrap items-center justify-between gap-2">
+                        <span>Candidate Safety Protocol &amp; Platform Legal Shield</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLegalModalType('safety');
+                            setSafetyModalOpen(true);
+                          }}
+                          className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <span>Review Safety Protocol</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <p className="text-stone-600 leading-relaxed text-[11px]">
+                        <strong>Security Warning:</strong> Never send money, application processing fees, or document security deposits to any prospective employer or clinic. Legitimate veterinary hospitals never charge job seekers. Only attend interviews at verified clinical locations during daytime business hours. VetAxis 360 is an open directory and bears zero legal or ethical liability for employer behavior, contract disputes, or workplace safety.
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 pt-2.5 border-t border-amber-200/80 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={candidateAgreedSafety}
+                      onChange={(e) => setCandidateAgreedSafety(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-amber-400 text-[#a0522d] focus:ring-[#a0522d] cursor-pointer shrink-0"
+                    />
+                    <span className="text-[11px] font-bold text-stone-900 leading-snug">
+                      I have read, understood, and agree to the Candidate Safety Protocol and Platform Terms. I acknowledge that I am applying at my own discretion and agree to hold VetAxis 360 completely harmless from any disputes, claims, or damages.
+                    </span>
+                  </label>
+                </div>
+
                 <div className="pt-4 border-t border-[#f4f1e9] flex gap-3 justify-end items-center">
                   <button
                     type="button"
@@ -1624,6 +1802,19 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                 </p>
               </div>
 
+              {/* Mandatory Due Diligence & Character Verification Notice for Employers */}
+              <div className="mb-5 p-4 rounded-2xl bg-amber-50/90 border border-amber-300 flex items-start gap-3 text-xs text-amber-950">
+                <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <span>Employer Due Diligence Mandate (Platform Safe Harbor)</span>
+                  </div>
+                  <p className="text-[11px] text-stone-600 leading-snug">
+                    VetAxis 360 does not perform character checks, psychiatric evaluations, or criminal background checks. Before hiring, interviewing privately, or giving clinical premises access, <strong>you must physically inspect original PVMC licenses and government CNICs, and call minimum 2 clinical references</strong>. All responsibility rests upon you; VetAxis 360 holds absolute zero liability.
+                  </p>
+                </div>
+              </div>
+
               {loadingApps ? (
                 <div className="py-12 text-center text-[#7a766f] font-bold flex flex-col items-center justify-center gap-2">
                   <div className="w-8 h-8 border-3 border-[#e3dec9] border-t-[#a0522d] rounded-full animate-spin" />
@@ -1647,10 +1838,19 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
                       {/* Name, role header, status select */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#f4f1e9] pb-3">
                         <div>
-                          <h4 className="text-sm font-black text-[#3c3c3b]">
-                            {app.applicantName} <span className="bg-amber-50 text-amber-700 text-[9px] uppercase px-2 py-0.5 rounded border border-amber-200 ml-1.5 inline-block">{app.applicantRole}</span>
-                          </h4>
-                          <p className="text-xs text-[#7a766f] font-medium">✉ Contact: {app.applicantEmail} · Phone: {app.applicantPhone}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm font-black text-[#3c3c3b]">
+                              {app.applicantName}
+                            </h4>
+                            <span className="bg-amber-50 text-amber-700 text-[9px] uppercase px-2 py-0.5 rounded border border-amber-200 inline-block font-bold">{app.applicantRole}</span>
+                            {app.agreedToSafetyProtocol && (
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-300 text-[9px] font-black px-2 py-0.5 rounded-full">
+                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                <span>Agreed Safety Protocol</span>
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#7a766f] font-medium mt-0.5">✉ Contact: {app.applicantEmail} · Phone: {app.applicantPhone}</p>
                         </div>
 
                         {/* Status Select action tag */}
@@ -1814,6 +2014,15 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
           </div>
         )}
       </AnimatePresence>
+
+      {/* Safety Protocol & Terms Legal Modal */}
+      {safetyModalOpen && (
+        <LegalModal
+          isOpen={safetyModalOpen}
+          type={legalModalType}
+          onClose={() => setSafetyModalOpen(false)}
+        />
+      )}
       
     </div>
   );

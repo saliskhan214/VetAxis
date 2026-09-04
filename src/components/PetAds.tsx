@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import { UserProfile, PetAd } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
+import { useTabRevalidation } from '../lib/tabSync';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -144,6 +145,14 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
       setWhatsapp(currentUser.phone);
     }
   }, []);
+
+  // Automatically refresh pet ads and boosted posts when tab is reopened, refocused, or updated in another tab
+  useTabRevalidation({
+    entity: 'pet_ads',
+    onRevalidate: async () => {
+      await Promise.allSettled([loadAds(), loadBoostedEmergencyPosts()]);
+    },
+  });
 
   useEffect(() => {
     if (highlightAdId && ads.length > 0) {

@@ -27,14 +27,16 @@ import {
   Clock,
   MapPin,
   DollarSign,
-  FileText
+  FileText,
+  Radio
 } from 'lucide-react';
+import { AdminBroadcastManager } from './AdminBroadcastManager';
 
 interface AdminPanelProps {
   currentUser: UserProfile;
 }
 
-type AdminTab = 'users' | 'farms' | 'payments' | 'ads' | 'jobs';
+type AdminTab = 'users' | 'farms' | 'payments' | 'ads' | 'jobs' | 'broadcasts';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -794,6 +796,17 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
               {stats.pendingAdsCount}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab('broadcasts')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all cursor-pointer relative ${
+            activeTab === 'broadcasts'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+          }`}
+        >
+          <Radio className="w-4 h-4 text-amber-500" />
+          Broadcast Notifications
         </button>
       </div>
 
@@ -1658,6 +1671,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             )}
           </div>
         </section>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* TAB 6: BROADCAST NOTIFICATIONS */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {activeTab === 'broadcasts' && (
+        <AdminBroadcastManager currentUser={currentUser} />
       )}
 
       {/* ───────────────────────────────────────────────────────────────── */}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
 import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
+import { useTabRevalidation } from '../lib/tabSync';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
@@ -601,6 +602,14 @@ export function ExploreFeed({
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  // Automatically refresh directory specialists and billboard campaigns when tab is reopened or refocused
+  useTabRevalidation({
+    entity: ['explore', 'campaigns'],
+    onRevalidate: async () => {
+      await Promise.allSettled([loadData(), fetchCampaigns()]);
+    },
+  });
 
   // Deep linking initial state handlers
   useEffect(() => {

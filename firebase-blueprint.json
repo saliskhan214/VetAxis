@@ -298,6 +298,44 @@
       },
       "required": ["farmId", "animalId", "createdAt"]
     },
+    "PushSubscription": {
+      "title": "PushSubscription",
+      "description": "Web Push API browser and mobile subscription endpoints for real-time push notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "keys": {
+          "type": "object",
+          "properties": {
+            "p256dh": { "type": "string" },
+            "auth": { "type": "string" }
+          }
+        },
+        "userId": { "type": "string" },
+        "userRole": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["endpoint", "keys", "createdAt"]
+    },
+    "BroadcastNotification": {
+      "title": "BroadcastNotification",
+      "description": "Global administrator broadcast announcement pushed to all users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["announcement", "alert", "update", "promo"] },
+        "priority": { "type": "string", "enum": ["normal", "high", "urgent"] },
+        "actionUrl": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "message", "type", "priority", "createdAt"]
+    },
     "HerdLevelMasterRecord": {
       "title": "HerdLevelMasterRecord",
       "description": "Comprehensive herd-level registry stats, demographics and inventory",

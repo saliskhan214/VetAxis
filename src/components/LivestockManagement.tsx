@@ -28,6 +28,7 @@ import {
 import { LivestockService, addDays, addMonths } from '../lib/livestockService';
 import { NotificationService } from '../lib/storage';
 import { ExploreService, PromotionalAdsService } from '../lib/storage';
+import { useTabRevalidation } from '../lib/tabSync';
 import {
   UserProfile,
   LivestockFarm,
@@ -424,6 +425,14 @@ export default function LivestockManagement({
     loadGlobalData();
     fetchCampaigns();
   }, [currentUser]);
+
+  // Automatically refresh livestock herds and records when tab is reopened, refocused, or updated
+  useTabRevalidation({
+    entity: 'livestock',
+    onRevalidate: async () => {
+      await Promise.allSettled([loadGlobalData(), fetchCampaigns()]);
+    },
+  });
 
   // Redirect to a highlighted farm on demand
   useEffect(() => {

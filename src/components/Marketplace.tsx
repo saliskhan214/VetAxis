@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { UserProfile, Product } from '../types';
 import { MarketplaceService } from '../lib/storage';
+import { useTabRevalidation } from '../lib/tabSync';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -53,6 +54,12 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
       setProdWhatsapp(currentUser.phone);
     }
   }, []);
+
+  // Automatically refresh marketplace products when tab is reopened, refocused, or updated in another tab
+  useTabRevalidation({
+    entity: 'marketplace',
+    onRevalidate: loadProducts,
+  });
 
   useEffect(() => {
     if (highlightProductId && products.length > 0) {

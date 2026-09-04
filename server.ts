@@ -4,6 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import webpush from "web-push";
 
 dotenv.config();
 
@@ -915,6 +916,172 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
   });
 
   // ─────────────────────────────────────────────────────────────────
+  // WEB PUSH API & VAPID SETUP
+  // ─────────────────────────────────────────────────────────────────
+  const VAPID_STORE_PATH = path.join(process.cwd(), '.vapid.json');
+  const PUSH_SUBSCRIPTIONS_STORE_PATH = path.join(process.cwd(), 'push_subscriptions_store.json');
+
+  let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
+  let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
+  const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@vetaxis360.com';
+
+  try {
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      if (fs.existsSync(VAPID_STORE_PATH)) {
+        const raw = JSON.parse(fs.readFileSync(VAPID_STORE_PATH, 'utf-8'));
+        vapidPublicKey = raw.publicKey;
+        vapidPrivateKey = raw.privateKey;
+      } else {
+        const newKeys = webpush.generateVAPIDKeys();
+        vapidPublicKey = newKeys.publicKey;
+        vapidPrivateKey = newKeys.privateKey;
+        fs.writeFileSync(VAPID_STORE_PATH, JSON.stringify(newKeys, null, 2), 'utf-8');
+        console.log('[Web Push] Generated fresh VAPID keys and saved to .vapid.json');
+      }
+    }
+
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    console.log('[Web Push] VAPID configuration initialized successfully.');
+  } catch (err) {
+    console.error('[Web Push] Failed to initialize VAPID credentials:', err);
+  }
+
+  // Local persistence for push subscriptions
+  const pushSubscriptionsMap = new Map<string, any>();
+
+  function loadSavedPushSubscriptions() {
+    try {
+      if (fs.existsSync(PUSH_SUBSCRIPTIONS_STORE_PATH)) {
+        const data = JSON.parse(fs.readFileSync(PUSH_SUBSCRIPTIONS_STORE_PATH, 'utf-8'));
+        if (Array.isArray(data)) {
+          data.forEach(item => {
+            if (item?.subscription?.endpoint) {
+              pushSubscriptionsMap.set(item.subscription.endpoint, item);
+            }
+          });
+          console.log(`[Web Push] Restored ${pushSubscriptionsMap.size} subscriptions from disk.`);
+        }
+      }
+    } catch (e) {
+      console.warn('[Web Push] Could not restore push subscriptions from disk:', e);
+    }
+  }
+
+  function persistPushSubscriptions() {
+    try {
+      const arr = Array.from(pushSubscriptionsMap.values());
+      fs.writeFileSync(PUSH_SUBSCRIPTIONS_STORE_PATH, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Web Push] Could not persist push subscriptions to disk:', e);
+    }
+  }
+
+  loadSavedPushSubscriptions();
+
+  // 1. Get public VAPID key
+  app.get("/api/push/public-key", (req, res) => {
+    res.json({
+      publicKey: vapidPublicKey,
+      isConfigured: Boolean(vapidPublicKey && vapidPrivateKey)
+    });
+  });
+
+  // 2. Subscribe endpoint
+  app.post("/api/push/subscribe", (req, res) => {
+    const { subscription, userId, userRole } = req.body;
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: "Invalid PushSubscription payload" });
+    }
+
+    const entry = {
+      subscription,
+      userId: userId || 'guest',
+      userRole: userRole || 'user',
+      updatedAt: Date.now()
+    };
+
+    pushSubscriptionsMap.set(subscription.endpoint, entry);
+    persistPushSubscriptions();
+
+    return res.json({
+      success: true,
+      totalActive: pushSubscriptionsMap.size
+    });
+  });
+
+  // 3. Unsubscribe endpoint
+  app.post("/api/push/unsubscribe", (req, res) => {
+    const { endpoint } = req.body;
+    if (endpoint && pushSubscriptionsMap.has(endpoint)) {
+      pushSubscriptionsMap.delete(endpoint);
+      persistPushSubscriptions();
+    }
+    return res.json({ success: true });
+  });
+
+  // 4. Broadcast push notification to all subscribed browsers and mobiles
+  app.post("/api/push/broadcast", async (req, res) => {
+    const { title, message, type, priority, actionUrl, subscriptions: clientSubs } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ error: "Missing title or message" });
+    }
+
+    // Combine stored subscriptions with any client-supplied Firestore subscriptions (deduped by endpoint)
+    const combinedMap = new Map<string, any>();
+    pushSubscriptionsMap.forEach((val, key) => combinedMap.set(key, val.subscription || val));
+
+    if (Array.isArray(clientSubs)) {
+      clientSubs.forEach(item => {
+        const sub = item?.subscription || item;
+        if (sub?.endpoint && sub?.keys) {
+          combinedMap.set(sub.endpoint, sub);
+        }
+      });
+    }
+
+    const payloadString = JSON.stringify({
+      title: title.startsWith('📢') || title.startsWith('🚨') ? title : `📢 ${title}`,
+      body: message,
+      url: actionUrl || '/',
+      type: type || 'announcement',
+      priority: priority || 'high',
+      tag: 'broadcast_' + Date.now()
+    });
+
+    let successCount = 0;
+    let failureCount = 0;
+    const deadEndpoints: string[] = [];
+
+    const targets = Array.from(combinedMap.values());
+    await Promise.allSettled(
+      targets.map(async (sub) => {
+        try {
+          await webpush.sendNotification(sub, payloadString);
+          successCount++;
+        } catch (err: any) {
+          failureCount++;
+          if (err?.statusCode === 404 || err?.statusCode === 410) {
+            deadEndpoints.push(sub.endpoint);
+            pushSubscriptionsMap.delete(sub.endpoint);
+          }
+        }
+      })
+    );
+
+    if (deadEndpoints.length > 0) {
+      persistPushSubscriptions();
+    }
+
+    return res.json({
+      success: true,
+      sent: successCount,
+      failed: failureCount,
+      total: targets.length
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
   // API NOT-FOUND (404) FALLBACK
   // ─────────────────────────────────────────────────────────────────
   app.all("/api/*", (req, res) => {
@@ -938,6 +1105,9 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

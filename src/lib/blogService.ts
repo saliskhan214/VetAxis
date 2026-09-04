@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
 import { BlogArticle } from '../types';
+import { broadcastDataUpdate } from './tabSync';
 
 const LOCAL_BLOGS_KEY = 'va_blogs';
 
@@ -128,6 +129,7 @@ export const BlogService = {
 
         // Fetch all again and sync local cache
         await this.fetchArticles();
+        broadcastDataUpdate('news', { articleId: newArticle.id });
         return newArticle;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, 'blogs');
@@ -138,6 +140,7 @@ export const BlogService = {
     const articles = await this.fetchArticles();
     articles.unshift(newArticle);
     localStorage.setItem(LOCAL_BLOGS_KEY, JSON.stringify(articles));
+    broadcastDataUpdate('news', { articleId: newArticle.id });
     return newArticle;
   },
 
@@ -187,6 +190,7 @@ export const BlogService = {
         
         // sync
         await this.fetchArticles();
+        broadcastDataUpdate('news', { id, slug });
         return true;
       } catch (err) {
         console.warn(`[BlogService] Failed to delete in Firestore:`, err);
@@ -198,6 +202,7 @@ export const BlogService = {
       const articles = await this.fetchArticles();
       const filtered = articles.filter(a => a.id !== id && a.slug !== slug);
       localStorage.setItem(LOCAL_BLOGS_KEY, JSON.stringify(filtered));
+      broadcastDataUpdate('news', { id, slug });
       return true;
     } catch (e) {
       console.warn('[BlogService] Error deleting local article:', e);

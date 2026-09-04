@@ -1,6 +1,7 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
 import { CommunityService, NotificationService, LocationService, secureGetItem } from '../lib/storage';
+import { useTabRevalidation } from '../lib/tabSync';
 import { motion, AnimatePresence } from 'motion/react';
 import VeterinaryNewsBrief from './VeterinaryNewsBrief';
 import { BlogSection } from './BlogSection';
@@ -161,6 +162,12 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   useEffect(() => {
     loadPosts();
   }, []);
+
+  // Automatically refresh community discussions when tab is reopened, refocused, or updated in another tab
+  useTabRevalidation({
+    entity: 'community',
+    onRevalidate: loadPosts,
+  });
 
   // Highlighted notification post automatic scroll and filter alignment
   useEffect(() => {

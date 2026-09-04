@@ -187,8 +187,14 @@ export function Navbar({
                                 {n.type === 'comment' && '💬'}
                                 {n.type === 'apply' && '📄'}
                                 {n.type === 'status_change' && '✨'}
+                                {n.type === 'broadcast' && '📢'}
                               </span>
                               <div className="flex flex-col gap-0.5">
+                                {n.type === 'broadcast' && (
+                                  <span className="text-[8px] font-black uppercase tracking-wider text-amber-700 bg-amber-100/80 px-1.5 py-0.2 rounded w-fit">
+                                    Official Announcement
+                                  </span>
+                                )}
                                 <p className="text-[11px] text-[#3c3c3b] font-medium leading-tight">
                                   {n.message}
                                 </p>

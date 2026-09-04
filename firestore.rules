@@ -324,7 +324,9 @@ service cloud.firestore {
         incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
         incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
         incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&
-        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400
+        incoming().get('clinicFacilities', '') is string && incoming().get('clinicFacilities', '').size() <= 400 &&
+        (!('agreedToSafetyTerms' in incoming()) || incoming().agreedToSafetyTerms is bool) &&
+        (!('agreedToSafetyTermsTimestamp' in incoming()) || incoming().agreedToSafetyTermsTimestamp is number)
       );
 
       allow update: if isSignedIn() && (
@@ -364,7 +366,9 @@ service cloud.firestore {
         incoming().applicantName is string && incoming().applicantName.size() <= 150 &&
         incoming().applicantPhone is string && incoming().applicantPhone.size() <= 24 &&
         incoming().status == 'Pending' &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        (!('agreedToSafetyProtocol' in incoming()) || incoming().agreedToSafetyProtocol is bool) &&
+        (!('agreedToSafetyProtocolTimestamp' in incoming()) || incoming().agreedToSafetyProtocolTimestamp is number)
       );
 
       allow update: if isSignedIn() && (
@@ -405,6 +409,25 @@ service cloud.firestore {
         incoming().senderId == existing().senderId &&
         incoming().message == existing().message
       );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // BROADCAST NOTIFICATIONS COLLECTION Rules (Admin to all users)
+    // ─────────────────────────────────────────────────────────────────
+    match /broadcast_notifications/{broadcastId} {
+      // Anyone can read broadcasts so that all users (even if inactive/not logged in for days) receive announcements
+      allow read: if true;
+
+      // Only verified administrators can publish or manage broadcasts
+      allow create: if isAdmin() && (
+        incoming().title is string && incoming().title.size() <= 150 &&
+        incoming().message is string && incoming().message.size() <= 3000 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().type in ['announcement', 'alert', 'update', 'promo']
+      );
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ─────────────────────────────────────────────────────────────────

@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserProfile, VetNotification } from './types';
-import { getLocalSession, AuthService, NotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
+import { getLocalSession, AuthService, NotificationService, BroadcastNotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
+import { useSWR } from './lib/useSWR';
+
+export { useSWR };
+export type { SWROptions, SWRResponse } from './lib/useSWR';
 
 // Import modular layouts
 import { Navbar } from './components/Navbar';
@@ -25,7 +29,7 @@ import { ClinicManagement } from './components/ClinicManagement';
 import { AboutUsDirectory } from './components/AboutUsDirectory';
 import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
 import { BlogSection } from './components/BlogSection';
-import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage } from './components/LegalAndAbout';
+import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage, CareersSafetyProtocolPage } from './components/LegalAndAbout';
 import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
 import { Footer } from './components/Footer';
 import PageNotFound from './components/PageNotFound';
@@ -212,86 +216,88 @@ export default function App() {
     }, durationMs);
   };
 
-  // Polling loop for real-time popup notifications
-  useEffect(() => {
-    if (!currentUser) {
-      setNotifications([]);
-      return;
-    }
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
+  const isFirstNotificationRunRef = useRef<boolean>(true);
+  const lastReminderCheckRef = useRef<number>(0);
 
-    if (dbQuotaExceeded) {
-      console.warn('[VetAxis] Background notifications polling suspended due to database quota exhaustion.');
-      return;
-    }
+  // Lightweight SWR Data-Fetching Hook: Automatically revalidates notifications from Firestore on focus / tab return
+  const {
+    mutate: mutateNotifications,
+  } = useSWR<VetNotification[]>(
+    currentUser?.uid && !dbQuotaExceeded ? `user_notifications_${currentUser.uid}` : null,
+    async () => {
+      if (!currentUser?.uid) return [];
 
-    let isMounted = true;
-    const seenIds = new Set<string>();
-    let lastReminderCheck = 0;
+      // ─── Automated 6-hour Appointment reminders (Throttled to once every 120 seconds for performance) ──────────────────
+      const nowMs = Date.now();
+      if (isFirstNotificationRunRef.current || nowMs - lastReminderCheckRef.current > 120 * 1000) {
+        lastReminderCheckRef.current = nowMs;
+        try {
+          // Fetch appointments where the user is either the pet owner or the clinic
+          const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
+          const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
+          
+          // Combine both lists uniquely
+          const combinedAppts = [...myUserAppts];
+          myClinicAppts.forEach(ca => {
+            if (!combinedAppts.some(a => a.id === ca.id)) {
+              combinedAppts.push(ca);
+            }
+          });
 
-    const checkNotifications = async (isFirstRun: boolean) => {
-      try {
-        // ─── Automated 6-hour Appointment reminders (Throttled to once every 120 seconds for performance) ──────────────────
-        const nowMs = Date.now();
-        if (isFirstRun || nowMs - lastReminderCheck > 120 * 1000) {
-          lastReminderCheck = nowMs;
-          try {
-            // Fetch appointments where the user is either the pet owner or the clinic
-            const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
-            const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
-            
-            // Combine both lists uniquely
-            const combinedAppts = [...myUserAppts];
-            myClinicAppts.forEach(ca => {
-              if (!combinedAppts.some(a => a.id === ca.id)) {
-                combinedAppts.push(ca);
-              }
-            });
+          const now = new Date();
+          for (const appt of combinedAppts) {
+            if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
+              const [year, month, day] = appt.date.split('-').map(Number);
+              const [hours, minutes] = appt.time.split(':').map(Number);
+              if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
+                const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                const diffMs = apptDate.getTime() - now.getTime();
+                const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
 
-            const now = new Date();
-            for (const appt of combinedAppts) {
-              if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
-                const [year, month, day] = appt.date.split('-').map(Number);
-                const [hours, minutes] = appt.time.split(':').map(Number);
-                if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
-                  const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-                  const diffMs = apptDate.getTime() - now.getTime();
-                  const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
+                // Trigger if scheduled time is within 6 hours (and is in the future)
+                if (diffMs > 0 && diffMs <= sixHoursMs) {
+                  appt.sent6hReminder = true;
+                  await ClinicService.saveAppointment(appt);
 
-                  // Trigger if scheduled time is within 6 hours (and is in the future)
-                  if (diffMs > 0 && diffMs <= sixHoursMs) {
-                    appt.sent6hReminder = true;
-                    await ClinicService.saveAppointment(appt);
-
-                    await NotificationService.createNotification({
-                      userId: appt.userId,
-                      senderId: appt.clinicId,
-                      senderName: appt.vetName || 'Vet Clinic',
-                      type: 'status_change',
-                      targetId: appt.id,
-                      targetType: 'appointment',
-                      message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
-                      read: false
-                    });
-                  }
+                  await NotificationService.createNotification({
+                    userId: appt.userId,
+                    senderId: appt.clinicId,
+                    senderName: appt.vetName || 'Vet Clinic',
+                    type: 'status_change',
+                    targetId: appt.id,
+                    targetType: 'appointment',
+                    message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
+                    read: false
+                  });
                 }
               }
             }
-          } catch (err) {
-            console.error("6h reminder checking failed:", err);
           }
+        } catch (err) {
+          console.error("6h reminder checking failed:", err);
         }
+      }
 
-        const list = await NotificationService.fetchNotifications(currentUser.uid);
-        if (!isMounted) return;
-
-        if (isFirstRun) {
+      const list = await NotificationService.fetchNotifications(currentUser.uid);
+      return list;
+    },
+    {
+      revalidateOnFocus: true, // Automatically revalidates when user returns from another tab
+      revalidateOnReconnect: true,
+      focusThrottleInterval: 3000,
+      refreshInterval: 25000,
+      onSuccess: (list) => {
+        if (!list) return;
+        if (isFirstNotificationRunRef.current) {
           // On first boot, mark existing unread notifications as seen so we don't spam popups for old interactions
-          list.forEach(n => seenIds.add(n.id));
+          isFirstNotificationRunRef.current = false;
+          list.forEach(n => seenNotificationIdsRef.current.add(n.id));
         } else {
           // Find any unread notification that we haven't seen in this session yet
-          const newUnreads = list.filter(n => !n.read && !seenIds.has(n.id));
+          const newUnreads = list.filter(n => !n.read && !seenNotificationIdsRef.current.has(n.id));
           newUnreads.forEach(n => {
-            seenIds.add(n.id);
+            seenNotificationIdsRef.current.add(n.id);
             const toastId = 'toast_' + n.id + '_' + Date.now();
             
             // Push toast popup with full notification ref for click handling
@@ -299,39 +305,67 @@ export default function App() {
             
             // Auto fade out after 5 seconds
             setTimeout(() => {
-              if (isMounted) {
-                setToasts(prev => prev.filter(t => t.id !== toastId));
-              }
+              setToasts(prev => prev.filter(t => t.id !== toastId));
             }, 5000);
           });
         }
 
         // Always sync the overall notifications list to keep badging correct
         setNotifications(list);
-      } catch (err) {
-        console.error('Error fetching notification logs:', err);
       }
-    };
+    }
+  );
 
-    // Run immediately first time
-    checkNotifications(true);
-
-    // Polling interval throttled to every 25 seconds to respect Firestore free tier limits and prevent quota exhaustion
-    const interval = setInterval(() => {
-      checkNotifications(false);
-    }, 25000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [currentUser?.uid, dbQuotaExceeded]);
+  // Lightweight SWR Data-Fetching Hook: Automatically revalidates user profile from Firestore on tab focus
+  const {
+    mutate: mutateUserProfile,
+  } = useSWR<UserProfile | null>(
+    currentUser?.uid && !dbQuotaExceeded ? `user_profile_${currentUser.uid}` : null,
+    async () => {
+      if (!currentUser?.uid) return null;
+      if (isFirebaseConfigured && db) {
+        try {
+          const userRef = doc(db, 'users', currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            const profile = userSnap.data() as UserProfile;
+            return injectTemporaryPlatinum(profile);
+          }
+        } catch (e) {
+          console.warn('[VetAxis SWR] Error revalidating user profile on focus:', e);
+        }
+      }
+      return currentUser;
+    },
+    {
+      revalidateOnFocus: true, // When user returns from another browser tab, fetch latest Firestore profile state
+      revalidateOnReconnect: true,
+      focusThrottleInterval: 4000,
+      onSuccess: (freshProfile) => {
+        if (freshProfile && currentUser) {
+          if (
+            freshProfile.role !== currentUser.role ||
+            freshProfile.isVerified !== currentUser.isVerified ||
+            freshProfile.subscriptionTier !== currentUser.subscriptionTier ||
+            freshProfile.name !== currentUser.name ||
+            freshProfile.emailVerified !== currentUser.emailVerified ||
+            freshProfile.profilePic !== currentUser.profilePic
+          ) {
+            console.log('[VetAxis SWR] User profile revalidated from Firestore on focus:', freshProfile.email);
+            setCurrentUser(freshProfile);
+            secureSetItem('va_session', JSON.stringify(freshProfile));
+          }
+        }
+      }
+    }
+  );
 
   const handleMarkAllAsRead = async () => {
     if (!currentUser) return;
     try {
       await NotificationService.markAllAsRead(currentUser.uid);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      mutateNotifications(prev => (prev || []).map(n => ({ ...n, read: true })), false);
     } catch (err) {
       console.error('Failed to mark notifications read:', err);
     }
@@ -339,8 +373,9 @@ export default function App() {
 
   const handleDeleteNotification = async (id: string) => {
     try {
-      await NotificationService.deleteNotification(id);
+      await NotificationService.deleteNotification(id, currentUser?.uid);
       setNotifications(prev => prev.filter(n => n.id !== id));
+      mutateNotifications(prev => (prev || []).filter(n => n.id !== id), false);
     } catch (err) {
       console.error('Failed to delete notification:', err);
     }
@@ -352,7 +387,9 @@ export default function App() {
     setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
     try {
       // Also sync all or this status to DB/localStorage
-      await NotificationService.markAllAsRead(currentUser!.uid);
+      if (currentUser?.uid) {
+        await NotificationService.markAllAsRead(currentUser.uid);
+      }
     } catch (err) {
       console.warn('Failed to sync notification read status on click:', err);
     }
@@ -380,6 +417,18 @@ export default function App() {
     } else if (notif.targetType === 'appointment') {
       setHighlightAppointmentId(notif.targetId);
       setActiveSection('clinic_management');
+    } else if (notif.targetType === 'broadcast' || notif.type === 'broadcast') {
+      if (notif.targetId && notif.targetId !== notif.id && !notif.targetId.startsWith('bcast_')) {
+        if (notif.targetId.startsWith('http://') || notif.targetId.startsWith('https://')) {
+          try {
+            window.open(notif.targetId, '_blank', 'noopener,noreferrer');
+          } catch (e) {
+            console.warn('Could not open external url:', e);
+          }
+        } else {
+          handleNavigate(notif.targetId);
+        }
+      }
     }
   };
 
@@ -455,6 +504,91 @@ export default function App() {
   useEffect(() => {
     testConnection();
   }, []);
+
+  // Automated Broadcast Notification Delivery: Checks and delivers global admin alerts to all users (including users returning after days)
+  useEffect(() => {
+    const handleCheckBroadcasts = async () => {
+      try {
+        await BroadcastNotificationService.checkAndDispatchUnseenBroadcasts((bcast) => {
+          const toastId = 'bcast_toast_' + bcast.id + '_' + Date.now();
+          setToasts(prev => [
+            ...prev,
+            {
+              id: toastId,
+              message: `${bcast.title}: ${bcast.message}`,
+              type: 'broadcast',
+              notif: {
+                id: 'bcast_notif_' + bcast.id,
+                userId: currentUser?.uid || 'guest',
+                senderId: bcast.authorId,
+                senderName: bcast.authorName,
+                type: 'broadcast',
+                targetId: bcast.actionUrl || bcast.id,
+                targetType: 'broadcast',
+                message: `${bcast.title}: ${bcast.message}`,
+                read: false,
+                createdAt: bcast.createdAt
+              }
+            }
+          ]);
+
+          // Auto dismiss toast after 8 seconds
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== toastId));
+          }, 8000);
+
+          if (currentUser?.uid) {
+            mutateNotifications();
+          }
+        });
+      } catch (err) {
+        console.warn('Error checking unseen broadcast notifications:', err);
+      }
+    };
+
+    // Initial check on startup and when user profile is ready
+    handleCheckBroadcasts();
+
+    // Auto-register Web Push API subscription if notification permission is already granted
+    if (BroadcastNotificationService.isPushManagerSupported() && BroadcastNotificationService.getNotificationPermission() === 'granted') {
+      BroadcastNotificationService.subscribeToPushNotifications(currentUser).catch(err => {
+        console.warn('[Web Push] Auto-subscription update error:', err);
+      });
+    }
+
+    // Listen for Service Worker push messages delivered to the active window
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'PUSH_NOTIFICATION_RECEIVED') {
+        console.log('[Web Push] Received real-time push message in client:', event.data.payload);
+        handleCheckBroadcasts();
+        if (currentUser?.uid) {
+          mutateNotifications();
+        }
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+
+    // Listen for live broadcast notifications fired across browser tabs/windows
+    const handleDataUpdate = (e: any) => {
+      if (e.detail?.entity === 'broadcasts' || e.detail?.entity === 'notifications') {
+        handleCheckBroadcasts();
+        if (currentUser?.uid) {
+          mutateNotifications();
+        }
+      }
+    };
+
+    window.addEventListener('vetaxis_data_update', handleDataUpdate);
+    return () => {
+      window.removeEventListener('vetaxis_data_update', handleDataUpdate);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
+    };
+  }, [currentUser, mutateNotifications]);
 
   // Global auto-scroller when any popup modal/dialog opens
   useEffect(() => {
@@ -666,16 +800,21 @@ export default function App() {
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
+    mutateUserProfile(user, false);
     setActiveSection('explore');
   };
 
   const handleLogout = async () => {
     await AuthService.signOut();
     setCurrentUser(null);
+    setNotifications([]);
+    mutateUserProfile(null, false);
+    mutateNotifications([], false);
   };
 
   const handleUpdateUserProfile = (updated: UserProfile) => {
     setCurrentUser(updated);
+    mutateUserProfile(updated, false);
   };
 
   if (isAuthInitializing) {
@@ -907,11 +1046,15 @@ export default function App() {
               <PrivacyPolicyPage onNavigate={handleNavigate} />
             )}
 
+            {activeSection === 'careers_safety' && (
+              <CareersSafetyProtocolPage onNavigate={handleNavigate} />
+            )}
+
             {activeSection === 'contact' && (
               <ContactSupportPage onNavigate={handleNavigate} />
             )}
 
-            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
+            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'careers_safety'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>
@@ -936,16 +1079,25 @@ export default function App() {
                   setToasts(prev => prev.filter(t => t.id !== toast.id));
                 }
               }}
-              className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto cursor-pointer hover:bg-[#fcf9f2] transition-colors"
+              className={`rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto cursor-pointer transition-colors ${
+                toast.type === 'broadcast'
+                  ? 'bg-amber-50/95 border-2 border-amber-400 border-b-[5px] border-b-amber-500 hover:bg-amber-100/90'
+                  : 'bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
+              }`}
             >
               <div className="text-xl filter drop-shadow select-none mt-0.5">
                 {toast.type === 'like' && '❤️'}
                 {toast.type === 'comment' && '💬'}
                 {toast.type === 'apply' && '📄'}
                 {toast.type === 'status_change' && '✨'}
+                {toast.type === 'broadcast' && '📢'}
               </div>
               <div className="flex-1 pr-6 text-left">
-                <span className="text-[9px] tracking-wider uppercase font-black text-[#5a5a40] block leading-none">ACTIVITY BULLETIN (CLICK to view)</span>
+                <span className={`text-[9px] tracking-wider uppercase font-black block leading-none ${
+                  toast.type === 'broadcast' ? 'text-amber-800' : 'text-[#5a5a40]'
+                }`}>
+                  {toast.type === 'broadcast' ? '🚨 ADMIN BROADCAST ANNOUNCEMENT (CLICK TO VIEW)' : 'ACTIVITY BULLETIN (CLICK TO VIEW)'}
+                </span>
                 <p className="text-[11px] text-[#3c3c3b] font-bold leading-tight mt-1.5">
                   {toast.message}
                 </p>

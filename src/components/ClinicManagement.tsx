@@ -50,6 +50,7 @@ import {
 } from '../lib/clinicService';
 import { UserProfile } from '../types';
 import { NotificationService } from '../lib/storage';
+import { useTabRevalidation } from '../lib/tabSync';
 
 interface ClinicManagementProps {
   user: UserProfile;
@@ -253,6 +254,12 @@ export function ClinicManagement({
   useEffect(() => {
     loadData();
   }, [user.uid]);
+
+  // Automatically refresh clinic appointments, records, and invoices when tab is reopened or refocused
+  useTabRevalidation({
+    entity: 'clinic',
+    onRevalidate: loadData,
+  });
 
   useEffect(() => {
     if (highlightAppointmentId && appointments.length > 0) {

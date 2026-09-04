@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   ShieldCheck, 
+  ShieldAlert,
+  AlertTriangle,
   FileText, 
   Lock, 
   Info, 
@@ -16,13 +18,13 @@ import {
 } from 'lucide-react';
 
 export const TERMS_AND_CONDITIONS_TEXT = `VetAxis 360 — Terms of Service & Clinical Platform Agreement
-Last Updated: June 2026
+Last Updated: September 2026
 
 Platform: VetAxis 360 (Digital Veterinary & Herd Intelligence Ecosystem)
 Operated by: VetAxis Healthcare Network
 
 1. Acceptance of Terms
-By creating an account, browsing, or utilizing any feature of VetAxis 360, you confirm that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, you must discontinue using the platform immediately. These terms apply equally to all users, including Pet Owners, Livestock Farmers, Licensed Veterinarians (DVM), Certified Clinics, and Veterinary Nursing Assistants.
+By creating an account, browsing, or utilizing any feature of VetAxis 360, you confirm that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, you must discontinue using the platform immediately. These terms apply equally to all users, including Pet Owners, Livestock Farmers, Licensed Veterinarians (DVM), Certified Clinics, Farm Helpers, and Veterinary Nursing Assistants.
 
 2. Nature of Platform & Medical Disclaimer
 VetAxis 360 is an independent technology directory, farm ledger, and clinical management ecosystem. VetAxis 360 does not directly dispense medical prescriptions, perform surgeries, or provide direct emergency clinical diagnosis. All veterinary advice, clinical procedures, treatments, and prescriptions are provided strictly by independent, licensed veterinary professionals. In acute animal emergencies, users must physically transport animals to verified 24/7 veterinary hospitals.
@@ -35,7 +37,7 @@ To register an account or interact with commercial/medical features, users must:
 - Maintain the strict confidentiality of login credentials and immediately report any unauthorized access.
 
 4. Roles & Professional Credential Verification
-- Licensed Veterinarians (DVM): Must possess and maintain a valid registration with their respective veterinary medical regulatory boards.
+- Licensed Veterinarians (DVM): Must possess and maintain a valid registration with their respective veterinary medical regulatory boards (e.g., PVMC / provincial authorities).
 - Veterinary Clinics & Hospitals: Must hold appropriate local commercial and healthcare permissions, ensure listed operating hours and emergency amenities are accurate, and maintain clinical standard operating procedures.
 - Livestock Farmers & Pet Owners: Must provide genuine health records for animals listed for adoption, sale, or community tracking.
 
@@ -47,11 +49,21 @@ To register an account or interact with commercial/medical features, users must:
 6. Intellectual Property & Community Conduct
 All proprietary code, branding, interface designs, and algorithmic tools remain the sole property of VetAxis 360. Users agree not to post defamatory, false, abusive, or harmful material on the Community Feed. VetAxis 360 reserves the right to moderate, delete, or suspend accounts that violate safety guidelines.
 
-7. Governing Law & Jurisdiction
+7. Veterinary Careers, Job Listings & Employment Marketplace — Safe Harbor & Complete Limitation of Liability
+- 7.1 Passive Classifieds & Neutral Intermediary Notice: VetAxis 360 operates exclusively as a passive digital notice board and technological conduit connecting independent veterinary practices, commercial livestock/dairy farms, licensed DVM veterinarians, paravets, veterinary nursing assistants, and agricultural workers. VetAxis 360 is NOT an employer, staffing agency, labor broker, recruiter, or party to any employment or contracting agreement. VetAxis 360 does not manage, direct, supervise, control, or evaluate any candidate or employer.
+- 7.2 Zero Criminal Vetting or Character Guarantee: VetAxis 360 does NOT conduct criminal record checks, police clearances, psychological evaluations, drug tests, character background investigations, or credit checks on any job poster (clinic/farm owner) or job applicant. Any verification badge, role designation, or profile status denotes solely that an unverified electronic profile, phone number, or document copy was submitted to the platform. It does NOT constitute any warranty, certification, endorsement, or representation of honesty, trustworthiness, competence, or safety.
+- 7.3 Sole Duty of Due Diligence Rests with Employers and Employees: Both employers and applicants acknowledge and agree that they are strictly and solely responsible for conducting their own comprehensive due diligence before interviewing, hiring, or commencing work:
+  * Mandatory Employer Due Diligence: Hiring clinics, veterinarians, and farm owners are exclusively responsible for physically inspecting and verifying original identity documents (CNIC / Passport), original academic degrees, official registration with the Pakistan Veterinary Medical Council (PVMC) or relevant statutory body, police verification certificates, and contacting minimum two verified previous employment references.
+  * Mandatory Applicant Due Diligence: Job applicants and assistants are exclusively responsible for verifying the physical legitimacy, legal registration, workplace safety standards, and commercial reputation of any clinic, hospital, or farm before attending interviews or accepting offers. Interviews must only take place in safe, public, commercially registered clinical facilities during regular business hours—never in isolated private living quarters.
+- 7.4 Absolute Disclaimer of Liability for Bad Actors, Crimes, Malpractice & Harm: To the fullest extent permitted by applicable law, VetAxis 360, its developers, operators, directors, employees, and affiliates EXPLICITLY DISCLAIM ALL LIABILITY, whether civil, criminal, tortious, or contractual, for any action, negligence, misconduct, or crime committed by any individual discovered or hired through this platform. IF A DISHONEST, FRAUDULENT, OR CRIMINAL PERSON GETS HIRED, OR IF AN ABUSIVE OR NEGLIGENT EMPLOYER HIRES SOMEONE, ALL RESPONSIBILITY, FAULT, CONSEQUENCES, AND LIABILITIES REST ENTIRELY AND EXCLUSIVELY UPON THE CONTRACTING PARTIES. VETAXIS 360 HAS ZERO INVOLVEMENT, ASSUMES ZERO RESPONSIBILITY, AND BEARS ZERO LEGAL OR ETHICAL LIABILITY FOR THE CONDUCT, CLINICAL OUTCOMES, PROPERTY DAMAGE, THEFT, MALPRACTICE, INJURY, WAGE DISPUTES, OR WRONGS OF ANY USER.
+- 7.5 Mutual Indemnification & Hold Harmless: Every employer who publishes a job vacancy and every applicant who submits an application expressly agrees to defend, indemnify, and hold harmless VetAxis 360 and its parent entities from and against any claims, losses, liabilities, damages, legal costs, judgments, or demands arising out of or related to their recruitment, interviews, hiring decisions, employment disputes, or conduct of hired staff.
+- 7.6 Anti-Scam & Zero-Fee Recruitment Policy: Legitimate employers never charge candidates money for job interviews, visa processing, registration forms, training, or application reviews. Demanding recruitment fees or deposits is strictly prohibited and constitutes grounds for permanent ban and reporting to cybercrime and labor enforcement authorities. Job seekers must never pay any fee to apply.
+
+8. Governing Law & Jurisdiction
 These Terms and Conditions are governed by applicable laws. Any legal proceedings shall be subject to the exclusive jurisdiction of the competent courts.`;
 
 export const PRIVACY_POLICY_TEXT = `VetAxis 360 — Privacy Policy, Cookie Disclosures & Advertising Transparency
-Last Updated: June 2026
+Last Updated: September 2026
 
 Platform: VetAxis 360 (https://vetaxis360.com)
 Data Protection Officer Contact: Vetaxis360@gmail.com
@@ -81,8 +93,35 @@ VetAxis 360 displays third-party advertisements served by Google AdSense to fund
 5. User Rights & Data Deletion
 Users retain full control over their personal records. You may request data access, correction, or permanent account deletion directly through your profile settings or by emailing Vetaxis360@gmail.com.
 
-6. Policy Revisions
+6. Employment & Career Applications Data Handling
+When applicants submit applications through the Careers & Vacancies board, submitted credentials (including resume text, phone numbers, email addresses, license IDs, and screening responses) are transmitted directly to the posting employer/clinic. VetAxis 360 acts as a technical transmission conduit and does not maintain internal personnel dossiers or control how recipient clinics archive or manage candidate resumes. Applicants are advised never to disclose confidential bank passwords, PINs, or sensitive financial data in job applications.
+
+7. Policy Revisions
 Any updates to this Privacy Policy will be reflected on this page with an updated timestamp. Continued use of the platform denotes acceptance of any revised policies.`;
+
+export const EMPLOYMENT_SAFETY_PROTOCOL_TEXT = `VetAxis 360 — Careers & Employment Safety Protocol & Platform Safe Harbor
+
+Mandatory Due Diligence & Safety Requirements for Employers and Job Applicants
+
+I. Core Platform Legal Shield & Intermediary Position
+1. VetAxis 360 is a technology-enabled directory and classifieds notice board. We do not act as an employer, recruiter, or staffing agency.
+2. VetAxis 360 does NOT conduct criminal record checks, police background screenings, or character investigations on any candidate or employer.
+3. If an unscrupulous, dishonest, or criminal person secures a job, or if an abusive employer hires someone, all legal, ethical, and civil liability rests 100% on the contracting parties. VetAxis 360 has zero involvement and bears zero liability.
+4. By using the Careers Portal to post or apply, all users agree to indemnify and hold VetAxis 360 harmless from any claims, damages, or disputes.
+
+II. Mandatory Safety Rules for Hiring Employers (Clinics, Hospitals & Farms)
+1. Verify Official Licenses: Always physically inspect and verify original PVMC (Pakistan Veterinary Medical Council) or relevant statutory veterinary registration certificates.
+2. Confirm National Identity: Inspect and record verified physical copies of the candidate's CNIC (Computerized National Identity Card) or Passport before granting premises access.
+3. Conduct Reference Checks: Contact at least two previous veterinary clinics, institutions, or supervising veterinary doctors to confirm the candidate's professional conduct and character.
+4. Secure Controlled Substances: Never provide unsupervised access to veterinary scheduled narcotics, ketamine, or expensive surgical pharmaceuticals until a full trial period and police clearance have been completed.
+5. Provide a Lawful Written Agreement: Provide a transparent, written contract outlining job duties, working hours, safety gear, probation terms, and agreed monthly wage.
+
+III. Mandatory Safety Rules for Job Seekers (Doctors, Paravets & Assistants)
+1. Zero Fee Policy: NEVER pay money, application fees, training charges, or security deposits to any employer. Legitimate clinics NEVER ask applicants for cash.
+2. Interview in Safe Clinical Facilities: Only attend interviews at verified, commercially operating veterinary hospitals or farms during daytime business hours. Never meet in isolated, unverified private residences.
+3. Inform Friends / Family: Always share the clinic name, address, and interview timing with a family member or trusted colleague before attending an on-site interview.
+4. Verify Clinic Legitimacy: Confirm the hospital's public location, business signboards, and public patient reviews prior to entering into any employment commitment.
+5. Report Suspicious Activity: Immediately report any employer attempting extortion, harassment, advance fees, or unlawful practices via Vetaxis360@gmail.com.`;
 
 export const ABOUT_US_TEXT = `VetAxis 360 is Pakistan's premier fully-integrated digital veterinary healthcare and clinical intelligence ecosystem. Our platform bridges the gap between active livestock breeders, independent pet owners, licensed veterinarians, qualified nursing assistants, and comprehensive clinics.
 
@@ -257,12 +296,151 @@ export function PrivacyPolicyPage({ onNavigate }: NavigablePageProps) {
           <div className="text-xs text-[#8c8c69]">
             Questions? Contact Data Officer: <strong className="text-[#5a5a40]">Vetaxis360@gmail.com</strong>
           </div>
-          <button
-            onClick={() => onNavigate('terms')}
-            className="text-xs font-bold text-[#5a5a40] hover:underline cursor-pointer"
-          >
-            Read Terms of Service →
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onNavigate('careers_safety')}
+              className="text-xs font-bold text-amber-800 hover:underline cursor-pointer"
+            >
+              Careers Safety Protocol →
+            </button>
+            <button
+              onClick={() => onNavigate('terms')}
+              className="text-xs font-bold text-[#5a5a40] hover:underline cursor-pointer"
+            >
+              Read Terms of Service →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DEDICATED FULL-PAGE: CAREERS SAFETY PROTOCOL & PLATFORM SHIELD
+// ─────────────────────────────────────────────────────────────────
+export function CareersSafetyProtocolPage({ onNavigate }: NavigablePageProps) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 select-text">
+      {/* Breadcrumb / Back button */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <button
+          onClick={() => onNavigate('jobs')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#e3dec9] text-[#5a5a40] hover:bg-[#fcfbf9] text-xs font-bold transition-all shadow-xs cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Careers &amp; Jobs</span>
+        </button>
+        <span className="text-xs font-black text-amber-900 bg-amber-100/80 px-3.5 py-1 rounded-full border border-amber-300 flex items-center gap-1.5">
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+          <span>Mandatory Safety &amp; Legal Shield</span>
+        </span>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] p-6 sm:p-10 shadow-sm space-y-8">
+        <div className="flex items-center gap-3.5 pb-6 border-b border-[#f0ecdf]">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-serif font-black text-[#2b2b24]">
+              Careers &amp; Employment Safety Protocol &amp; Safe Harbor
+            </h1>
+            <p className="text-xs font-semibold text-[#8c8c69] mt-0.5">
+              Comprehensive legal disclaimer, due diligence mandates, and mutual liability shield for employers &amp; job seekers
+            </p>
+          </div>
+        </div>
+
+        {/* High Priority Safe Harbor Notice */}
+        <div className="p-5 rounded-2xl bg-amber-50/90 border border-amber-300/80 space-y-2">
+          <div className="flex items-center gap-2 text-amber-950 font-black text-sm">
+            <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0" />
+            <span>Platform Intermediary Safe Harbor &amp; Zero Platform Liability</span>
+          </div>
+          <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
+            VetAxis 360 operates strictly as a digital classifieds notice board and neutral technological venue. VetAxis 360 does not conduct police background checks, character investigations, or psychological screenings on any employer or job applicant. If an unethical, fraudulent, or criminal individual secures a job, or if an abusive employer hires someone, <strong>all responsibility, legal liabilities, and consequences rest exclusively upon the contracting parties</strong>. VetAxis 360 has zero involvement and bears zero legal or ethical liability.
+          </p>
+        </div>
+
+        {/* Formatted Content Body */}
+        <div className="space-y-6 text-[#4a4a38] text-sm sm:text-base leading-relaxed">
+          {EMPLOYMENT_SAFETY_PROTOCOL_TEXT.split('\n\n').map((paragraph, idx) => {
+            const isRomanHeading = paragraph.match(/^[I|V|X]+\.\s/);
+            const isSubHeading = paragraph.match(/^\d+\.\s/);
+            if (isRomanHeading) {
+              return (
+                <div key={idx} className="pt-4 border-t border-[#f0ecdf] first:border-t-0 first:pt-0">
+                  <h2 className="text-base sm:text-lg font-serif font-black text-[#2b2b24] text-amber-950">
+                    {paragraph}
+                  </h2>
+                </div>
+              );
+            }
+            if (isSubHeading) {
+              return (
+                <div key={idx} className="p-3.5 rounded-xl bg-[#fcfbf7] border border-[#e3dec9]/70 space-y-1">
+                  <p className="text-xs sm:text-sm font-bold text-[#2b2b24] leading-relaxed">
+                    {paragraph}
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <p key={idx} className="whitespace-pre-wrap text-xs sm:text-sm text-stone-700">
+                {paragraph}
+              </p>
+            );
+          })}
+        </div>
+
+        {/* Summary of Core Rules */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[#f0ecdf]">
+          <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-2">
+            <h3 className="text-xs font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+              <span>🏢 Employer Checklist</span>
+            </h3>
+            <ul className="text-xs space-y-1.5 text-emerald-950 font-medium list-disc pl-4">
+              <li>Physically inspect original PVMC registration certificates.</li>
+              <li>Record and file original CNIC / Passport copies.</li>
+              <li>Contact minimum 2 prior clinical references directly.</li>
+              <li>Keep controlled scheduled pharmaceuticals secured.</li>
+            </ul>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200 space-y-2">
+            <h3 className="text-xs font-black uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+              <span>🎓 Candidate Checklist</span>
+            </h3>
+            <ul className="text-xs space-y-1.5 text-blue-950 font-medium list-disc pl-4">
+              <li>Never pay any application, training, or deposit fee.</li>
+              <li>Attend interviews only at verified clinical facilities.</li>
+              <li>Never meet in private residential or unverified locations.</li>
+              <li>Inform a trusted friend/family of interview details.</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="pt-6 border-t border-[#f0ecdf] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#8c8c69]">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Binding on all users participating in VetAxis Careers</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onNavigate('terms')}
+              className="text-xs font-bold text-[#5a5a40] hover:underline cursor-pointer"
+            >
+              Platform Terms of Service →
+            </button>
+            <button
+              onClick={() => onNavigate('jobs')}
+              className="text-xs font-black text-[#a0522d] hover:underline cursor-pointer"
+            >
+              Go to Job Listings →
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -682,16 +860,38 @@ Sent via VetAxis 360 Web Portal`;
 // ─────────────────────────────────────────────────────────────────
 interface LegalModalProps {
   isOpen: boolean;
-  type: 'terms' | 'about';
+  type: 'terms' | 'about' | 'privacy' | 'safety';
   onClose: () => void;
 }
 
 export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
   if (!isOpen) return null;
 
-  const content = type === 'terms' ? TERMS_AND_CONDITIONS_TEXT : ABOUT_US_TEXT;
-  const title = type === 'terms' ? 'VetAxis — Terms of Service' : 'About VetAxis 360';
-  const subtitle = type === 'terms' ? 'Last Updated: June 2026' : 'Pakistan\'s Premier Veterinary Network';
+  const content = type === 'terms' 
+    ? TERMS_AND_CONDITIONS_TEXT 
+    : type === 'privacy' 
+    ? PRIVACY_POLICY_TEXT 
+    : type === 'safety' 
+    ? EMPLOYMENT_SAFETY_PROTOCOL_TEXT 
+    : ABOUT_US_TEXT;
+
+  const title = type === 'terms' 
+    ? 'VetAxis — Terms of Service & Safe Harbor' 
+    : type === 'privacy' 
+    ? 'VetAxis — Privacy & Data Protection Policy' 
+    : type === 'safety' 
+    ? 'Careers & Employment Safety Protocol' 
+    : 'About VetAxis 360';
+
+  const subtitle = type === 'terms' 
+    ? 'Legal Agreement & Limitation of Liability' 
+    : type === 'privacy' 
+    ? 'Data Handling & Candidate Resume Security' 
+    : type === 'safety' 
+    ? 'Mandatory Due Diligence Rules for Hirers & Applicants' 
+    : 'Pakistan\'s Premier Veterinary Network';
+
+  const icon = type === 'terms' ? '📜' : type === 'privacy' ? '🔒' : type === 'safety' ? '🛡️' : 'ℹ️';
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[99999] overflow-y-auto">
@@ -705,7 +905,7 @@ export function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
         <div className="p-4 sm:p-6 bg-[#fcf9f2] border-b border-[#e3dec9] flex items-start justify-between gap-4 shrink-0">
           <div className="min-w-0 flex-1">
             <h3 className="font-serif font-black text-base sm:text-lg md:text-xl text-[#373735] flex items-center gap-1.5 leading-tight">
-              <span className="shrink-0">{type === 'terms' ? '📜' : 'ℹ️'}</span>
+              <span className="shrink-0">{icon}</span>
               <span className="break-words">{title}</span>
             </h3>
             <p className="text-[9px] sm:text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mt-1">{subtitle}</p>

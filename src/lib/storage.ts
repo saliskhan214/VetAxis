@@ -25,7 +25,8 @@ import {
 } from 'firebase/auth';
 
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd, ManualPayment, VetAnswer } from '../types';
+import { UserProfile, Review, Product, PetAd, CommunityPost, SORT_TYPES, GeoLocation, canUserReview, JobPost, JobApplication, VetNotification, PromotionalAd, ManualPayment, VetAnswer, BroadcastNotification, WebPushSubscriptionRecord } from '../types';
+import { broadcastDataUpdate } from './tabSync';
 import bcrypt from 'bcryptjs';
 
 // ─────────────────────────────────────────────────────────────────
@@ -39,6 +40,8 @@ const LOCAL_POSTS_KEY = 'va_community_posts';
 const LOCAL_JOBS_KEY = 'va_job_posts';
 const LOCAL_APPLICATIONS_KEY = 'va_job_applications';
 const LOCAL_NOTIFICATIONS_KEY = 'va_notifications';
+const LOCAL_BROADCASTS_KEY = 'va_broadcasts';
+const LOCAL_SEEN_BROADCASTS_KEY = 'va_seen_broadcast_ids';
 
 function encryptPII(value: string): string {
   try {
@@ -273,6 +276,7 @@ function saveLocalSession(user: UserProfile | null) {
   } else {
     localStorage.removeItem(LOCAL_SESSION_KEY);
   }
+  broadcastDataUpdate('auth', { user: finalUser });
 }
 
 function cleanUndefined<T>(obj: T): T {
@@ -1684,6 +1688,7 @@ export const CommunityService = {
 
         // Enforce exact structure rules requirement on creation
         await setDoc(doc(db, 'community_posts', post.id), cleanUndefined(post));
+        broadcastDataUpdate('community', { postId: post.id });
         return post;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, 'community_posts');
@@ -1726,6 +1731,7 @@ export const CommunityService = {
       const posts = await this.fetchPosts();
       posts.unshift(post);
       localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+      broadcastDataUpdate('community', { postId: post.id });
       return post;
     }
     return post;
@@ -1865,6 +1871,7 @@ export const CommunityService = {
         }
 
         await updateDoc(docRef, { reactions: post.reactions });
+        broadcastDataUpdate('community', { postId });
         return { ...post, id: postId };
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `community_posts/${postId}`);
@@ -1883,6 +1890,7 @@ export const CommunityService = {
         }
         posts[idx].reactions = reactions;
         localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+        broadcastDataUpdate('community', { postId });
         return posts[idx];
       }
       throw new Error('Post not found.');
@@ -1893,6 +1901,7 @@ export const CommunityService = {
     if (isFirebaseConfigured && db) {
       try {
         await deleteDoc(doc(db, 'community_posts', postId));
+        broadcastDataUpdate('community', { postId });
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `community_posts/${postId}`);
       }
@@ -1900,6 +1909,7 @@ export const CommunityService = {
       const posts = await this.fetchPosts();
       const filtered = posts.filter(p => p.id !== postId);
       localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(filtered));
+      broadcastDataUpdate('community', { postId });
     }
   },
 
@@ -1944,6 +1954,7 @@ export const CommunityService = {
           });
         }
 
+        broadcastDataUpdate('community', { postId });
         return { ...post, id: postId, answers };
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `community_posts/${postId}`);
@@ -1976,6 +1987,7 @@ export const CommunityService = {
           localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(localNotifs));
         }
 
+        broadcastDataUpdate('community', { postId });
         return posts[idx];
       }
       throw new Error('Post not found.');
@@ -2001,6 +2013,7 @@ export const CommunityService = {
           }
           answers[ansIdx].upvotes = upvotes;
           await updateDoc(docRef, { answers });
+          broadcastDataUpdate('community', { postId });
           return { ...post, id: postId, answers };
         }
         throw new Error('Answer not found.');
@@ -2025,6 +2038,7 @@ export const CommunityService = {
           answers[ansIdx].upvotes = upvotes;
           posts[idx].answers = answers;
           localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(posts));
+          broadcastDataUpdate('community', { postId });
           return posts[idx];
         }
       }
@@ -2142,6 +2156,7 @@ export const PetAdsService = {
     if (isFirebaseConfigured && db) {
       try {
         await setDoc(doc(db, 'pet_ads', ad.id), cleanUndefined(ad));
+        broadcastDataUpdate('pet_ads', { adId: ad.id });
         return ad;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `pet_ads/${ad.id}`);
@@ -2150,6 +2165,7 @@ export const PetAdsService = {
       const ads = await this.fetchAds();
       ads.unshift(ad);
       localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(ads));
+      broadcastDataUpdate('pet_ads', { adId: ad.id });
       return ad;
     }
   },
@@ -2158,6 +2174,7 @@ export const PetAdsService = {
     if (isFirebaseConfigured && db) {
       try {
         await deleteDoc(doc(db, 'pet_ads', adId));
+        broadcastDataUpdate('pet_ads', { adId });
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `pet_ads/${adId}`);
       }
@@ -2165,6 +2182,7 @@ export const PetAdsService = {
       const ads = await JSON.parse(localStorage.getItem(LOCAL_PETS_KEY) || '[]');
       const filtered = ads.filter((a: any) => a.id !== adId);
       localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(filtered));
+      broadcastDataUpdate('pet_ads', { adId });
     }
   }
 };
@@ -2273,6 +2291,7 @@ export const MarketplaceService = {
     if (isFirebaseConfigured && db) {
       try {
         await setDoc(doc(db, 'marketplace_products', product.id), cleanUndefined(product));
+        broadcastDataUpdate('marketplace', { productId: product.id });
         return product;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `marketplace_products/${product.id}`);
@@ -2281,6 +2300,7 @@ export const MarketplaceService = {
       const products = await this.fetchProducts();
       products.unshift(product);
       localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(products));
+      broadcastDataUpdate('marketplace', { productId: product.id });
       return product;
     }
   },
@@ -2289,6 +2309,7 @@ export const MarketplaceService = {
     if (isFirebaseConfigured && db) {
       try {
         await deleteDoc(doc(db, 'marketplace_products', productId));
+        broadcastDataUpdate('marketplace', { productId });
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `marketplace_products/${productId}`);
       }
@@ -2296,6 +2317,7 @@ export const MarketplaceService = {
       const products = await JSON.parse(localStorage.getItem(LOCAL_ACC_KEY) || '[]');
       const filtered = products.filter((p: any) => p.id !== productId);
       localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(filtered));
+      broadcastDataUpdate('marketplace', { productId });
     }
   }
 };
@@ -2348,12 +2370,15 @@ export const JobBoardService = {
       clinicAddress: jobData.clinicAddress || '',
       clinicWebsite: jobData.clinicWebsite || '',
       clinicContactPhone: jobData.clinicContactPhone || '',
-      clinicFacilities: jobData.clinicFacilities || ''
+      clinicFacilities: jobData.clinicFacilities || '',
+      agreedToSafetyTerms: jobData.agreedToSafetyTerms ?? true,
+      agreedToSafetyTermsTimestamp: jobData.agreedToSafetyTermsTimestamp || Date.now()
     };
 
     if (isFirebaseConfigured && db) {
       try {
         await setDoc(doc(db, 'job_posts', job.id), cleanUndefined(job));
+        broadcastDataUpdate('jobs', { jobId: job.id });
         return job;
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `job_posts/${job.id}`);
@@ -2362,6 +2387,7 @@ export const JobBoardService = {
       const jobs = await this.fetchJobs();
       jobs.unshift(job);
       localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+      broadcastDataUpdate('jobs', { jobId: job.id });
       return job;
     }
   },
@@ -2376,6 +2402,7 @@ export const JobBoardService = {
     if (isFirebaseConfigured && db) {
       try {
         await updateDoc(doc(db, 'job_posts', jobId), cleanUndefined(updates));
+        broadcastDataUpdate('jobs', { jobId });
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `job_posts/${jobId}`);
       }
@@ -2385,6 +2412,7 @@ export const JobBoardService = {
       if (idx !== -1) {
         jobs[idx] = { ...jobs[idx], ...updates };
         localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+        broadcastDataUpdate('jobs', { jobId });
       }
     }
 
@@ -2415,6 +2443,7 @@ export const JobBoardService = {
     if (isFirebaseConfigured && db) {
       try {
         await updateDoc(doc(db, 'job_posts', jobId), cleanUndefined(updates));
+        broadcastDataUpdate('jobs', { jobId });
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `job_posts/${jobId}`);
       }
@@ -2424,6 +2453,7 @@ export const JobBoardService = {
       if (idx !== -1) {
         jobs[idx] = { ...jobs[idx], ...updates };
         localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+        broadcastDataUpdate('jobs', { jobId });
       }
     }
 
@@ -2449,6 +2479,7 @@ export const JobBoardService = {
     if (isFirebaseConfigured && db) {
       try {
         await updateDoc(doc(db, 'job_posts', jobId), cleanUndefined(updatedData));
+        broadcastDataUpdate('jobs', { jobId });
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `job_posts/${jobId}`);
       }
@@ -2458,6 +2489,7 @@ export const JobBoardService = {
       if (idx !== -1) {
         jobs[idx] = { ...jobs[idx], ...updatedData } as JobPost;
         localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(jobs));
+        broadcastDataUpdate('jobs', { jobId });
       }
     }
   },
@@ -2466,6 +2498,7 @@ export const JobBoardService = {
     if (isFirebaseConfigured && db) {
       try {
         await deleteDoc(doc(db, 'job_posts', jobId));
+        broadcastDataUpdate('jobs', { jobId });
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `job_posts/${jobId}`);
       }
@@ -2473,6 +2506,7 @@ export const JobBoardService = {
       const jobs = await this.fetchJobs();
       const filtered = jobs.filter(j => j.id !== jobId);
       localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(filtered));
+      broadcastDataUpdate('jobs', { jobId });
     }
   },
 
@@ -2537,6 +2571,8 @@ export const JobBoardService = {
       answers: appData.answers || [],
       submittedDocs: appData.submittedDocs || {},
       status: 'Pending',
+      agreedToSafetyProtocol: appData.agreedToSafetyProtocol ?? true,
+      agreedToSafetyProtocolTimestamp: appData.agreedToSafetyProtocolTimestamp || Date.now(),
       createdAt: Date.now()
     };
 
@@ -2618,7 +2654,6 @@ export const NotificationService = {
         );
         const snapshot = await getDocs(q);
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as VetNotification[];
-        list.sort((a, b) => b.createdAt - a.createdAt);
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'notifications');
       }
@@ -2628,8 +2663,47 @@ export const NotificationService = {
       } catch {
         list = [];
       }
-      list = list.filter(n => n.userId === userId).sort((a, b) => b.createdAt - a.createdAt);
+      list = list.filter(n => n.userId === userId);
     }
+
+    // Merge global admin broadcasts for every user
+    try {
+      const broadcasts = await BroadcastNotificationService.fetchBroadcasts();
+      if (broadcasts && broadcasts.length > 0) {
+        let readBroadcastIds: Set<string> = new Set();
+        try {
+          const raw = localStorage.getItem('va_read_broadcasts_' + userId);
+          if (raw) readBroadcastIds = new Set(JSON.parse(raw));
+        } catch {}
+
+        let deletedBroadcastIds: Set<string> = new Set();
+        try {
+          const raw = localStorage.getItem('va_deleted_broadcasts_' + userId);
+          if (raw) deletedBroadcastIds = new Set(JSON.parse(raw));
+        } catch {}
+
+        const broadcastNotifs: VetNotification[] = broadcasts
+          .filter(b => !deletedBroadcastIds.has(b.id))
+          .map(b => ({
+            id: 'bcast_notif_' + b.id,
+            userId: userId,
+            senderId: b.authorId,
+            senderName: b.authorName || 'VetAxis Admin',
+            type: 'broadcast',
+            targetId: b.actionUrl || b.id,
+            targetType: 'broadcast',
+            message: `📢 [${b.title}] ${b.message}`,
+            read: readBroadcastIds.has(b.id),
+            createdAt: b.createdAt
+          }));
+        
+        list = [...list, ...broadcastNotifs];
+      }
+    } catch (e) {
+      console.warn('Error merging broadcasts into user notifications:', e);
+    }
+
+    list.sort((a, b) => b.createdAt - a.createdAt);
     return list;
   },
 
@@ -2672,7 +2746,7 @@ export const NotificationService = {
     if (isFirebaseConfigured && db) {
       try {
         const list = await this.fetchNotifications(userId);
-        const unread = list.filter(n => !n.read);
+        const unread = list.filter(n => !n.read && !n.id.startsWith('bcast_notif_'));
         await Promise.all(unread.map(async (n) => {
           await updateDoc(doc(db, 'notifications', n.id), { read: true });
         }));
@@ -2693,9 +2767,29 @@ export const NotificationService = {
       });
       localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(list));
     }
+
+    // Also mark all broadcasts as read for this user
+    try {
+      const broadcasts = await BroadcastNotificationService.fetchBroadcasts();
+      const allBcastIds = broadcasts.map(b => b.id);
+      localStorage.setItem('va_read_broadcasts_' + userId, JSON.stringify(allBcastIds));
+    } catch {}
   },
 
-  async deleteNotification(notificationId: string): Promise<void> {
+  async deleteNotification(notificationId: string, userId?: string): Promise<void> {
+    if (notificationId.startsWith('bcast_notif_')) {
+      const realBcastId = notificationId.replace('bcast_notif_', '');
+      const storageKey = 'va_deleted_broadcasts_' + (userId || 'current');
+      try {
+        let delIds: string[] = [];
+        const raw = localStorage.getItem(storageKey);
+        if (raw) delIds = JSON.parse(raw);
+        if (!delIds.includes(realBcastId)) delIds.push(realBcastId);
+        localStorage.setItem(storageKey, JSON.stringify(delIds));
+      } catch {}
+      return;
+    }
+
     if (isFirebaseConfigured && db) {
       try {
         await deleteDoc(doc(db, 'notifications', notificationId));
@@ -2711,6 +2805,353 @@ export const NotificationService = {
       }
       const filtered = list.filter(n => n.id !== notificationId);
       localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(filtered));
+    }
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// BROADCAST NOTIFICATIONS SERVICE (Admin to All Users)
+// Delivers notifications in-app and directly to the browser /
+// mobile notification bar via Web Push API even if users haven't logged in for days
+// ─────────────────────────────────────────────────────────────────
+export const BroadcastNotificationService = {
+  // Helper to convert base64 url-safe string to Uint8Array for PushManager subscribe
+  urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  },
+
+  // Check if browser/mobile native notifications are supported
+  isNativeNotificationSupported(): boolean {
+    return typeof window !== 'undefined' && 'Notification' in window;
+  },
+
+  // Check if PushManager is supported
+  isPushManagerSupported(): boolean {
+    return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+  },
+
+  // Get current browser notification permission
+  getNotificationPermission(): NotificationPermission {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
+    return Notification.permission;
+  },
+
+  // Request native browser/mobile notification permission and auto-register push subscription
+  async requestNotificationPermission(user?: UserProfile | null): Promise<NotificationPermission> {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        // Register Web Push subscription in background
+        this.subscribeToPushNotifications(user).catch(err => {
+          console.warn('[Web Push] Auto-subscribe error:', err);
+        });
+      }
+      return permission;
+    } catch (err) {
+      console.warn('Notification permission request failed:', err);
+      return 'denied';
+    }
+  },
+
+  // Retrieve current active PushSubscription if available
+  async getPushSubscription(): Promise<PushSubscription | null> {
+    if (!this.isPushManagerSupported()) return null;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      return await registration.pushManager.getSubscription();
+    } catch (err) {
+      console.warn('[Web Push] Failed to get existing subscription:', err);
+      return null;
+    }
+  },
+
+  // Subscribe this browser/device to Web Push API
+  async subscribeToPushNotifications(user?: UserProfile | null): Promise<PushSubscription | null> {
+    if (!this.isPushManagerSupported()) return null;
+    if (this.getNotificationPermission() !== 'granted') return null;
+
+    try {
+      // 1. Fetch server public VAPID key
+      let vapidPublicKey = '';
+      try {
+        const res = await fetch('/api/push/public-key');
+        if (res.ok) {
+          const data = await res.json();
+          vapidPublicKey = data.publicKey;
+        }
+      } catch (e) {
+        console.warn('[Web Push] Could not fetch public key from server:', e);
+      }
+
+      if (!vapidPublicKey) {
+        console.warn('[Web Push] Server did not return a public VAPID key.');
+        return null;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        const convertedKey = this.urlBase64ToUint8Array(vapidPublicKey);
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedKey
+        });
+      }
+
+      if (subscription) {
+        const rawJson = subscription.toJSON();
+        const subData = {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: rawJson.keys?.p256dh || '',
+            auth: rawJson.keys?.auth || ''
+          },
+          userId: user?.uid || 'guest',
+          userRole: user?.role || 'user',
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+
+        // 1. Sync to backend API
+        fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: rawJson,
+            userId: user?.uid,
+            userRole: user?.role
+          })
+        }).catch(err => console.warn('[Web Push] Error syncing sub to server:', err));
+
+        // 2. Sync to Firestore push_subscriptions collection for persistent audit & multi-user distribution
+        if (isFirebaseConfigured && db) {
+          try {
+            // Generate clean doc ID from hash/b64 of endpoint
+            const subDocId = 'sub_' + btoa(subscription.endpoint.slice(-32)).replace(/[^a-zA-Z0-9]/g, '_');
+            await setDoc(doc(db, 'push_subscriptions', subDocId), cleanUndefined(subData), { merge: true });
+          } catch (err) {
+            handleFirestoreError(err, OperationType.CREATE, 'push_subscriptions');
+          }
+        }
+      }
+
+      return subscription;
+    } catch (err) {
+      console.warn('[Web Push] Failed to register push subscription:', err);
+      return null;
+    }
+  },
+
+  // Send a native OS / mobile notification bar notification
+  async sendNativeNotification(title: string, options: { body: string; icon?: string; tag?: string; url?: string; priority?: string }): Promise<boolean> {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    if (Notification.permission !== 'granted') return false;
+
+    const notificationOptions = {
+      body: options.body,
+      icon: options.icon || '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: options.tag || 'broadcast_' + Date.now(),
+      vibrate: [250, 100, 250, 100, 250],
+      renotify: true,
+      data: { url: options.url || '/' }
+    };
+
+    try {
+      // 1. Prefer Service Worker registration (critical for Android status bar & background PWA)
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration && 'showNotification' in registration) {
+          await registration.showNotification(title, notificationOptions as any);
+          return true;
+        }
+      }
+      
+      // 2. Fallback to standard Window Notification
+      const notif = new Notification(title, notificationOptions);
+      if (options.url) {
+        notif.onclick = () => {
+          window.focus();
+          notif.close();
+        };
+      }
+      return true;
+    } catch (err) {
+      console.warn('Failed to display native notification:', err);
+      return false;
+    }
+  },
+
+  // Fetch all broadcast notifications
+  async fetchBroadcasts(): Promise<BroadcastNotification[]> {
+    let list: BroadcastNotification[] = [];
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'broadcast_notifications'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BroadcastNotification[];
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'broadcast_notifications');
+      }
+    } else {
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_BROADCASTS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+    }
+    return list.sort((a, b) => b.createdAt - a.createdAt);
+  },
+
+  // Publish a new custom text broadcast notification from Admin to all users
+  async createBroadcast(data: Partial<BroadcastNotification>, author: UserProfile): Promise<BroadcastNotification> {
+    const broadcast: BroadcastNotification = {
+      id: 'bcast_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      title: data.title?.trim() || 'Notice from VetAxis 360',
+      message: data.message?.trim() || '',
+      type: data.type || 'announcement',
+      priority: data.priority || 'normal',
+      authorId: author.uid,
+      authorName: author.name || 'System Administrator',
+      authorEmail: author.email,
+      createdAt: Date.now(),
+      actionUrl: data.actionUrl?.trim() || undefined,
+      actionLabel: data.actionLabel?.trim() || undefined
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'broadcast_notifications', broadcast.id), cleanUndefined(broadcast));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `broadcast_notifications/${broadcast.id}`);
+      }
+    } else {
+      let list: BroadcastNotification[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_BROADCASTS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      list.unshift(broadcast);
+      localStorage.setItem(LOCAL_BROADCASTS_KEY, JSON.stringify(list));
+    }
+
+    // Broadcast cross-tab and cross-window sync event
+    broadcastDataUpdate('broadcasts', { broadcastId: broadcast.id, broadcast });
+
+    // Also attempt native notification display for this browser immediately
+    if (this.getNotificationPermission() === 'granted') {
+      await this.sendNativeNotification(`📢 ${broadcast.title}`, {
+        body: broadcast.message,
+        tag: 'broadcast_' + broadcast.id,
+        url: broadcast.actionUrl || '/'
+      });
+    }
+
+    // Trigger Web Push API to send real-time browser/mobile push notifications to all subscribed devices
+    try {
+      let activeSubscriptions: any[] = [];
+      if (isFirebaseConfigured && db) {
+        try {
+          const snap = await getDocs(collection(db, 'push_subscriptions'));
+          activeSubscriptions = snap.docs.map(d => d.data());
+        } catch (e) {
+          console.warn('[Web Push] Could not fetch firestore push_subscriptions:', e);
+        }
+      }
+
+      await fetch('/api/push/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: broadcast.title,
+          message: broadcast.message,
+          type: broadcast.type,
+          priority: broadcast.priority,
+          actionUrl: broadcast.actionUrl || '/',
+          subscriptions: activeSubscriptions
+        })
+      });
+      console.log('[Web Push] Broadcast push trigger delivered to backend API.');
+    } catch (pushErr) {
+      console.warn('[Web Push] Broadcast push dispatch error:', pushErr);
+    }
+
+    return broadcast;
+  },
+
+  // Delete a broadcast notification
+  async deleteBroadcast(broadcastId: string): Promise<void> {
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'broadcast_notifications', broadcastId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `broadcast_notifications/${broadcastId}`);
+      }
+    } else {
+      let list: BroadcastNotification[] = [];
+      try {
+        list = JSON.parse(localStorage.getItem(LOCAL_BROADCASTS_KEY) || '[]');
+      } catch {
+        list = [];
+      }
+      list = list.filter(b => b.id !== broadcastId);
+      localStorage.setItem(LOCAL_BROADCASTS_KEY, JSON.stringify(list));
+    }
+    broadcastDataUpdate('broadcasts', { broadcastId, deleted: true });
+  },
+
+  // Check and dispatch unseen broadcasts (for returning users who haven't logged in for several days)
+  async checkAndDispatchUnseenBroadcasts(onNewBroadcast?: (b: BroadcastNotification) => void): Promise<BroadcastNotification[]> {
+    try {
+      const broadcasts = await this.fetchBroadcasts();
+      if (!broadcasts || broadcasts.length === 0) return [];
+
+      let seenIds: string[] = [];
+      try {
+        const raw = localStorage.getItem(LOCAL_SEEN_BROADCASTS_KEY);
+        if (raw) seenIds = JSON.parse(raw);
+      } catch {
+        seenIds = [];
+      }
+
+      const seenSet = new Set(seenIds);
+      const newBroadcasts = broadcasts.filter(b => !seenSet.has(b.id));
+
+      if (newBroadcasts.length > 0) {
+        for (const b of newBroadcasts) {
+          seenSet.add(b.id);
+
+          // 1. Dispatch native browser / mobile status bar notification
+          await this.sendNativeNotification(`📢 ${b.title}`, {
+            body: b.message,
+            tag: 'broadcast_' + b.id,
+            url: b.actionUrl || '/'
+          });
+
+          // 2. Trigger in-app callback (banner/toast)
+          if (onNewBroadcast) {
+            onNewBroadcast(b);
+          }
+        }
+
+        // Save updated seen IDs to prevent duplicate alerts on re-renders
+        localStorage.setItem(LOCAL_SEEN_BROADCASTS_KEY, JSON.stringify(Array.from(seenSet).slice(-100)));
+      }
+
+      return newBroadcasts;
+    } catch (err) {
+      console.warn('Error checking unseen broadcasts:', err);
+      return [];
     }
   }
 };

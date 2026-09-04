@@ -191,6 +191,15 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  onClick={(e) => handleNavClick('careers_safety', e)}
+                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors flex items-center gap-1 ${activeSection === 'careers_safety' ? 'font-bold text-[#5a5a40]' : ''}`}
+                >
+                  <ShieldCheck className="w-3 h-3 text-amber-700 shrink-0" />
+                  <span>Careers Safety Protocol</span>
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={(e) => handleNavClick('contact', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'contact' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -205,7 +214,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
         {/* Bottom Disclaimers & Copyright */}
         <div className="mt-12 pt-6 border-t border-[#ece7d8] flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-[#8c8c69]">
           <div>
-            &copy; {currentYear} VetAxis 360 Healthcare Network. All rights reserved. Registered in Pakistan.
+            &copy; {currentYear} VetAxis 360 Healthcare Network. All rights reserved.
           </div>
           <div className="text-center sm:text-right">
             Independent technology directory. For critical medical emergencies, consult licensed veterinarians immediately.

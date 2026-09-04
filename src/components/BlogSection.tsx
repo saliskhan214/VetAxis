@@ -22,6 +22,7 @@ import {
 import { BlogArticle, UserProfile } from '../types';
 import { BlogService } from '../lib/blogService';
 import { AdContainer } from './AdContainer';
+import { useTabRevalidation } from '../lib/tabSync';
 
 interface BlogSectionProps {
   currentUser: UserProfile | null;
@@ -130,6 +131,12 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
       }
     });
   }, []);
+
+  // Automatically refresh articles when tab is reopened or refocused
+  useTabRevalidation({
+    entity: 'news',
+    onRevalidate: loadArticles,
+  });
 
   // Update slug automatically from title
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
