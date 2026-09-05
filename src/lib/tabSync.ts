@@ -13,6 +13,7 @@ export type SyncEntity =
   | 'broadcasts'
   | 'auth' 
   | 'campaigns'
+  | 'chat'
   | 'all';
 
 interface SyncMessage {

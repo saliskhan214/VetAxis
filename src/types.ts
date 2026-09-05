@@ -708,6 +708,45 @@ export interface BlogArticle {
   views: number;
 }
 
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  senderProfilePic?: string;
+  receiverId: string;
+  receiverName: string;
+  receiverRole: UserRole;
+  text: string;
+  createdAt: number; // millisecond timestamp
+  expiresAt: number; // createdAt + (15 * 24 * 60 * 60 * 1000)
+  delivered?: boolean;
+  read?: boolean;
+  readAt?: number;
+}
+
+export interface ChatConversation {
+  id: string;
+  participants: string[];
+  participantDetails: {
+    [userId: string]: {
+      name: string;
+      role: UserRole;
+      profilePic?: string;
+      email?: string;
+      phone?: string;
+    };
+  };
+  lastMessageText?: string;
+  lastMessageTimestamp?: number;
+  lastSenderId?: string;
+  unreadCount?: { [userId: string]: number };
+  createdAt: number;
+  updatedAt: number;
+}
+
+
 
 
 

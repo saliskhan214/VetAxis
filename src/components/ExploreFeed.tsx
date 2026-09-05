@@ -7,6 +7,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 import { InteractiveClinicMap } from './InteractiveClinicMap';
+import { ChatModal } from './ChatModal';
 
 
 interface ExploreFeedProps {
@@ -104,6 +105,15 @@ export function ExploreFeed({
   const [activeContactAdModal, setActiveContactAdModal] = useState<any | null>(null);
   const [adAdvertiserProfile, setAdAdvertiserProfile] = useState<UserProfile | null>(null);
   const [loadingAdProfile, setLoadingAdProfile] = useState<boolean>(false);
+
+  // Direct Consultation Chat Modal state (15-day auto disappearing messages)
+  const [chatRecipient, setChatRecipient] = useState<UserProfile | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+
+  const handleOpenChat = (prof: UserProfile) => {
+    setChatRecipient(prof);
+    setIsChatOpen(true);
+  };
 
   const [activeAds, setActiveAds] = useState<any[]>([]);
   const [deletingAdId, setDeletingAdId] = useState<string | null>(null);
@@ -1955,25 +1965,26 @@ export function ExploreFeed({
 
                 {/* Tactical Communications Strip */}
                 <div className="flex flex-wrap gap-3 mb-6 py-4.5 border-y border-[#f4f1e9]">
+                  {/* DIRECT CHAT FACILITY (15-Day Auto-Disappearing Messages) */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenChat(selectedProfile)}
+                    className="btn-tactile-3d-primary py-2 px-5 text-xs inline-flex items-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    💬 Chat Box ({selectedProfile.role === 'doctor' ? 'Doctor' : selectedProfile.role === 'clinic' ? 'Clinic' : 'Practitioner'})
+                  </button>
+
                   {selectedProfile.phone && (
-                    <>
-                      <a
-                        href={`tel:${selectedProfile.phone}`}
-                        className="btn-tactile-3d-primary py-2 px-5 text-xs inline-flex items-center gap-2"
-                      >
-                        📞 Call Professional
-                      </a>
-                      <a
-                        href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                          `Hi ${selectedProfile.name}, I discovered your clinic portfolio profile on VetAxis with premium clinical registries and would like to schedule an evaluation.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
-                      >
-                        💬 WhatsApp Consult
-                      </a>
-                    </>
+                    <a
+                      href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        `Hi ${selectedProfile.name}, I discovered your clinic portfolio profile on VetAxis with premium clinical registries and would like to schedule an evaluation.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
+                    >
+                      💬 WhatsApp Consult
+                    </a>
                   )}
 
                   {selectedProfile.role === 'clinic' && selectedProfile.location?.lat && selectedProfile.location?.lng && (
@@ -2585,6 +2596,29 @@ export function ExploreFeed({
                     </a>
                   )}
 
+                  {/* 2b. Direct In-App Chat Box */}
+                  {adAdvertiserProfile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = adAdvertiserProfile;
+                        setActiveContactAdModal(null);
+                        handleOpenChat(target);
+                      }}
+                      className="p-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl flex items-center gap-3 transition-all cursor-pointer shadow-sm text-left border-none"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg">
+                        💬
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-black block leading-tight">Direct Chat Box</span>
+                        <span className="text-[9px] text-emerald-100 font-semibold block truncate">
+                          15-Day Auto-Disappearing Messages
+                        </span>
+                      </div>
+                    </button>
+                  )}
+
                   {/* 3. In-App Profile & Reviews */}
                   <button
                     type="button"
@@ -2658,6 +2692,21 @@ export function ExploreFeed({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* DIRECT CONSULTATION CHAT BOX (15-Day Auto-Disappearing Messages) */}
+      <AnimatePresence>
+        {isChatOpen && chatRecipient && (
+          <ChatModal
+            isOpen={isChatOpen}
+            onClose={() => {
+              setIsChatOpen(false);
+              setChatRecipient(null);
+            }}
+            recipient={chatRecipient}
+            currentUser={currentUser}
+          />
         )}
       </AnimatePresence>
 

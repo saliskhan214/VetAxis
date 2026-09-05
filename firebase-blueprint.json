@@ -348,6 +348,46 @@
         "createdAt": { "type": "number" }
       },
       "required": ["farmId", "farmName", "totalHerdSize", "createdAt"]
+    },
+    "ChatConversation": {
+      "title": "ChatConversation",
+      "description": "Direct consultation session between pet owners, clients, and veterinary professionals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participants": { "type": "array" },
+        "participantDetails": { "type": "object" },
+        "lastMessageText": { "type": "string" },
+        "lastMessageTimestamp": { "type": "number" },
+        "lastSenderId": { "type": "string" },
+        "unreadCount": { "type": "object" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "participants", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual consultation message with 15-day auto-disappearing expiration timer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "senderProfilePic": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "receiverName": { "type": "string" },
+        "receiverRole": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "delivered": { "type": "boolean" },
+        "read": { "type": "boolean" },
+        "readAt": { "type": "number" }
+      },
+      "required": ["id", "conversationId", "senderId", "receiverId", "text", "createdAt", "expiresAt"]
     }
   },
   "firestore": {
@@ -358,6 +398,14 @@
     "/users/{userId}/reviews/{reviewId}": {
       "schema": "Review",
       "description": "Feedback reviews left for a specific doctor, clinic, or assistant"
+    },
+    "/chat_conversations/{conversationId}": {
+      "schema": "ChatConversation",
+      "description": "Active direct consultation threads between practitioners and clients"
+    },
+    "/chat_messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Direct consultation messages with 15-day automatic privacy expiration"
     },
     "/pet_ads/{adId}": {
       "schema": "PetAd",
