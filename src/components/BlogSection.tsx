@@ -23,6 +23,7 @@ import { BlogArticle, UserProfile } from '../types';
 import { BlogService } from '../lib/blogService';
 import { AdContainer } from './AdContainer';
 import { useTabRevalidation } from '../lib/tabSync';
+import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 
 interface BlogSectionProps {
   currentUser: UserProfile | null;
@@ -45,8 +46,8 @@ const PRESET_IMAGES = [
 ];
 
 export function BlogSection({ currentUser }: BlogSectionProps) {
-  const [articles, setArticles] = useState<BlogArticle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [articles, setArticles] = useState<BlogArticle[]>(() => swrGlobalCache.get<BlogArticle[]>('blog_articles') || []);
+  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('blog_articles'));
   const [error, setError] = useState<string | null>(null);
 
   // Filter & Search states
@@ -103,10 +104,14 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
 
   // Load articles
   const loadArticles = async () => {
-    setLoading(true);
+    if (!swrGlobalCache.has('blog_articles')) {
+      setLoading(true);
+    }
     try {
-      const data = await BlogService.fetchArticles();
-      setArticles(data);
+      const data = await prefetchSWR('blog_articles', () => BlogService.fetchArticles());
+      if (data) {
+        setArticles(data);
+      }
     } catch (err) {
       setError('Failed to fetch articles. Please check your network connection.');
     } finally {

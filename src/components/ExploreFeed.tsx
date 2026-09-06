@@ -3,6 +3,7 @@ import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd
 import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
 import { useTabRevalidation } from '../lib/tabSync';
+import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
@@ -19,6 +20,7 @@ interface ExploreFeedProps {
   highlightDoctorId?: string | null;
   initialCity?: string | null;
   initialFilter?: string | null;
+  onOpenChat?: (recipient: UserProfile) => void;
 }
 
 const WELCOME_BANNER_SLIDE = {
@@ -58,7 +60,8 @@ export function ExploreFeed({
   highlightClinicId,
   highlightDoctorId,
   initialCity,
-  initialFilter
+  initialFilter,
+  onOpenChat
 }: ExploreFeedProps) {
   const [activeTab, setActiveTab] = useState<UserRole>(() => {
     if (highlightClinicId) return 'clinic';
@@ -66,8 +69,14 @@ export function ExploreFeed({
     return 'doctor';
   });
   const [exploreMenuOpen, setExploreMenuOpen] = useState<boolean>(false);
-  const [professionals, setProfessionals] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [professionals, setProfessionals] = useState<UserProfile[]>(() => {
+    const tab = highlightClinicId ? 'clinic' : 'doctor';
+    return swrGlobalCache.get<UserProfile[]>(`professionals_${tab}`) || [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    const tab = highlightClinicId ? 'clinic' : 'doctor';
+    return !swrGlobalCache.has(`professionals_${tab}`);
+  });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [homeVisitOnly, setHomeVisitOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
@@ -111,8 +120,12 @@ export function ExploreFeed({
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
   const handleOpenChat = (prof: UserProfile) => {
-    setChatRecipient(prof);
-    setIsChatOpen(true);
+    if (onOpenChat) {
+      onOpenChat(prof);
+    } else {
+      setChatRecipient(prof);
+      setIsChatOpen(true);
+    }
   };
 
   const [activeAds, setActiveAds] = useState<any[]>([]);
@@ -598,10 +611,15 @@ export function ExploreFeed({
 
   // Load specialists on mount or tab change
   const loadData = async () => {
-    setLoading(true);
+    const cacheKey = `professionals_${activeTab}`;
+    if (!swrGlobalCache.has(cacheKey)) {
+      setLoading(true);
+    }
     try {
-      const data = await ExploreService.fetchProfessionals(activeTab as any);
-      setProfessionals(data);
+      const data = await prefetchSWR(cacheKey, () => ExploreService.fetchProfessionals(activeTab as any));
+      if (data) {
+        setProfessionals(data);
+      }
     } catch (err) {
       console.error('Failed to load specialists', err);
     } finally {
@@ -1907,6 +1925,8 @@ export function ExploreFeed({
                       src={selectedProfile.profilePic}
                       className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-xl shrink-0 bg-neutral-100"
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-2xl bg-[#f4f1e9] border-4 border-white shadow-xl text-[#5a5a40] text-3xl font-black font-serif flex items-center justify-center shrink-0 uppercase">

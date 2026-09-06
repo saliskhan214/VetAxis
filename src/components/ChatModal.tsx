@@ -3,14 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Send,
   Clock,
-  ShieldCheck,
   Check,
   CheckCheck,
   X,
   User,
   Sparkles,
   Info,
-  ChevronDown,
   MessageSquare,
   AlertCircle,
   Smile
@@ -59,7 +57,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   const [inputText, setInputText] = useState<string>(initialMessage);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState<boolean>(false);
-  const [showSimulateToolbar, setShowSimulateToolbar] = useState<boolean>(false);
   const [showTimerNotice, setShowTimerNotice] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -142,16 +139,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
     }
   };
 
-  // Interactive reply simulator: lets users test two-way communication immediately
-  const handleSimulateDoctorReply = async (replyText: string) => {
-    try {
-      await ChatService.simulateDoctorReply(recipient, effectiveSender, replyText);
-      scrollToBottom('smooth');
-    } catch (err) {
-      console.error('[ChatModal] Simulated reply failed:', err);
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -187,13 +174,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
     '⏰ What are your current clinical OPD consultation hours?',
     '🚗 Do you provide doorstep home visits or farm calls in my area?',
     '💉 I need guidance regarding vaccination schedules & pet checkup.'
-  ];
-
-  const doctorSimulatedReplies = [
-    `👋 Hello! Yes, I am currently on duty. Please describe your animal's symptoms and age.`,
-    `🚗 Yes, I do offer doorstep home visits. Please share your location and urgency level.`,
-    `🏥 Our clinical hours are 9:00 AM to 8:00 PM Monday through Saturday. You are welcome to visit!`,
-    `💊 Based on clinical protocol, please keep the animal hydrated and isolated until physical evaluation.`
   ];
 
   const recipientRoleLabel =
@@ -430,41 +410,6 @@ export const ChatModal: React.FC<ChatModalProps> = ({
           )}
         </div>
 
-        {/* TWO-USER INTERACTIVE SIMULATION TESTING BAR (Allows testing replies from doctor with one click) */}
-        <div className="bg-[#f4f1e9] border-t border-[#e3dec9] px-4 py-2 shrink-0">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowSimulateToolbar(!showSimulateToolbar)}
-              className="text-[11px] font-black text-[#5a5a40] hover:text-[#3e3e2b] flex items-center gap-1.5 cursor-pointer select-none"
-            >
-              <span>💬 Test Two-Way Clinical Reply</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSimulateToolbar ? 'rotate-180' : ''}`} />
-            </button>
-            <span className="text-[10px] text-[#7a766f]">
-              Direct communication between pet owner & doctor
-            </span>
-          </div>
-
-          {showSimulateToolbar && (
-            <div className="mt-2 pt-2 border-t border-[#e3dec9] space-y-1.5 animate-fadeIn">
-              <div className="text-[10px] font-bold text-[#7a766f]">
-                Simulate reply received from {recipient.name}:
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {doctorSimulatedReplies.map((reply, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSimulateDoctorReply(reply)}
-                    className="text-[10.5px] px-2.5 py-1 rounded-xl bg-white hover:bg-emerald-50 border border-stone-300 hover:border-emerald-400 text-stone-700 transition-colors cursor-pointer text-left truncate max-w-full"
-                  >
-                    💬 {reply}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* BOTTOM INPUT BAR */}
         <div className="p-3 sm:p-4 bg-white border-t border-[#e3dec9] shrink-0 relative">
           {/* Lightweight Veterinary Emoji Picker Popover */}
@@ -496,7 +441,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Message ${recipient.name}... (disappears in 15 days)`}
+              placeholder={`Message ${recipient.name}...`}
               className="flex-1 bg-[#fdfbf7] border border-[#e3dec9] focus:border-[#5a5a40] focus:bg-white rounded-2xl px-4 py-3 text-sm text-[#3c3c3b] outline-none transition-all placeholder:text-[#a49f92]"
               maxLength={5000}
             />
@@ -512,11 +457,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center justify-between text-[10px] text-[#a49f92] mt-2 px-1">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Protected consultation. Auto-disappearing after 15 days.</span>
-            </span>
+          <div className="flex items-center justify-end text-[10px] text-[#a49f92] mt-2 px-1">
             <span>Press Enter to send</span>
           </div>
         </div>

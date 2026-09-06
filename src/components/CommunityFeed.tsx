@@ -2,13 +2,13 @@ import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
 import { CommunityService, NotificationService, LocationService, secureGetItem } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
+import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { motion, AnimatePresence } from 'motion/react';
-import VeterinaryNewsBrief from './VeterinaryNewsBrief';
 import { BlogSection } from './BlogSection';
 import { AdContainer } from './AdContainer';
 import { 
   Sparkles, MessageCircle, AlertCircle, Heart, ThumbsUp, AlertTriangle, 
-  ShieldCheck, TrendingUp, Users, Megaphone, Navigation, CreditCard, 
+  ShieldCheck, TrendingUp, Megaphone, Navigation, CreditCard, 
   CheckCircle, DollarSign, MapPin, Zap, Radio, Send, X, HelpCircle,
   ChevronLeft, ChevronRight, Newspaper
 } from 'lucide-react';
@@ -46,8 +46,8 @@ interface CommunityFeedProps {
 }
 
 export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedProps) {
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [posts, setPosts] = useState<CommunityPost[]>(() => swrGlobalCache.get<CommunityPost[]>('community_posts') || []);
+  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('community_posts'));
   const [activeFilter, setActiveFilter] = useState<string>('all');
   
   const [cityFilter, setCityFilter] = useState<string>(() => {
@@ -107,8 +107,6 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [payerName, setPayerName] = useState<string>('');
   const [payerCvvOrPin, setPayerCvvOrPin] = useState<string>('');
   const [nearbyEstimCount, setNearbyEstimCount] = useState<number>(0);
-  const [isNewsModalOpen, setIsNewsModalOpen] = useState<boolean>(false);
-  const [newsActiveTab, setNewsActiveTab] = useState<'guides' | 'news'>('news');
 
   // Subscription Alert privilege evaluations
   const userTier = currentUser.subscriptionTier;
@@ -121,10 +119,14 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
   // Load posts
   const loadPosts = async () => {
-    setLoading(true);
+    if (!swrGlobalCache.has('community_posts')) {
+      setLoading(true);
+    }
     try {
-      const data = await CommunityService.fetchPosts();
-      setPosts(data);
+      const data = await prefetchSWR('community_posts', () => CommunityService.fetchPosts());
+      if (data) {
+        setPosts(data);
+      }
     } catch (err) {
       console.error('Failed to load posts', err);
     } finally {
@@ -518,14 +520,6 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     if (categoryCounts[p.category] !== undefined) categoryCounts[p.category]++;
   });
   const totalPostsCount = posts.length || 1;
-
-  // Active contributors (Unique posters)
-  const recentContributors = Array.from(new Set(posts.map((p) => p.authorEmail)))
-    .map((email) => {
-      return posts.find((p) => p.authorEmail === email);
-    })
-    .filter(Boolean)
-    .slice(0, 5) as CommunityPost[];
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4">
@@ -1393,57 +1387,6 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
         {/* RIGHT COLUMN SIDEBAR (4 columns) */}
         <div className="col-span-1 lg:col-span-4 space-y-6 w-full">
-          
-          {/* VETERINARY NEWS BRIEF TRIGGER CARD */}
-          <div className="bg-gradient-to-br from-[#fcfbf9] via-[#f7f5ef] to-stone-100 border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-5 shadow-sm space-y-3.5 text-left relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-[#5a5a40]/5 rounded-bl-full pointer-events-none" />
-            <div className="space-y-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#a0522d] bg-[#a0522d]/10 px-2.5 py-0.5 rounded">📰 Veterinary News</span>
-              <h4 className="font-serif font-black text-sm text-[#373735]">Veterinary News Hub</h4>
-              <p className="text-[11px] font-medium text-[#7a766f] leading-relaxed">
-                Natively access peer-reviewed clinical studies, global disease alerts, and small animal studies.
-              </p>
-            </div>
-            
-            <div className="w-full">
-              <button
-                onClick={() => {
-                  setNewsActiveTab('news');
-                  setIsNewsModalOpen(true);
-                }}
-                className="w-full cursor-pointer text-center bg-[#5a5a40] hover:bg-[#4a4a34] text-white py-2.5 px-4 rounded-xl font-bold text-[11px] border border-b-[3px] border-b-[#303022] transition-all flex items-center justify-center gap-1.5 shadow-xs"
-              >
-                <span>📰 View News Briefs</span>
-              </button>
-            </div>
-          </div>
-
-          {/* ACTIVE ADVISORS */}
-          <div className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-3xl p-6 shadow-md space-y-4 text-left">
-            <div className="flex items-center gap-2 border-b border-[#f4f1e9] pb-3">
-              <Users className="w-5 h-5 text-[#5a5a40]" />
-              <h4 className="font-serif font-black text-base text-[#373735]">Top Contributors</h4>
-            </div>
-
-            <div className="space-y-3.5">
-              {recentContributors.length === 0 ? (
-                <div className="text-xs font-semibold text-[#a49f92] py-2 text-center">No active advisors online.</div>
-              ) : (
-                recentContributors.map((post, idx) => (
-                  <div key={idx} className="flex items-center gap-3 text-xs bg-[#fcf9f2] border border-[#e3dec9] p-2.5 rounded-2xl">
-                    <div className="w-8 h-8 bg-[#5a5a40] text-[#fcf9f2] rounded-xl flex items-center justify-center font-black uppercase text-xs shrink-0">
-                      {post.authorName[0]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-extrabold text-[#373735] truncate leading-tight">{post.authorName}</div>
-                      <div className="text-[10px] text-[#a49f92] font-semibold uppercase tracking-wider capitalize mt-0.5">{post.role} Member</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
           {/* Google AdSense Community Sidebar Unit */}
           <div className="w-full">
             <AdContainer 
@@ -1453,42 +1396,9 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               className="shadow-sm"
             />
           </div>
-
         </div>
 
       </div>
-
-      {/* VETERINARY NEWS BRIEF & KNOWLEDGE HUB MODAL */}
-      <AnimatePresence>
-        {isNewsModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-[#fcfbf9] border-2 border-[#e3dec9] rounded-3xl max-w-6xl w-full max-h-[92vh] overflow-y-auto shadow-2xl relative p-1"
-            >
-              {/* Close Button */}
-              <button
-                onClick={() => setIsNewsModalOpen(false)}
-                className="absolute top-5 right-5 w-9 h-9 bg-white border border-[#e3dec9] hover:bg-stone-100 text-[#373735] font-black rounded-full flex items-center justify-center cursor-pointer transition-colors shadow-sm z-50 text-xs"
-              >
-                ✕
-              </button>
-
-              {/* Header Title */}
-              <div className="border-b border-[#e3dec9] px-6 pt-5 pb-3 flex items-center gap-2">
-                <span className="text-xl">📰</span>
-                <span className="text-base font-black text-[#5a5a40] font-serif">Veterinary News Briefs</span>
-              </div>
-
-              <div className="p-3">
-                <VeterinaryNewsBrief />
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* EMERGENCY BOOST PAYMENT SIMULATION MODAL */}
       <AnimatePresence>

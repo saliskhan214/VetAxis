@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { UserProfile, VetNotification } from '../types';
-import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2 } from 'lucide-react';
+import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getPrefetchProps, prefetchSection } from '../lib/prefetch';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -13,6 +14,8 @@ interface NavbarProps {
   onDeleteNotification: (id: string) => void;
   onNotificationClick?: (notif: VetNotification) => void;
   onOpenAboutUs?: () => void;
+  onOpenMessenger?: () => void;
+  unreadMessagesCount?: number;
 }
 
 export function Navbar({ 
@@ -24,7 +27,9 @@ export function Navbar({
   onMarkAllAsRead,
   onDeleteNotification,
   onNotificationClick,
-  onOpenAboutUs
+  onOpenAboutUs,
+  onOpenMessenger,
+  unreadMessagesCount = 0
 }: NavbarProps) {
   if (!user) return null;
 
@@ -76,23 +81,74 @@ export function Navbar({
   return (
     <>
       <nav className="sticky top-0 z-[200] max-w-7xl mx-auto w-[95%] mt-4 rounded-2xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] bg-white/90 backdrop-blur-md px-4 md:px-8 h-18 flex items-center justify-between shadow-[0_10px_30px_-10px_rgba(90,90,64,0.15)]">
-        <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-3 lg:gap-6">
           <motion.button
             whileHover={{ scale: 1.05, y: -1 }}
             whileTap={{ scale: 0.95 }}
+            {...getPrefetchProps('explore', user)}
             onClick={() => onNavigate('explore')}
-            className="flex items-center gap-2 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none font-display"
+            className="flex items-center gap-2 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none font-display shrink-0"
           >
             <span className="text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">🐾</span>
             <span className="tracking-tight font-display text-2xl">
               Vet<span className="text-[#a0522d] font-bold font-display">Axis</span> <span className="text-xs font-black px-1.5 py-0.5 rounded bg-[#a0522d] text-white align-super">360</span>
             </span>
           </motion.button>
+
+          {/* Desktop Critical Sections Navigation Bar with Mouse-Over Predictive Prefetching */}
+          <div className="hidden lg:flex items-center gap-1 xl:gap-1.5 bg-[#fdfbf7]/80 p-1 rounded-2xl border border-[#ece7d8]">
+            {[
+              { id: 'explore', label: 'Explore', icon: '🩺' },
+              { id: 'clinical_tools', label: 'Calculators', icon: '🧮' },
+              { id: 'community', label: 'Community', icon: '💬' },
+              { id: 'marketplace', label: 'Products', icon: '🛒' },
+              { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },
+              { id: 'jobs', label: 'Jobs', icon: '💼' },
+              { id: 'news', label: 'Guides', icon: '📰' },
+            ].map(tab => {
+              const isActive = activeSection === tab.id;
+              const prefetchProps = getPrefetchProps(tab.id, user);
+              return (
+                <button
+                  key={tab.id}
+                  {...prefetchProps}
+                  onClick={() => onNavigate(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
+                    isActive
+                      ? 'bg-[#5a5a40] text-white shadow-xs font-extrabold'
+                      : 'text-[#5a5a40] hover:bg-white hover:shadow-2xs hover:text-[#2b2b24]'
+                  }`}
+                  title={`Open ${tab.label} (Instant Load Prefetched)`}
+                >
+                  <span className="text-sm">{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Right Header Navigation - Notification & Clean Profile Button */}
-        <div className="flex items-center gap-3">
+        {/* Right Header Navigation - Messenger, Notification & Clean Profile Button */}
+        <div className="flex items-center gap-2 sm:gap-3">
           
+          {/* Messenger Button (Left to Notification Button) */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            {...getPrefetchProps('messenger', user)}
+            onClick={onOpenMessenger}
+            className="relative flex items-center justify-center p-2.5 rounded-xl border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs bg-white text-[#5a5a40] border-[#e3dec9] border-b-[#cdc6ad] hover:bg-[#fcf9f2] hover:border-[#5a5a40]"
+            aria-label="Clinical Messenger"
+            title="Clinical Messenger & Conversations (15-Day Auto-Disappear)"
+          >
+            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#5a5a40]" />
+            {unreadMessagesCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-black text-white border border-white animate-bounce shadow">
+                {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+              </span>
+            )}
+          </motion.button>
+
           {/* Notification Bell Dropdown */}
           <div className="relative">
             <motion.button
@@ -168,6 +224,11 @@ export function Navbar({
                         notifications.map(n => (
                           <div 
                             key={n.id}
+                            onMouseEnter={() => {
+                              if (n.type === 'like' || n.type === 'comment') prefetchSection('community', user);
+                              else if (n.type === 'apply') prefetchSection('jobs', user);
+                              else prefetchSection('community', user);
+                            }}
                             onClick={() => {
                               if (onNotificationClick) {
                                 onNotificationClick(n);
@@ -228,6 +289,10 @@ export function Navbar({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onMouseEnter={() => {
+              prefetchSection('profile', user);
+              prefetchSection('community', user);
+            }}
             onClick={() => setIsSidebarOpen(true)}
             className={`flex items-center justify-center p-0.5 rounded-full border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
               isSidebarOpen 
@@ -335,6 +400,7 @@ export function Navbar({
                         <motion.button
                           key={item.id}
                           whileTap={{ scale: 0.98 }}
+                          {...getPrefetchProps(item.id, user)}
                           onClick={() => {
                             if (isLocked) {
                               triggerLockPopup();
@@ -361,11 +427,34 @@ export function Navbar({
                       );
                     })}
 
+                  {/* Clinical Messenger Button in Mobile Drawer */}
+                  <div className="border-t border-[#e3dec9] my-2 pt-3">
+                    <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Direct Consultations</p>
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      {...getPrefetchProps('messenger', user)}
+                      onClick={() => {
+                        setIsSidebarOpen(false);
+                        if (onOpenMessenger) onOpenMessenger();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold text-[#5a5a40] bg-[#fdfbf7] hover:bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] transition-all text-left cursor-pointer"
+                    >
+                      <MessageCircle className="w-5 h-5 text-[#5a5a40]" />
+                      <span className="flex-1">Clinical Messenger</span>
+                      {unreadMessagesCount > 0 && (
+                        <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                          {unreadMessagesCount} New
+                        </span>
+                      )}
+                    </motion.button>
+                  </div>
+
                   {/* About Us / Platform Directory Button */}
                   <div className="border-t border-[#e3dec9] my-2 pt-3">
                     <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Platform Guide</p>
                     <motion.button
                       whileTap={{ scale: 0.98 }}
+                      {...getPrefetchProps('about_directory', user)}
                       onClick={() => {
                         setIsSidebarOpen(false);
                         if (onOpenAboutUs) onOpenAboutUs();
@@ -386,6 +475,7 @@ export function Navbar({
 
                 {/* Profile Card Option */}
                 <button
+                  {...getPrefetchProps('profile', user)}
                   onClick={() => handleMobileNav('profile')}
                   className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${
                     activeSection === 'profile'

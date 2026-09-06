@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { UserProfile, JobPost, JobApplication, UserRole } from '../types';
 import { JobBoardService, NotificationService } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
+import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { AdContainer } from './AdContainer';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -18,9 +19,9 @@ interface JobBoardProps {
 }
 
 export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }: JobBoardProps) {
-  const [jobs, setJobs] = useState<JobPost[]>([]);
+  const [jobs, setJobs] = useState<JobPost[]>(() => swrGlobalCache.get<JobPost[]>('job_posts') || []);
   const [applications, setApplications] = useState<JobApplication[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('job_posts'));
   const [loadingApps, setLoadingApps] = useState<boolean>(false);
   const [loadingAllApps, setLoadingAllApps] = useState<boolean>(false);
 
@@ -151,10 +152,14 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   };
 
   const loadJobs = async () => {
-    setLoading(true);
+    if (!swrGlobalCache.has('job_posts')) {
+      setLoading(true);
+    }
     try {
-      const allJobs = await JobBoardService.fetchJobs();
-      setJobs(allJobs);
+      const allJobs = await prefetchSWR('job_posts', () => JobBoardService.fetchJobs());
+      if (allJobs) {
+        setJobs(allJobs);
+      }
     } catch (err) {
       console.error('Failed to fetch job postings:', err);
     } finally {

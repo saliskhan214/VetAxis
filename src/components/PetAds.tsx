@@ -2,6 +2,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'reac
 import { UserProfile, PetAd } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
+import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -14,9 +15,9 @@ interface PetAdsProps {
 }
 
 export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: PetAdsProps) {
-  const [ads, setAds] = useState<PetAd[]>([]);
+  const [ads, setAds] = useState<PetAd[]>(() => swrGlobalCache.get<PetAd[]>('pet_ads') || []);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('pet_ads'));
   const [speciesFilter, setSpeciesFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>(() => {
     if (initialType === 'adoption' || initialType === 'sale') return initialType;
@@ -117,10 +118,14 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   }, [visibleBoostedPosts.length, isHovered]);
 
   const loadAds = async () => {
-    setLoading(true);
+    if (!swrGlobalCache.has('pet_ads')) {
+      setLoading(true);
+    }
     try {
-      const data = await PetAdsService.fetchAds();
-      setAds(data);
+      const data = await prefetchSWR('pet_ads', () => PetAdsService.fetchAds());
+      if (data) {
+        setAds(data);
+      }
     } catch (err) {
       console.error('Failed to load pet ads', err);
     } finally {

@@ -1355,31 +1355,37 @@ export const ExploreService = {
       try {
         const q = query(collection(db, 'users'), where('role', '==', role));
         const snapshots = await getDocs(q);
-        const list: UserProfile[] = [];
         
-        for (const userDoc of snapshots.docs) {
+        const list: UserProfile[] = await Promise.all(snapshots.docs.map(async (userDoc) => {
           const profile = userDoc.data() as UserProfile;
-          // Subcollection reviews fetch
-          const revSnap = await getDocs(collection(db, 'users', profile.uid, 'reviews'));
-          const reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
-          
-          const filteredReviews = reviews.filter(rev => {
-            const email = (rev.reviewerEmail || '').toLowerCase().trim();
-            return !email || validEmails.has(email);
-          });
-          profile.reviews = filteredReviews;
-          
-          // Recompute stats inline safely
-          if (filteredReviews.length > 0) {
-            const sum = filteredReviews.reduce((s, r) => s + r.rating, 0);
-            profile.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
-            profile.totalReviews = filteredReviews.length;
-          } else {
-            profile.avgRating = 0;
-            profile.totalReviews = 0;
+          try {
+            // Parallel subcollection reviews fetch
+            const revSnap = await getDocs(collection(db, 'users', profile.uid, 'reviews'));
+            const reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
+            
+            const filteredReviews = reviews.filter(rev => {
+              const email = (rev.reviewerEmail || '').toLowerCase().trim();
+              return !email || validEmails.has(email);
+            });
+            profile.reviews = filteredReviews;
+            
+            // Recompute stats inline safely
+            if (filteredReviews.length > 0) {
+              const sum = filteredReviews.reduce((s, r) => s + r.rating, 0);
+              profile.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
+              profile.totalReviews = filteredReviews.length;
+            } else {
+              profile.avgRating = 0;
+              profile.totalReviews = 0;
+            }
+          } catch {
+            profile.reviews = profile.reviews || [];
+            profile.avgRating = profile.avgRating || 0;
+            profile.totalReviews = profile.totalReviews || 0;
           }
-          list.push(injectPresence(injectTemporaryPlatinum(profile)) as UserProfile);
-        }
+          return injectPresence(injectTemporaryPlatinum(profile)) as UserProfile;
+        }));
+        
         return list;
       } catch (err) {
         try {

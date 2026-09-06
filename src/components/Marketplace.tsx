@@ -2,6 +2,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { UserProfile, Product } from '../types';
 import { MarketplaceService } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
+import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -13,9 +14,9 @@ interface MarketplaceProps {
 }
 
 export function Marketplace({ currentUser, onNavigate, highlightProductId }: MarketplaceProps) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => swrGlobalCache.get<Product[]>('marketplace_products') || []);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('marketplace_products'));
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(true);
@@ -36,10 +37,14 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadProducts = async () => {
-    setLoading(true);
+    if (!swrGlobalCache.has('marketplace_products')) {
+      setLoading(true);
+    }
     try {
-      const data = await MarketplaceService.fetchProducts();
-      setProducts(data);
+      const data = await prefetchSWR('marketplace_products', () => MarketplaceService.fetchProducts());
+      if (data) {
+        setProducts(data);
+      }
     } catch (err) {
       console.error('Failed to load marketplace products', err);
     } finally {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { UserProfile, VetNotification } from './types';
 import { getLocalSession, AuthService, NotificationService, BroadcastNotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
@@ -8,39 +8,66 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
 import { useSWR } from './lib/useSWR';
+import { initIdlePrefetch } from './lib/prefetch';
 
 export { useSWR };
 export type { SWROptions, SWRResponse } from './lib/useSWR';
 
-// Import modular layouts
+// Immediate core components for instant 0ms first-paint
 import { Navbar } from './components/Navbar';
 import { AuthScreen } from './components/AuthScreen';
 import { ExploreFeed } from './components/ExploreFeed';
-import { CommunityFeed } from './components/CommunityFeed';
-import { AdminPanel } from './components/AdminPanel';
-import { Marketplace } from './components/Marketplace';
-import { PetAds } from './components/PetAds';
-import { ProfilePage } from './components/ProfilePage';
-import { JobBoard } from './components/JobBoard';
-import LivestockManagement from './components/LivestockManagement';
-import { SubscriptionPortal } from './components/SubscriptionPortal';
-import { GuestAnimalViewer } from './components/GuestAnimalViewer';
-import { ClinicManagement } from './components/ClinicManagement';
-import { AboutUsDirectory } from './components/AboutUsDirectory';
-import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
-import { BlogSection } from './components/BlogSection';
-import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage, CareersSafetyProtocolPage } from './components/LegalAndAbout';
-import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
 import { Footer } from './components/Footer';
-import PageNotFound from './components/PageNotFound';
+import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
+import { ChatService } from './lib/chatService';
+
+// Lazy-loaded route components for high-speed code-splitting & zero initial lag
+const CommunityFeed = lazy(() => import('./components/CommunityFeed').then(m => ({ default: m.CommunityFeed })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const Marketplace = lazy(() => import('./components/Marketplace').then(m => ({ default: m.Marketplace })));
+const PetAds = lazy(() => import('./components/PetAds').then(m => ({ default: m.PetAds })));
+const ProfilePage = lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const JobBoard = lazy(() => import('./components/JobBoard').then(m => ({ default: m.JobBoard })));
+const LivestockManagement = lazy(() => import('./components/LivestockManagement'));
+const SubscriptionPortal = lazy(() => import('./components/SubscriptionPortal').then(m => ({ default: m.SubscriptionPortal })));
+const GuestAnimalViewer = lazy(() => import('./components/GuestAnimalViewer').then(m => ({ default: m.GuestAnimalViewer })));
+const ClinicManagement = lazy(() => import('./components/ClinicManagement').then(m => ({ default: m.ClinicManagement })));
+const AboutUsDirectory = lazy(() => import('./components/AboutUsDirectory').then(m => ({ default: m.AboutUsDirectory })));
+const BlogSection = lazy(() => import('./components/BlogSection').then(m => ({ default: m.BlogSection })));
+const VeterinaryClinicalSuite = lazy(() => import('./components/VeterinaryClinicalSuite').then(m => ({ default: m.VeterinaryClinicalSuite })));
+const PageNotFound = lazy(() => import('./components/PageNotFound'));
+const MessengerModal = lazy(() => import('./components/MessengerModal').then(m => ({ default: m.MessengerModal })));
+const ChatModal = lazy(() => import('./components/ChatModal').then(m => ({ default: m.ChatModal })));
+
+const TermsOfServicePage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.TermsOfServicePage })));
+const PrivacyPolicyPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.PrivacyPolicyPage })));
+const AboutUsPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.AboutUsPage })));
+const ContactSupportPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.ContactSupportPage })));
+const CareersSafetyProtocolPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.CareersSafetyProtocolPage })));
+
+function SectionLoadingFallback() {
+  return (
+    <div className="w-full py-24 flex flex-col items-center justify-center space-y-3 select-none">
+      <div className="w-10 h-10 rounded-2xl bg-[#2d4a39]/10 border border-[#2d4a39]/20 flex items-center justify-center text-lg animate-pulse">
+        🩺
+      </div>
+      <p className="text-[11px] font-bold text-[#7a766f] tracking-wider uppercase">
+        Loading facility...
+      </p>
+    </div>
+  );
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
-  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(isFirebaseConfigured);
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(() => !getLocalSession() && isFirebaseConfigured);
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
   const [isAboutUsOpen, setIsAboutUsOpen] = useState<boolean>(false);
+  const [isMessengerOpen, setIsMessengerOpen] = useState<boolean>(false);
+  const [globalChatRecipient, setGlobalChatRecipient] = useState<UserProfile | null>(null);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
 
   const [dbQuotaExceeded, setDbQuotaExceeded] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -162,6 +189,11 @@ export default function App() {
       }
     }
   }, [currentUser?.uid]);
+
+  // Predictive background idle prefetch for top application sections
+  useEffect(() => {
+    initIdlePrefetch(currentUser);
+  }, [currentUser]);
 
   // Dynamic SEO meta tags and Title management per active section
   useEffect(() => {
@@ -360,6 +392,41 @@ export default function App() {
     }
   );
 
+  // Real-time unread messages tracking & synchronization
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setUnreadMessagesCount(0);
+      return;
+    }
+
+    const refreshUnread = () => {
+      const count = ChatService.getUnreadMessagesCount(currentUser.uid);
+      setUnreadMessagesCount(count);
+    };
+
+    refreshUnread();
+
+    const handleNewChatMessage = () => {
+      refreshUnread();
+      mutateNotifications();
+    };
+
+    window.addEventListener('vetaxis_chat_new_message', handleNewChatMessage);
+    window.addEventListener('vetaxis_notification_received', handleNewChatMessage);
+    window.addEventListener('storage', refreshUnread);
+
+    const unsubscribe = ChatService.subscribeToUserConversations(currentUser.uid, () => {
+      refreshUnread();
+    });
+
+    return () => {
+      window.removeEventListener('vetaxis_chat_new_message', handleNewChatMessage);
+      window.removeEventListener('vetaxis_notification_received', handleNewChatMessage);
+      window.removeEventListener('storage', refreshUnread);
+      unsubscribe();
+    };
+  }, [currentUser?.uid, mutateNotifications]);
+
   const handleMarkAllAsRead = async () => {
     if (!currentUser) return;
     try {
@@ -429,6 +496,31 @@ export default function App() {
           handleNavigate(notif.targetId);
         }
       }
+    } else if (notif.targetType === 'chat' || notif.type === 'chat_message') {
+      const targetSenderId = notif.senderId;
+      if (targetSenderId) {
+        AuthService.fetchUserProfile(targetSenderId)
+          .then((userObj) => {
+            if (userObj) {
+              setGlobalChatRecipient(userObj);
+            } else {
+              setGlobalChatRecipient({
+                uid: targetSenderId,
+                name: notif.senderName || 'Veterinarian',
+                role: 'doctor',
+                isVerified: true
+              });
+            }
+          })
+          .catch(() => {
+            setGlobalChatRecipient({
+              uid: targetSenderId,
+              name: notif.senderName || 'Veterinarian',
+              role: 'doctor',
+              isVerified: true
+            });
+          });
+      }
     }
   };
 
@@ -441,7 +533,6 @@ export default function App() {
     if (normalized === 'privacy_policy') normalized = 'privacy';
     if (normalized === 'support') normalized = 'contact';
 
-    triggerLoading(`Opening ${normalized.replace('_', ' ').toUpperCase()}...`, 400);
     setActiveSection(normalized);
     // Clear highlight tags during manual user shifts
     setHighlightPostId(null);
@@ -590,51 +681,31 @@ export default function App() {
     };
   }, [currentUser, mutateNotifications]);
 
-  // Global auto-scroller when any popup modal/dialog opens
+  // Lightweight auto-scroller when any popup modal/dialog opens
   useEffect(() => {
     let lastActionTime = 0;
     
     const handlePopupOpened = (element: HTMLElement) => {
       const now = Date.now();
-      // Debounce slightly to prevent recursive triggers within 300ms
       if (now - lastActionTime < 300) return;
       lastActionTime = now;
 
       // Scroll the main screen viewport to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      // Scroll the popup container/overlay itself to its top
-      element.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      // Also scroll any internal scrollable panels within the modal to their top
-      const scrollables = element.querySelectorAll('.overflow-y-auto');
-      scrollables.forEach(el => {
-        el.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-
-      // If there's an active dialog card inside the overlay, scroll it elegantly into view
-      const dialogArea = element.querySelector('[role="dialog"], .bg-white, .bg-neutral-900, .bg-\\[\\#fcf9f2\\]');
+      element.scrollTo?.({ top: 0, behavior: 'smooth' });
+      const dialogArea = element.querySelector?.('[role="dialog"]');
       if (dialogArea) {
-        dialogArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        dialogArea.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
       }
     };
 
     const isModalElement = (node: Node): node is HTMLElement => {
       if (!(node instanceof HTMLElement)) return false;
-      
-      // If the node or any parent/ancestor has data-no-scroll="true", do not treat as a modal to prevent unwanted scrolling
-      if (node.closest('[data-no-scroll="true"]') || node.querySelector('[data-no-scroll="true"]')) {
-        return false;
-      }
-
+      if (node.closest?.('[data-no-scroll="true"]')) return false;
       const cn = node.className;
       if (typeof cn !== 'string') return false;
-      
-      const isFixed = node.classList.contains('fixed') && !node.classList.contains('pointer-events-none');
-      const hasBackdrop = (cn.includes('bg-black/') || cn.includes('backdrop-blur') || cn.includes('bg-stone-900/')) && node.classList.contains('fixed');
-      const hasDialog = node.getAttribute('role') === 'dialog' || node.querySelector('[role="dialog"]') !== null;
-      
-      return isFixed || hasBackdrop || hasDialog;
+      return (node.classList.contains('fixed') && !node.classList.contains('pointer-events-none')) ||
+             node.getAttribute('role') === 'dialog';
     };
 
     const observer = new MutationObserver((mutations) => {
@@ -645,22 +716,6 @@ export default function App() {
               handlePopupOpened(node);
               return;
             }
-            if (node instanceof HTMLElement) {
-              const innerModal = Array.from(node.querySelectorAll('*')).find(el => isModalElement(el));
-              if (innerModal instanceof HTMLElement) {
-                handlePopupOpened(innerModal);
-                return;
-              }
-            }
-          }
-        } else if (mutation.type === 'attributes') {
-          const target = mutation.target;
-          if (isModalElement(target)) {
-            const isHidden = target.classList.contains('hidden') || target.style.display === 'none';
-            if (!isHidden) {
-              handlePopupOpened(target);
-              return;
-            }
           }
         }
       }
@@ -668,9 +723,7 @@ export default function App() {
 
     observer.observe(document.body, {
       childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'style']
+      subtree: false
     });
 
     return () => observer.disconnect();
@@ -706,7 +759,7 @@ export default function App() {
     };
   }, [currentUser?.uid, dbQuotaExceeded, isAuthInitializing]);
 
-  // Real-time precise monthly/trial subscription expiration checker
+  // Real-time monthly/trial subscription expiration checker (checked once per minute to preserve CPU)
   useEffect(() => {
     if (isAuthInitializing || !currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || dbQuotaExceeded) return;
     
@@ -717,7 +770,7 @@ export default function App() {
         console.warn(`[VetAxis] Active premium ${expiredTier} subscription has ended. Auto-downgrading.`);
         
         try {
-          // 1. Create a beautiful persistent system notification in the DB
+          // 1. Create a persistent system notification in the DB
           const newNotif = await NotificationService.createNotification({
             userId: currentUser.uid,
             senderId: 'admin',
@@ -766,8 +819,8 @@ export default function App() {
     // Check instantly on mount or tier update
     checkExpiry();
 
-    // Check memory every 1000ms to catch the exact moment of expiry (e.g. for counting down trials)
-    const timerId = setInterval(checkExpiry, 1000);
+    // Check every 60 seconds to eliminate unnecessary CPU cycles
+    const timerId = setInterval(checkExpiry, 60000);
     
     return () => {
       active = false;
@@ -893,6 +946,8 @@ export default function App() {
         onDeleteNotification={handleDeleteNotification}
         onNotificationClick={handleNotificationClick}
         onOpenAboutUs={() => setIsAboutUsOpen(true)}
+        onOpenMessenger={() => setIsMessengerOpen(true)}
+        unreadMessagesCount={unreadMessagesCount}
       />
 
       {currentUser && !currentUser.emailVerified && (
@@ -927,138 +982,141 @@ export default function App() {
 
       {/* RENDERED FEED ROUTER BOX */}
       <main className="flex-1 container max-w-7xl mx-auto px-4 py-8 overflow-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeSection}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-          >
-            {activeSection === 'explore' && (
-              <ExploreFeed
-                currentUser={currentUser}
-                onUpdateUser={handleUpdateUserProfile}
-                activeSection={activeSection}
-                onNavigate={handleNavigate}
-                highlightClinicId={highlightClinicId}
-                highlightDoctorId={highlightDoctorId}
-                initialCity={initialCity}
-                initialFilter={initialFilter}
-              />
-            )}
+        <Suspense fallback={<SectionLoadingFallback />}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSection}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              {activeSection === 'explore' && (
+                <ExploreFeed
+                  currentUser={currentUser}
+                  onUpdateUser={handleUpdateUserProfile}
+                  activeSection={activeSection}
+                  onNavigate={handleNavigate}
+                  highlightClinicId={highlightClinicId}
+                  highlightDoctorId={highlightDoctorId}
+                  initialCity={initialCity}
+                  initialFilter={initialFilter}
+                  onOpenChat={(prof) => setGlobalChatRecipient(prof)}
+                />
+              )}
 
-            {activeSection === 'community' && (
-              <CommunityFeed 
-                currentUser={currentUser} 
-                highlightPostId={highlightPostId}
-              />
-            )}
+              {activeSection === 'community' && (
+                <CommunityFeed 
+                  currentUser={currentUser} 
+                  highlightPostId={highlightPostId}
+                />
+              )}
 
-            {activeSection === 'marketplace' && (
-              <Marketplace 
-                currentUser={currentUser} 
-                onNavigate={setActiveSection} 
-                highlightProductId={highlightProductId}
-              />
-            )}
+              {activeSection === 'marketplace' && (
+                <Marketplace 
+                  currentUser={currentUser} 
+                  onNavigate={setActiveSection} 
+                  highlightProductId={highlightProductId}
+                />
+              )}
 
-            {activeSection === 'pet_ads' && (
-              <PetAds 
-                currentUser={currentUser} 
-                onNavigate={(section, highlightId) => {
-                  if (highlightId) {
-                    setHighlightPostId(highlightId);
-                  }
-                  setActiveSection(section);
-                }}
-                highlightAdId={highlightAdId}
-                initialType={initialPetType}
-              />
-            )}
+              {activeSection === 'pet_ads' && (
+                <PetAds 
+                  currentUser={currentUser} 
+                  onNavigate={(section, highlightId) => {
+                    if (highlightId) {
+                      setHighlightPostId(highlightId);
+                    }
+                    setActiveSection(section);
+                  }}
+                  highlightAdId={highlightAdId}
+                  initialType={initialPetType}
+                />
+              )}
 
-            {activeSection === 'jobs' && (
-              <JobBoard 
-                currentUser={currentUser} 
-                highlightJobId={highlightJobId}
-                highlightApplicationId={highlightApplicationId}
-              />
-            )}
+              {activeSection === 'jobs' && (
+                <JobBoard 
+                  currentUser={currentUser} 
+                  highlightJobId={highlightJobId}
+                  highlightApplicationId={highlightApplicationId}
+                />
+              )}
 
-            {activeSection === 'livestock' && (
-              <LivestockManagement 
-                currentUser={currentUser} 
-                highlightFarmId={highlightFarmId}
-                scannedAnimalRecordId={scannedAnimalRecordId}
-                onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
-              />
-            )}
+              {activeSection === 'livestock' && (
+                <LivestockManagement 
+                  currentUser={currentUser} 
+                  highlightFarmId={highlightFarmId}
+                  scannedAnimalRecordId={scannedAnimalRecordId}
+                  onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
+                />
+              )}
 
-            {activeSection === 'profile' && (
-              <ProfilePage
-                currentUser={currentUser}
-                onUpdateUser={handleUpdateUserProfile}
-                onDeleteSuccess={handleLogout}
-              />
-            )}
+              {activeSection === 'profile' && (
+                <ProfilePage
+                  currentUser={currentUser}
+                  onUpdateUser={handleUpdateUserProfile}
+                  onDeleteSuccess={handleLogout}
+                />
+              )}
 
-            {activeSection === 'subscription' && (
-              <SubscriptionPortal
-                currentUser={currentUser}
-                onUpdateUser={handleUpdateUserProfile}
-                onNavigateToSection={handleNavigate}
-              />
-            )}
+              {activeSection === 'subscription' && (
+                <SubscriptionPortal
+                  currentUser={currentUser}
+                  onUpdateUser={handleUpdateUserProfile}
+                  onNavigateToSection={handleNavigate}
+                />
+              )}
 
-            {activeSection === 'admin' && currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
-              <AdminPanel currentUser={currentUser} />
-            )}
+              {activeSection === 'admin' && currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
+                <AdminPanel currentUser={currentUser} />
+              )}
 
-            {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (
-              <ClinicManagement 
-                user={currentUser} 
-                highlightAppointmentId={highlightAppointmentId}
-                onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
-              />
-            )}
+              {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (
+                <ClinicManagement 
+                  user={currentUser} 
+                  highlightAppointmentId={highlightAppointmentId}
+                  onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
+                />
+              )}
 
-            {activeSection === 'news' && (
-              <BlogSection currentUser={currentUser} />
-            )}
+              {activeSection === 'news' && (
+                <BlogSection currentUser={currentUser} />
+              )}
 
-            {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
-              <VeterinaryClinicalSuite 
-                currentUser={currentUser}
-                onNavigate={handleNavigate}
-                initialTool={initialClinicalTool}
-              />
-            )}
+              {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
+                <VeterinaryClinicalSuite 
+                  currentUser={currentUser}
+                  onNavigate={handleNavigate}
+                  initialTool={initialClinicalTool}
+                />
+              )}
 
-            {activeSection === 'about' && (
-              <AboutUsPage onNavigate={handleNavigate} />
-            )}
+              {activeSection === 'about' && (
+                <AboutUsPage onNavigate={handleNavigate} />
+              )}
 
-            {activeSection === 'terms' && (
-              <TermsOfServicePage onNavigate={handleNavigate} />
-            )}
+              {activeSection === 'terms' && (
+                <TermsOfServicePage onNavigate={handleNavigate} />
+              )}
 
-            {activeSection === 'privacy' && (
-              <PrivacyPolicyPage onNavigate={handleNavigate} />
-            )}
+              {activeSection === 'privacy' && (
+                <PrivacyPolicyPage onNavigate={handleNavigate} />
+              )}
 
-            {activeSection === 'careers_safety' && (
-              <CareersSafetyProtocolPage onNavigate={handleNavigate} />
-            )}
+              {activeSection === 'careers_safety' && (
+                <CareersSafetyProtocolPage onNavigate={handleNavigate} />
+              )}
 
-            {activeSection === 'contact' && (
-              <ContactSupportPage onNavigate={handleNavigate} />
-            )}
+              {activeSection === 'contact' && (
+                <ContactSupportPage onNavigate={handleNavigate} />
+              )}
 
-            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'careers_safety'].includes(activeSection) && (
-              <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
-            )}
-          </motion.div>
-        </AnimatePresence>
+              {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'careers_safety'].includes(activeSection) && (
+                <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
       </main>
 
       {/* COMPLIANT GLOBAL FOOTER NAVIGATION */}
@@ -1091,12 +1149,21 @@ export default function App() {
                 {toast.type === 'apply' && '📄'}
                 {toast.type === 'status_change' && '✨'}
                 {toast.type === 'broadcast' && '📢'}
+                {(toast.type === 'chat_message' || toast.type === 'chat') && '🩺'}
               </div>
               <div className="flex-1 pr-6 text-left">
                 <span className={`text-[9px] tracking-wider uppercase font-black block leading-none ${
-                  toast.type === 'broadcast' ? 'text-amber-800' : 'text-[#5a5a40]'
+                  toast.type === 'broadcast' 
+                    ? 'text-amber-800' 
+                    : (toast.type === 'chat_message' || toast.type === 'chat')
+                    ? 'text-emerald-800'
+                    : 'text-[#5a5a40]'
                 }`}>
-                  {toast.type === 'broadcast' ? '🚨 ADMIN BROADCAST ANNOUNCEMENT (CLICK TO VIEW)' : 'ACTIVITY BULLETIN (CLICK TO VIEW)'}
+                  {toast.type === 'broadcast' 
+                    ? '🚨 ADMIN BROADCAST ANNOUNCEMENT (CLICK TO VIEW)' 
+                    : (toast.type === 'chat_message' || toast.type === 'chat')
+                    ? '💬 CLINICAL CONSULTATION MESSAGE (CLICK TO REPLY)'
+                    : 'ACTIVITY BULLETIN (CLICK TO VIEW)'}
                 </span>
                 <p className="text-[11px] text-[#3c3c3b] font-bold leading-tight mt-1.5">
                   {toast.message}
@@ -1136,44 +1203,45 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* GLOBAL FLOATING WHATSAPP BUTTON */}
-      <div className="fixed bottom-6 left-6 z-[9999]">
-        <a
-          href="https://wa.me/923001216272?text=Hello%20VetAxis!%20I%20have%20a%20query%20about%20the%20platform."
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group flex items-center gap-2 bg-[#128c7e] hover:bg-[#075e54] text-white text-xs font-bold px-4 py-3 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-105 select-none border border-emerald-500/20"
-          id="global-whatsapp-float"
-        >
-          {/* Pulsing Dot Indicator */}
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {isAboutUsOpen && (
+            <AboutUsDirectory
+              isOpen={isAboutUsOpen}
+              onClose={() => setIsAboutUsOpen(false)}
+              onNavigate={handleNavigate}
+              isLoggedIn={true}
+            />
+          )}
+        </AnimatePresence>
 
-          {/* Official WhatsApp SVG Path */}
-          <svg
-            className="w-4 h-4 fill-current text-white group-hover:rotate-12 transition-transform duration-300"
-            viewBox="0 0 448 512"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7 .9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z" />
-          </svg>
+        {/* GLOBAL CLINICAL MESSENGER MODAL (15-Day Auto Disappearing Conversations) */}
+        <AnimatePresence>
+          {isMessengerOpen && currentUser && (
+            <MessengerModal
+              isOpen={isMessengerOpen}
+              onClose={() => setIsMessengerOpen(false)}
+              currentUser={currentUser}
+              onOpenChatWith={(targetUser) => {
+                setGlobalChatRecipient(targetUser);
+              }}
+              onExploreClinicians={() => handleNavigate('explore')}
+            />
+          )}
+        </AnimatePresence>
 
-          <span className="font-sans text-[10px] uppercase tracking-wider font-extrabold">Contact with us</span>
-        </a>
-      </div>
-
-      <AnimatePresence>
-        {isAboutUsOpen && (
-          <AboutUsDirectory
-            isOpen={isAboutUsOpen}
-            onClose={() => setIsAboutUsOpen(false)}
-            onNavigate={handleNavigate}
-            isLoggedIn={true}
-          />
-        )}
-      </AnimatePresence>
+        {/* GLOBAL DIRECT CONSULTATION CHAT MODAL */}
+        <AnimatePresence>
+          {globalChatRecipient && currentUser && (
+            <ChatModal
+              isOpen={!!globalChatRecipient}
+              onClose={() => setGlobalChatRecipient(null)}
+              recipient={globalChatRecipient}
+              currentUser={currentUser}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
     </div>
   );

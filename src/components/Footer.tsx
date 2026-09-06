@@ -14,6 +14,7 @@ import {
   Lock,
   Info
 } from 'lucide-react';
+import { getPrefetchProps } from '../lib/prefetch';
 
 interface FooterProps {
   onNavigate: (section: string) => void;
@@ -77,6 +78,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             <ul className="space-y-2">
               <li>
                 <button
+                  {...getPrefetchProps('clinical_tools', null)}
                   onClick={(e) => handleNavClick('clinical_tools', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-emerald-800 ${activeSection === 'clinical_tools' ? 'underline' : ''}`}
                 >
@@ -85,6 +87,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('explore', null)}
                   onClick={(e) => handleNavClick('explore', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'explore' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -93,6 +96,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('livestock', null)}
                   onClick={(e) => handleNavClick('livestock', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'livestock' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -101,6 +105,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('pet_ads', null)}
                   onClick={(e) => handleNavClick('pet_ads', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'pet_ads' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -109,6 +114,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('marketplace', null)}
                   onClick={(e) => handleNavClick('marketplace', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'marketplace' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -126,6 +132,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             <ul className="space-y-2">
               <li>
                 <button
+                  {...getPrefetchProps('jobs', null)}
                   onClick={(e) => handleNavClick('jobs', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'jobs' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -134,6 +141,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('community', null)}
                   onClick={(e) => handleNavClick('community', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'community' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -142,6 +150,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('news', null)}
                   onClick={(e) => handleNavClick('news', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'news' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -150,6 +159,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('subscription', null)}
                   onClick={(e) => handleNavClick('subscription', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'subscription' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -167,6 +177,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             <ul className="space-y-2">
               <li>
                 <button
+                  {...getPrefetchProps('about_directory', null)}
                   onClick={(e) => handleNavClick('about', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'about' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -175,6 +186,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('terms', null)}
                   onClick={(e) => handleNavClick('terms', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'terms' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -183,6 +195,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('privacy', null)}
                   onClick={(e) => handleNavClick('privacy', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'privacy' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -191,6 +204,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('careers_safety', null)}
                   onClick={(e) => handleNavClick('careers_safety', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors flex items-center gap-1 ${activeSection === 'careers_safety' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
@@ -200,6 +214,7 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  {...getPrefetchProps('contact', null)}
                   onClick={(e) => handleNavClick('contact', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'contact' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >

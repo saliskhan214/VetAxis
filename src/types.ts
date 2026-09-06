@@ -204,9 +204,9 @@ export interface VetNotification {
   userId: string;
   senderId: string;
   senderName: string;
-  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action' | 'broadcast';
+  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action' | 'broadcast' | 'chat_message';
   targetId: string;
-  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment' | 'broadcast';
+  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment' | 'broadcast' | 'chat';
   message: string;
   read: boolean;
   createdAt: number;
@@ -742,6 +742,7 @@ export interface ChatConversation {
   lastMessageTimestamp?: number;
   lastSenderId?: string;
   unreadCount?: { [userId: string]: number };
+  deletedBy?: string[];
   createdAt: number;
   updatedAt: number;
 }

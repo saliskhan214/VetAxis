@@ -165,9 +165,9 @@
         "userId": { "type": "string", "description": "The recipient's user UID" },
         "senderId": { "type": "string", "description": "The initiator's user UID" },
         "senderName": { "type": "string", "description": "Display name of the initiator" },
-        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change", "farm_assign", "farm_response", "farm_reminder"], "description": "Type of event" },
-        "targetId": { "type": "string", "description": "ID of post or job or application or farm" },
-        "targetType": { "type": "string", "enum": ["post", "job", "application", "farm"], "description": "Target entity category" },
+        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change", "farm_assign", "farm_response", "farm_reminder", "appointment_booked", "appointment_action", "broadcast", "chat_message"], "description": "Type of event" },
+        "targetId": { "type": "string", "description": "ID of post or job or application or farm or chat" },
+        "targetType": { "type": "string", "enum": ["post", "job", "application", "farm", "appointment", "broadcast", "chat"], "description": "Target entity category" },
         "message": { "type": "string", "description": "Display text of the alert" },
         "read": { "type": "boolean", "description": "Whether the user read the notification" },
         "createdAt": { "type": "number", "description": "Event timestamp" }
@@ -361,6 +361,7 @@
         "lastMessageTimestamp": { "type": "number" },
         "lastSenderId": { "type": "string" },
         "unreadCount": { "type": "object" },
+        "deletedBy": { "type": "array" },
         "createdAt": { "type": "number" },
         "updatedAt": { "type": "number" }
       },

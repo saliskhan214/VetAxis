@@ -45,7 +45,51 @@ export const swrGlobalCache = {
   set: <T = any>(key: string, data: T) => swrCache.set(key, { data, timestamp: Date.now() }),
   delete: (key: string) => swrCache.delete(key),
   clear: () => swrCache.clear(),
+  has: (key: string) => swrCache.has(key),
 };
+
+/**
+ * Predictively prefetch and prime data into the SWR cache.
+ * If data is already fresh within maxAge, or an identical request is in flight,
+ * it deduplicates automatically to prevent redundant network requests.
+ */
+export async function prefetchSWR<T = any>(
+  key: string,
+  fetcher: () => Promise<T>,
+  maxAgeMs: number = 30000
+): Promise<T | undefined> {
+  if (!key) return undefined;
+  const now = Date.now();
+  const cached = swrCache.get(key);
+  if (cached && now - cached.timestamp < maxAgeMs) {
+    return cached.data;
+  }
+  if (swrInFlight.has(key)) {
+    return swrInFlight.get(key);
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const freshData = await fetcher();
+      if (freshData !== undefined) {
+        swrCache.set(key, { data: freshData, timestamp: Date.now() });
+        const subs = swrSubscribers.get(key);
+        if (subs) {
+          subs.forEach(cb => cb(freshData, null, false));
+        }
+      }
+      return freshData;
+    } catch (err) {
+      console.warn(`[useSWR] Prefetch error for key "${key}":`, err);
+      return undefined;
+    } finally {
+      swrInFlight.delete(key);
+    }
+  })();
+
+  swrInFlight.set(key, fetchPromise);
+  return fetchPromise;
+}
 
 /**
  * Lightweight SWR-style data-fetching hook with focus & tab revalidation
