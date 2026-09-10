@@ -3,19 +3,43 @@ name: Deploy to Firebase Hosting on merge
   push:
     branches:
       - main
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Verify Firebase Secret
+        run: |
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 || secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "::warning ::FIREBASE_SERVICE_ACCOUNT_VETAXIS360 secret is not configured in GitHub Secrets. Please add it in Repository Settings -> Secrets and variables -> Actions."
+          else
+            echo "Firebase Service Account secret is present."
+          fi
+
       - name: Install dependencies
-        run: npm install
+        run: npm ci || npm install
+
       - name: Build project
         run: npm run build
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 || secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
           projectId: vetaxis360
