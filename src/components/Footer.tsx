@@ -19,9 +19,10 @@ import { getPrefetchProps } from '../lib/prefetch';
 interface FooterProps {
   onNavigate: (section: string) => void;
   activeSection: string;
+  onOpenAndroidDownload?: () => void;
 }
 
-export function Footer({ onNavigate, activeSection }: FooterProps) {
+export function Footer({ onNavigate, activeSection, onOpenAndroidDownload }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   const handleNavClick = (section: string, e: React.MouseEvent) => {
@@ -76,6 +77,18 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               Veterinary Services
             </h4>
             <ul className="space-y-2">
+              <li>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onOpenAndroidDownload) onOpenAndroidDownload();
+                  }}
+                  className="hover:text-emerald-700 hover:underline cursor-pointer text-left transition-colors font-black text-emerald-800 flex items-center gap-1.5"
+                >
+                  <span>📲</span>
+                  <span>Download APK File</span>
+                </button>
+              </li>
               <li>
                 <button
                   {...getPrefetchProps('clinical_tools', null)}

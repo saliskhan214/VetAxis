@@ -117,12 +117,17 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
     return () => clearInterval(interval);
   }, [visibleBoostedPosts.length, isHovered]);
 
-  const loadAds = async () => {
+  const loadAds = async (force: boolean = false) => {
+    if (force) {
+      swrGlobalCache.delete('pet_ads');
+    }
     if (!swrGlobalCache.has('pet_ads')) {
       setLoading(true);
     }
     try {
-      const data = await prefetchSWR('pet_ads', () => PetAdsService.fetchAds());
+      const data = force
+        ? await PetAdsService.fetchAds()
+        : await prefetchSWR('pet_ads', () => PetAdsService.fetchAds(), 30000, false);
       if (data) {
         setAds(data);
       }
@@ -155,7 +160,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   useTabRevalidation({
     entity: 'pet_ads',
     onRevalidate: async () => {
-      await Promise.allSettled([loadAds(), loadBoostedEmergencyPosts()]);
+      await Promise.allSettled([loadAds(true), loadBoostedEmergencyPosts()]);
     },
   });
 

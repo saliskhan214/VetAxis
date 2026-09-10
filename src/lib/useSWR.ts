@@ -43,10 +43,37 @@ const swrSubscribers = new Map<string, Set<(data: any, error: any, isValidating:
 export const swrGlobalCache = {
   get: <T = any>(key: string): T | undefined => swrCache.get(key)?.data,
   set: <T = any>(key: string, data: T) => swrCache.set(key, { data, timestamp: Date.now() }),
-  delete: (key: string) => swrCache.delete(key),
-  clear: () => swrCache.clear(),
+  delete: (key: string) => {
+    swrCache.delete(key);
+    swrInFlight.delete(key);
+  },
+  clear: () => {
+    swrCache.clear();
+    swrInFlight.clear();
+  },
   has: (key: string) => swrCache.has(key),
 };
+
+// Automatically invalidate in-memory SWR cache when cross-tab or remote sync events fire
+if (typeof window !== 'undefined') {
+  window.addEventListener('vetaxis_data_update', (e: Event) => {
+    try {
+      const customEvent = e as CustomEvent;
+      const entity = customEvent.detail?.entity;
+      if (entity === 'all') {
+        swrCache.clear();
+        swrInFlight.clear();
+      } else if (entity) {
+        swrCache.delete(entity);
+        swrInFlight.delete(entity);
+        if (entity === 'pet_ads') swrCache.delete('pet_ads');
+        if (entity === 'marketplace') swrCache.delete('marketplace_products');
+        if (entity === 'community') swrCache.delete('community_posts');
+        if (entity === 'jobs') swrCache.delete('job_posts');
+      }
+    } catch {}
+  });
+}
 
 /**
  * Predictively prefetch and prime data into the SWR cache.
@@ -56,16 +83,22 @@ export const swrGlobalCache = {
 export async function prefetchSWR<T = any>(
   key: string,
   fetcher: () => Promise<T>,
-  maxAgeMs: number = 30000
+  maxAgeMs: number = 30000,
+  force: boolean = false
 ): Promise<T | undefined> {
   if (!key) return undefined;
   const now = Date.now();
-  const cached = swrCache.get(key);
-  if (cached && now - cached.timestamp < maxAgeMs) {
-    return cached.data;
-  }
-  if (swrInFlight.has(key)) {
-    return swrInFlight.get(key);
+  if (force) {
+    swrCache.delete(key);
+    swrInFlight.delete(key);
+  } else {
+    const cached = swrCache.get(key);
+    if (cached && now - cached.timestamp < maxAgeMs) {
+      return cached.data;
+    }
+    if (swrInFlight.has(key)) {
+      return swrInFlight.get(key);
+    }
   }
 
   const fetchPromise = (async () => {

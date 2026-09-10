@@ -992,7 +992,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     const isAuthor = 
                       (post.authorUid && post.authorUid === currentUser.uid) ||
                       (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
-                    const initials = post.authorName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                    const initials = (post.authorName || post.authorEmail || 'User').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
                     
                     const loved = post.reactions?.['❤️']?.includes(currentUser.email);
                     const thanked = post.reactions?.['👍']?.includes(currentUser.email);

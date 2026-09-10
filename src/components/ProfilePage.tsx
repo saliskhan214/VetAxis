@@ -2,16 +2,16 @@ import { useState, ChangeEvent, FormEvent, useEffect, useRef } from 'react';
 import { UserProfile } from '../types';
 import { AuthService, PromotionalAdsService, LocationService } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, User, MapPin, Mail, Sparkles, AlertTriangle, Trash2, Camera, RefreshCw, Megaphone, ChevronRight } from 'lucide-react';
+import { ShieldCheck, User, MapPin, Mail, Sparkles, AlertTriangle, Trash2, Camera, RefreshCw, Megaphone, ChevronRight, Smartphone, Globe, Wifi, CheckCircle2 } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
 import { InteractiveClinicMap } from './InteractiveClinicMap';
-
-
+import { useLiveCloudSync, isAndroidApp } from '../lib/androidBridge';
 
 interface ProfileProps {
   currentUser: UserProfile;
   onUpdateUser: (updated: UserProfile) => void;
   onDeleteSuccess: () => void;
+  onOpenAndroidDownload?: () => void;
 }
 
 const PAKISTAN_CITIES = [
@@ -28,7 +28,8 @@ const PAKISTAN_CITIES = [
   { name: 'Hyderabad', lat: 25.3960, lng: 68.3578 },
 ];
 
-export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: ProfileProps) {
+export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess, onOpenAndroidDownload }: ProfileProps) {
+  const { isOnline, lastSyncedAt, syncState, isAndroidShell, triggerManualSync } = useLiveCloudSync();
   const [editing, setEditing] = useState<boolean>(false);
   const [name, setName] = useState<string>(currentUser.name);
   const [phone, setPhone] = useState<string>(currentUser.phone || '');
@@ -516,7 +517,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
     }
   };
 
-  const initials = currentUser.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const initials = (currentUser?.name || currentUser?.email || 'User').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4 text-left">
@@ -1218,6 +1219,79 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               </div>
             </div>
           )}
+          {/* CROSS-PLATFORM MOBILE APP & LIVE CLOUD SYNCHRONIZATION */}
+          <div className="pt-6 border-t border-[#f4f1e9] space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#373735] flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-[#5a5a40]" />
+                <span>Cross-Platform &amp; Live Cloud Synchronization</span>
+              </h4>
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                <span>{isAndroidShell ? 'Android Shell Active' : 'Web Browser Synced'}</span>
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#fdfbf7] border border-[#ece7d8] space-y-3 shadow-2xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-white border border-[#ece7d8] rounded-xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-[#a49f92] block">Current Device</span>
+                  <div className="flex items-center gap-1.5 font-black text-[#2b2b24]">
+                    {isAndroidShell ? <Smartphone className="w-3.5 h-3.5 text-emerald-700" /> : <Globe className="w-3.5 h-3.5 text-[#5a5a40]" />}
+                    <span>{isAndroidShell ? 'Android Live Shell' : 'Web Browser'}</span>
+                  </div>
+                  <p className="text-[10px] text-[#78716c]">Single-account sign-in</p>
+                </div>
+
+                <div className="p-3 bg-white border border-[#ece7d8] rounded-xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-[#a49f92] block">Database Engine</span>
+                  <div className="flex items-center gap-1.5 font-black text-[#2b2b24]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Firestore Real-Time</span>
+                  </div>
+                  <p className="text-[10px] text-[#78716c]">Bi-directional phone ⇄ web</p>
+                </div>
+
+                <div className="p-3 bg-white border border-[#ece7d8] rounded-xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-[#a49f92] block">Cloud Status</span>
+                  <div className="flex items-center gap-1.5 font-black text-[#2b2b24]">
+                    {isOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-700" /> : <span className="text-stone-400">Offline</span>}
+                    <span>{syncState === 'syncing' ? 'Syncing...' : isOnline ? 'Connected' : 'Offline Cache'}</span>
+                  </div>
+                  <p className="text-[10px] text-[#78716c]">
+                    Last: {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <p className="text-[11px] text-[#78716c]">
+                  All animal records, appointments, consultations, and messaging are synchronized in real-time across your Android phone and desktop web app.
+                </p>
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={triggerManualSync}
+                    disabled={syncState === 'syncing' || !isOnline}
+                    className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-[#2b2b24] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${syncState === 'syncing' ? 'animate-spin text-amber-600' : ''}`} />
+                    <span>{syncState === 'syncing' ? 'Verifying...' : 'Sync Now'}</span>
+                  </button>
+                  {onOpenAndroidDownload && (
+                    <button
+                      type="button"
+                      onClick={onOpenAndroidDownload}
+                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-[#5a5a40] hover:bg-[#484833] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Download APK File</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

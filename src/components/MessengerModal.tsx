@@ -20,6 +20,7 @@ import {
 import { ChatConversation, UserProfile, UserRole } from '../types';
 import { ChatService, AUTO_DISAPPEAR_DURATION_MS, formatDisappearingCountdown } from '../lib/chatService';
 import { AuthService } from '../lib/storage';
+import { useAndroidHardwareBackButton, triggerMobileHaptic } from '../lib/androidBridge';
 
 interface MessengerModalProps {
   isOpen: boolean;
@@ -36,6 +37,8 @@ export const MessengerModal: React.FC<MessengerModalProps> = ({
   onOpenChatWith,
   onExploreClinicians
 }) => {
+  useAndroidHardwareBackButton(isOpen, onClose);
+
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'doctor' | 'clinic' | 'unread'>('all');

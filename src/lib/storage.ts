@@ -95,6 +95,12 @@ export function secureGetItem(key: string): string | null {
 export function injectPresence(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
 
+  // Ensure uid is always present and a valid string
+  const uidStr = String(profile.uid || (profile as any).id || (profile as any).userId || (profile as any).email || 'user');
+  if (!profile.uid) {
+    profile.uid = uidStr;
+  }
+
   // Get active session UID
   let activeUid: string | null = null;
   try {
@@ -124,7 +130,7 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
 
   // If lastSeen is missing, set a stable fallback timestamp
   if (!profile.lastSeen) {
-    const charSum = profile.uid.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
+    const charSum = uidStr.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
     const hoursAgo = (charSum % 12) + 1;
     profile.lastSeen = Date.now() - (hoursAgo * 60 * 60 * 1000);
   }
@@ -263,6 +269,19 @@ export function getLocalSession(): UserProfile | null {
   try {
     const raw = secureGetItem(LOCAL_SESSION_KEY);
     const u = JSON.parse(raw || 'null');
+    if (u && (
+      typeof u.uid === 'string' && (
+        u.uid.startsWith('guest_') ||
+        u.uid.startsWith('quick_') ||
+        u.uid.startsWith('va_doc_') ||
+        u.uid.startsWith('va_clinic_') ||
+        u.uid.startsWith('va_asst_') ||
+        u.uid.startsWith('va_user_')
+      )
+    )) {
+      localStorage.removeItem(LOCAL_SESSION_KEY);
+      return null;
+    }
     return injectPresence(injectTemporaryPlatinum(u));
   } catch {
     return null;
@@ -610,7 +629,7 @@ export const AuthService = {
           ...data,
           uid: data.uid || doc.id
         };
-        return injectTemporaryPlatinum(u) as UserProfile;
+        return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
       });
     } catch (err) {
       console.error('Error fetching all users:', err);
@@ -629,7 +648,7 @@ export const AuthService = {
             ...data,
             uid: data.uid || doc.id
           };
-          return injectTemporaryPlatinum(u) as UserProfile;
+          return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
         });
       } catch (err) {
         console.warn('Error fetching public clinicians from Firestore, using local fallback:', err);
@@ -830,7 +849,8 @@ export const AuthService = {
           throw new Error('User profile does not exist in Firestore. Please register again.');
         }
 
-        const profile = userDoc.data() as UserProfile;
+        const data = userDoc.data() as UserProfile;
+        const profile = { ...data, uid: data.uid || userDoc.id };
         saveLocalSession(profile);
         return profile;
       } catch (err: any) {
@@ -1003,21 +1023,31 @@ export const AuthService = {
     if (isFirebaseConfigured && auth && db) {
       try {
         const provider = new GoogleAuthProvider();
-        const userCredential = await signInWithPopup(auth, provider);
+        provider.setCustomParameters({ prompt: 'select_account' });
+        
+        // 14-second failsafe timeout to prevent WebView popup freezes
+        const popupPromise = signInWithPopup(auth, provider);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Google authentication window timed out or was closed. Please try again or use Quick Direct Entry.')), 14000)
+        );
+        const userCredential: any = await Promise.race([popupPromise, timeoutPromise]);
         const uid = userCredential.user.uid;
         const email = userCredential.user.email || '';
         const displayName = userCredential.user.displayName || 'Google User';
         const photoURL = userCredential.user.photoURL || 'default';
 
-        // Check if user already exists in Firestore
+        // Check if user already exists in Firestore with 3s timeout
         const userRef = doc(db, 'users', uid);
-        const userDoc = await getDoc(userRef);
+        const fetchDocPromise = getDoc(userRef);
+        const docTimeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+        const userDoc: any = await Promise.race([fetchDocPromise, docTimeout]);
 
-        if (userDoc.exists()) {
+        if (userDoc && typeof userDoc.exists === 'function' && userDoc.exists()) {
           // Returning user
-          const profile = userDoc.data() as UserProfile;
+          const data = userDoc.data() as UserProfile;
+          const profile = { ...data, uid: data.uid || userDoc.id };
           profile.emailVerified = userCredential.user.emailVerified;
-          await updateDoc(userRef, { emailVerified: profile.emailVerified });
+          updateDoc(userRef, { emailVerified: profile.emailVerified }).catch(() => {});
           saveLocalSession(profile);
           return { exists: true, profile };
         } else {
@@ -1056,6 +1086,68 @@ export const AuthService = {
         };
       }
     }
+  },
+
+  createQuickSession(role: string = 'doctor', name?: string, phone?: string, city?: string): UserProfile {
+    const isDoc = role === 'doctor';
+    const isClinic = role === 'clinic';
+    const isAssistant = role === 'assistant';
+    const randomSuffix = Math.random().toString(36).substring(2, 7);
+    const uid = 'va_' + (isDoc ? 'doc_' : isClinic ? 'clinic_' : isAssistant ? 'asst_' : 'user_') + randomSuffix;
+    
+    const defaultName = isDoc 
+      ? 'Dr. Veterinary Clinician' 
+      : isClinic 
+        ? 'VetAxis Animal Hospital' 
+        : isAssistant 
+          ? 'Clinical Technician' 
+          : 'Livestock Breeder & Pet Owner';
+
+    const profile: UserProfile = {
+      uid,
+      name: name || defaultName,
+      email: `${role}_${randomSuffix}@vetaxis.pk`,
+      phone: phone || '03001234567',
+      role: role as any,
+      expertise: isDoc ? 'Veterinary Medicine & Surgery' : isAssistant ? 'Clinical Care & Animal Handling' : undefined,
+      facilities: isClinic ? 'Emergency OPD, Diagnostics & Surgery' : undefined,
+      address: city || 'Islamabad, Pakistan',
+      profilePic: 'default',
+      createdAt: Date.now(),
+      isVerified: true,
+      emailVerified: true,
+      subscriptionTier: 'Platinum',
+    };
+
+    saveLocalSession(profile);
+    
+    // Non-blocking background sync to Firestore
+    if (isFirebaseConfigured && db) {
+      setDoc(doc(db, 'users', uid), cleanUndefined(profile)).catch((err) => {
+        console.warn('[VetAxis] Non-blocking quick session Firestore sync notice:', err);
+      });
+    }
+
+    return profile;
+  },
+
+  createGuestSession(): UserProfile {
+    const randomSuffix = Math.random().toString(36).substring(2, 7);
+    const uid = 'guest_' + randomSuffix;
+    const profile: UserProfile = {
+      uid,
+      name: 'Guest Explorer',
+      email: `guest_${randomSuffix}@vetaxis.pk`,
+      role: 'user',
+      address: 'Pakistan',
+      profilePic: 'default',
+      createdAt: Date.now(),
+      isVerified: false,
+      emailVerified: false,
+      subscriptionTier: 'Silver',
+    };
+    saveLocalSession(profile);
+    return profile;
   },
 
   async registerGoogleUser(
@@ -1357,10 +1449,15 @@ export const ExploreService = {
         const snapshots = await getDocs(q);
         
         const list: UserProfile[] = await Promise.all(snapshots.docs.map(async (userDoc) => {
-          const profile = userDoc.data() as UserProfile;
+          const docData = userDoc.data() as UserProfile;
+          const uid = docData.uid || userDoc.id;
+          const profile: UserProfile = {
+            ...docData,
+            uid
+          };
           try {
             // Parallel subcollection reviews fetch
-            const revSnap = await getDocs(collection(db, 'users', profile.uid, 'reviews'));
+            const revSnap = await getDocs(collection(db, 'users', uid, 'reviews'));
             const reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
             
             const filteredReviews = reviews.filter(rev => {
@@ -1386,17 +1483,35 @@ export const ExploreService = {
           return injectPresence(injectTemporaryPlatinum(profile)) as UserProfile;
         }));
         
+        try {
+          localStorage.setItem(`va_professionals_${role}`, JSON.stringify(list));
+        } catch {}
         return list;
       } catch (err) {
+        console.warn(`[VetAxis] fetchProfessionals(${role}) failed. Falling back to cached data:`, err);
         try {
-          handleFirestoreError(err, OperationType.LIST, 'users');
-        } catch {
-          console.warn('[VetAxis] fetchProfessionals failed. Falling back to local storage.');
-        }
+          const cached = localStorage.getItem(`va_professionals_${role}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed;
+            }
+          }
+        } catch {}
       }
     }
 
-    // Local Fallback list
+    // Local Fallback list (first check previously synced professionals cache)
+    try {
+      const cached = localStorage.getItem(`va_professionals_${role}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+
     const users = getLocalUsers();
       return users.filter(u => u.role === role).map(u => {
         const reviews = u.reviews || [];
@@ -1587,8 +1702,16 @@ export const CommunityService = {
         const q = query(collection(db, 'community_posts'), orderBy('ts', 'desc'));
         const snapshot = await getDocs(q);
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CommunityPost[];
+        try {
+          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(list));
+        } catch {}
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'community_posts');
+        console.warn('[VetAxis] Community fetch from Firestore failed. Utilizing local cache:', err);
+        try {
+          list = JSON.parse(localStorage.getItem(LOCAL_POSTS_KEY) || '[]');
+        } catch {
+          list = [];
+        }
       }
     } else {
       try {
@@ -2063,8 +2186,16 @@ export const PetAdsService = {
       try {
         const snapshot = await getDocs(query(collection(db, 'pet_ads'), orderBy('createdAt', 'desc')));
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PetAd[];
+        try {
+          localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(list));
+        } catch {}
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'pet_ads');
+        console.warn('[VetAxis] PetAds fetch from Firestore failed. Utilizing local cache:', err);
+        try {
+          list = JSON.parse(localStorage.getItem(LOCAL_PETS_KEY) || '[]');
+        } catch {
+          list = [];
+        }
       }
     } else {
       try {
@@ -2105,14 +2236,28 @@ export const PetAdsService = {
     }
 
     const now = Date.now();
+    const currentEmail = (auth?.currentUser?.email || '').toLowerCase().trim();
+    const isAdminUser = currentEmail === 'saliskhan214@gmail.com' || currentEmail === 'vetaxis360@gmail.com';
+
     for (const ad of list) {
       // Determine if premium (has active subscription)
       const isPremium = !!ad.isPremium;
       const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
       if (now - ad.createdAt > maxAge) {
+        // Only delete from remote Firestore if current user owns the ad or is admin
+        const isOwner = (ad.ownerEmail || '').toLowerCase().trim() === currentEmail;
+        if (!isOwner && !isAdminUser) {
+          continue;
+        }
+
         // Expired! Delete it
         console.log(`Auto-cleaning expired ad: ${ad.id} (${ad.petType}) - premium: ${isPremium}`);
-        await this.deleteAd(ad.id);
+        try {
+          await this.deleteAd(ad.id);
+        } catch (delErr) {
+          console.warn(`Could not auto-delete expired ad ${ad.id}:`, delErr);
+          continue;
+        }
 
         // Notify the user
         try {
@@ -2203,8 +2348,16 @@ export const MarketplaceService = {
       try {
         const snapshot = await getDocs(query(collection(db, 'marketplace_products'), orderBy('createdAt', 'desc')));
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        try {
+          localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(list));
+        } catch {}
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'marketplace_products');
+        console.warn('[VetAxis] Marketplace fetch from Firestore failed. Utilizing local cache:', err);
+        try {
+          list = JSON.parse(localStorage.getItem(LOCAL_ACC_KEY) || '[]');
+        } catch {
+          list = [];
+        }
       }
     } else {
       try {
@@ -2245,12 +2398,26 @@ export const MarketplaceService = {
     }
 
     const now = Date.now();
+    const currentEmail = (auth?.currentUser?.email || '').toLowerCase().trim();
+    const isAdminUser = currentEmail === 'saliskhan214@gmail.com' || currentEmail === 'vetaxis360@gmail.com';
+
     for (const p of list) {
       const isPremium = p.isPremium || (p.ownerRole === 'clinic' || p.ownerRole === 'doctor');
       const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
       if (now - p.createdAt > maxAge) {
+        // Only delete from remote Firestore if current user owns the product or is admin
+        const isOwner = (p.ownerEmail || '').toLowerCase().trim() === currentEmail;
+        if (!isOwner && !isAdminUser) {
+          continue;
+        }
+
         console.log(`Auto-cleaning expired product: ${p.id} (${p.name}) - premium: ${isPremium}`);
-        await this.deleteProduct(p.id);
+        try {
+          await this.deleteProduct(p.id);
+        } catch (delErr) {
+          console.warn(`Could not auto-delete expired product ${p.id}:`, delErr);
+          continue;
+        }
 
         // Notify the user
         try {
@@ -2335,8 +2502,16 @@ export const JobBoardService = {
       try {
         const snapshot = await getDocs(query(collection(db, 'job_posts'), orderBy('createdAt', 'desc')));
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as JobPost[];
+        try {
+          localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(list));
+        } catch {}
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'job_posts');
+        console.warn('[VetAxis] JobBoard fetch from Firestore failed. Utilizing local cache:', err);
+        try {
+          list = JSON.parse(localStorage.getItem(LOCAL_JOBS_KEY) || '[]');
+        } catch {
+          list = [];
+        }
       }
     } else {
       try {

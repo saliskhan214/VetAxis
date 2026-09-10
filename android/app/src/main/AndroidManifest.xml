@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.vetaxis.app"
+    android:versionCode="4"
+    android:versionName="1.0.3">
+
+    <!-- Backward-compatible SDK limits: Android 5.0 (API 21) up to modern Android 14 (API 34) -->
+    <uses-sdk
+        android:minSdkVersion="21"
+        android:targetSdkVersion="34" />
+
+    <!-- Network & Live Cloud Synchronization -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- Camera for Livestock Lesion & Symptom Photography -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Geolocation for Rural Veterinary Clinics & Farm Mapping -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- Notifications, Timers & Critical Alerts -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Hardware Compatibility Flags for Rugged & Older Devices -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true"
+        android:hardwareAccelerated="true">
+
+        <!-- Main Activity: Entry point, launcher & deep-link receiver -->
+        <activity
+            android:name="com.vetaxis.app.MainActivity"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|screenLayout|smallestScreenSize|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true">
+
+            <!-- Primary Home Launcher Intent Filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Custom URI Scheme Deep Linking (vetaxis://) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vetaxis" />
+            </intent-filter>
+
+            <!-- Cloud App Links (HTTPS) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="ais-pre-z5sefz4cpfnl2t5cug7unw-366026919204.asia-southeast1.run.app" />
+                <data
+                    android:scheme="https"
+                    android:host="ais-dev-z5sefz4cpfnl2t5cug7unw-366026919204.asia-southeast1.run.app" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

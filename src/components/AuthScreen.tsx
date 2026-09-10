@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { UserRole } from '../types';
+import { UserRole, UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
@@ -12,11 +12,14 @@ interface AuthScreenProps {
     signIn: (email: string, password: string) => Promise<any>;
     signInWithGoogle: (roleForSignUp?: string) => Promise<any>;
     registerGoogleUser?: (pendingInfo: any, role: string, phone: string, extra: any) => Promise<any>;
+    createQuickSession?: (role?: string) => UserProfile;
+    createGuestSession?: () => UserProfile;
   };
   onOpenAboutUs?: () => void;
+  onOpenAndroidDownload?: () => void;
 }
 
-export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthScreenProps) {
+export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs, onOpenAndroidDownload }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [googlePendingInfo, setGooglePendingInfo] = useState<any | null>(null);
@@ -31,6 +34,7 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [legalModalOpen, setLegalModalOpen] = useState<boolean>(false);
   const [legalModalType, setLegalModalType] = useState<'terms' | 'about'>('terms');
+  const [showQuickRoleSelector, setShowQuickRoleSelector] = useState<boolean>(false);
 
   // Automatically scroll screen to top/start of popup when legal modal opens
   useEffect(() => {
@@ -56,8 +60,14 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
   const handleGoogleAuth = async () => {
     setError(null);
     setLoading(true);
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      setError('Google Sign-In response was delayed. Please check your connection and tap to try again.');
+    }, 15000);
+
     try {
       const result = await authService.signInWithGoogle('doctor');
+      clearTimeout(safetyTimeout);
       if (result.exists) {
         onAuthSuccess(result.profile);
       } else {
@@ -65,8 +75,10 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
         setSelectedRole('doctor'); // default to doctor on onboarding start
       }
     } catch (err: any) {
-      setError(err.message || 'Google Authentication failed.');
+      clearTimeout(safetyTimeout);
+      setError(err.message || 'Google Authentication failed. Please check your connection and try again.');
     } finally {
+      clearTimeout(safetyTimeout);
       setLoading(false);
     }
   };
@@ -230,8 +242,44 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
           </div>
 
           <AnimatePresence mode="wait">
+            {loading && (
+              <motion.div 
+                key="auth-loading-banner"
+                initial={{ opacity: 0, height: 0, y: -10 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-4 mb-6 bg-emerald-50/80 border border-emerald-200 border-b-[3px] border-b-emerald-300 rounded-2xl flex items-center gap-3.5 shadow-inner"
+                id="auth-loading-transition-state"
+              >
+                <div className="w-9 h-9 rounded-xl bg-emerald-100/90 flex items-center justify-center shrink-0 shadow-xs">
+                  <HeartPulse className="w-4 h-4 text-emerald-700 animate-pulse" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-xs font-black text-[#373735] flex items-center gap-1.5">
+                    Validating Authentication Status…
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  </p>
+                  <p className="text-[10px] text-emerald-800 font-semibold mt-0.5">
+                    Verifying session token & syncing clinical register
+                  </p>
+                </div>
+                <div className="w-4 h-4 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoading(false);
+                    setError(null);
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-bold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 rounded-lg shrink-0 cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+              </motion.div>
+            )}
+
             {error && (
               <motion.div 
+                key="auth-error-banner"
                 initial={{ opacity: 0, height: 0, y: -10 }}
                 animate={{ opacity: 1, height: 'auto', y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
@@ -498,6 +546,12 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
                 <span>{loading ? 'Opening Portal…' : 'Continue with Google'}</span>
               </motion.button>
 
+              <div className="text-center pt-2">
+                <p className="text-[11px] font-semibold text-[#8c887e]">
+                  🔒 Direct Google authentication required to access clinical tools and listings.
+                </p>
+              </div>
+
               {/* About Us / Platform Directory guide button */}
               <div className="border-t border-[#e3dec9] pt-6 flex flex-col items-center">
                 <span className="text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Unsure what we offer?</span>
@@ -509,6 +563,16 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
                   className="w-full py-3.5 bg-[#fdfbf7] hover:bg-[#fcf9f2] text-[#a0522d] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
                 >
                   <span>ℹ️ Explore All Services & Directory</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenAndroidDownload) onOpenAndroidDownload();
+                  }}
+                  className="w-full mt-2.5 py-3 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 border-b-[3px] border-b-emerald-500 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
+                >
+                  <span>📲 Download APK File</span>
                 </button>
               </div>
             </div>

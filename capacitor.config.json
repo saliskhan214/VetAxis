@@ -1,0 +1,26 @@
+{
+  "appId": "com.vetaxis.app",
+  "appName": "VetAxis 360",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://ais-dev-z5sefz4cpfnl2t5cug7unw-366026919204.asia-southeast1.run.app",
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#2b2b24",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    }
+  }
+}

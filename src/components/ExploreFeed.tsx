@@ -1864,7 +1864,7 @@ export function ExploreFeed({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
           {filteredProfessionals.map((prof) => {
-            const initials = prof.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+            const initials = (prof.name || prof.email || 'User').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
             
             // Calculate distance strictly for clinic profiles using getDistance
             let distance: number | null = null;

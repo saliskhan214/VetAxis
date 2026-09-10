@@ -74,7 +74,7 @@ service cloud.firestore {
 
       allow create: if isSignedIn() && isOwner(userId) && (
         incoming().keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 300000 &&
         incoming().role in ['doctor', 'clinic', 'assistant', 'user'] &&
         incoming().name is string && incoming().name.size() <= 80 &&
         incoming().email is string && incoming().email.size() <= 128 &&
@@ -104,9 +104,9 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         isAdmin() ||
         (isOwner(userId) && (
-          incoming().role == existing().role &&
-          incoming().email == existing().email &&
-          incoming().createdAt == existing().createdAt &&
+          (!('role' in existing()) || incoming().role == existing().role || isAdmin()) &&
+          (!('email' in existing()) || incoming().email.lower() == existing().email.lower() || isAdmin()) &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt || isAdmin()) &&
           (!('isVerified' in incoming()) || incoming().isVerified == existing().isVerified) && // Guard: cannot self-verify
           (!('subscriptionTier' in incoming()) || incoming().subscriptionTier == existing().get('subscriptionTier', null)) && // Guard: cannot self-upgrade tier
           (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt == existing().get('subscriptionExpiresAt', null)) && // Guard: cannot self-extend subscription
@@ -153,7 +153,7 @@ service cloud.firestore {
           incoming().reviewerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
           incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
           (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
-          incoming().date is number && incoming().date <= request.time.toMillis() + 60000 &&
+          incoming().date is number && incoming().date <= request.time.toMillis() + 300000 &&
           // Verify that reviewer can review the target clinician
           canUserReview(
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role,
@@ -189,7 +189,7 @@ service cloud.firestore {
     // CONNECTION METADATA TEST RULES
     // ─────────────────────────────────────────────────────────────────
     match /test-metadata-connection/{docId} {
-      allow read: if true;
+      allow read, write: if true;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -199,34 +199,36 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn() && (
-        incoming().ownerEmail == request.auth.token.email &&
+        (incoming().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin()) &&
         incoming().ownerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
         incoming().adType in ['sale', 'adoption'] &&
-        incoming().petType is string && incoming().petType.size() <= 50 &&
-        incoming().description is string && incoming().description.size() <= 1500 &&
-        incoming().location is string && incoming().location.size() <= 100 &&
-        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().petType is string && incoming().petType.size() <= 100 &&
+        incoming().description is string && incoming().description.size() <= 5000 &&
+        incoming().location is string && incoming().location.size() <= 200 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 30 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 300000 &&
         (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
-        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 5 * 1024 * 1024))
       );
 
       allow update: if isSignedIn() && (
-        existing().ownerEmail == request.auth.token.email &&
-        incoming().ownerEmail == existing().ownerEmail &&
-        incoming().ownerRole == existing().ownerRole &&
-        incoming().createdAt == existing().createdAt &&
-        incoming().adType == existing().adType &&
-        incoming().petType is string && incoming().petType.size() <= 50 &&
-        incoming().description is string && incoming().description.size() <= 1500 &&
-        incoming().location is string && incoming().location.size() <= 100 &&
-        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
-        (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
-        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+        (
+          (existing().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin()) &&
+          (incoming().ownerEmail.lower() == existing().ownerEmail.lower() || isAdmin()) &&
+          (incoming().ownerRole == existing().ownerRole || isAdmin()) &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt || isAdmin()) &&
+          incoming().adType == existing().adType &&
+          incoming().petType is string && incoming().petType.size() <= 100 &&
+          incoming().description is string && incoming().description.size() <= 5000 &&
+          incoming().location is string && incoming().location.size() <= 200 &&
+          incoming().whatsapp is string && incoming().whatsapp.size() <= 30 &&
+          (!('price' in incoming()) || (incoming().price is number && incoming().price >= 0)) &&
+          (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 5 * 1024 * 1024))
+        ) || isAdmin()
       );
 
       allow delete: if isSignedIn() && (
-        existing().ownerEmail == request.auth.token.email
+        (existing().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin())
       );
     }
 
@@ -237,34 +239,36 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn() && (
-        // Authority check: Only Clinicians (Doctors or Clinics) can post marketplace items
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic'] &&
-        incoming().ownerEmail == request.auth.token.email &&
+        // Authority check: Clinicians (Doctors or Clinics) or Admin can post marketplace items
+        (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic']) &&
+        (incoming().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin()) &&
         incoming().ownerRole in ['doctor', 'clinic'] &&
-        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().name is string && incoming().name.size() <= 200 &&
         incoming().price is number && incoming().price >= 0 &&
         incoming().quantity is number && incoming().quantity >= 1 &&
-        incoming().description is string && incoming().description.size() <= 1500 &&
-        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
-        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+        incoming().description is string && incoming().description.size() <= 5000 &&
+        incoming().whatsapp is string && incoming().whatsapp.size() <= 30 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 300000 &&
+        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 5 * 1024 * 1024))
       );
 
       allow update: if isSignedIn() && (
-        existing().ownerEmail == request.auth.token.email &&
-        incoming().ownerEmail == existing().ownerEmail &&
-        incoming().ownerRole == existing().ownerRole &&
-        incoming().createdAt == existing().createdAt &&
-        incoming().name is string && incoming().name.size() <= 100 &&
-        incoming().price is number && incoming().price >= 0 &&
-        incoming().quantity is number && incoming().quantity >= 0 &&
-        incoming().description is string && incoming().description.size() <= 1500 &&
-        incoming().whatsapp is string && incoming().whatsapp.size() <= 24 &&
-        (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 2 * 1024 * 1024))
+        (
+          (existing().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin()) &&
+          (incoming().ownerEmail.lower() == existing().ownerEmail.lower() || isAdmin()) &&
+          (incoming().ownerRole == existing().ownerRole || isAdmin()) &&
+          (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt || isAdmin()) &&
+          incoming().name is string && incoming().name.size() <= 200 &&
+          incoming().price is number && incoming().price >= 0 &&
+          incoming().quantity is number && incoming().quantity >= 0 &&
+          incoming().description is string && incoming().description.size() <= 5000 &&
+          incoming().whatsapp is string && incoming().whatsapp.size() <= 30 &&
+          (!('image' in incoming()) || (incoming().image is string && incoming().image.size() <= 5 * 1024 * 1024))
+        ) || isAdmin()
       );
 
       allow delete: if isSignedIn() && (
-        existing().ownerEmail == request.auth.token.email
+        (existing().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin())
       );
     }
 
@@ -317,7 +321,7 @@ service cloud.firestore {
         incoming().screeningQuestions is list &&
         incoming().requiredDocuments is list &&
         incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 300000 &&
         (!('approvalStatus' in incoming()) || incoming().approvalStatus in ['pending', 'approved', 'rejected']) &&
         (!('posterRole' in incoming()) || incoming().posterRole in ['doctor', 'clinic', 'assistant', 'user']) &&
         (!('employerType' in incoming()) || incoming().employerType in ['clinic', 'farm', 'individual', 'hospital']) &&
@@ -366,7 +370,7 @@ service cloud.firestore {
         incoming().applicantName is string && incoming().applicantName.size() <= 150 &&
         incoming().applicantPhone is string && incoming().applicantPhone.size() <= 24 &&
         incoming().status == 'Pending' &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 300000 &&
         (!('agreedToSafetyProtocol' in incoming()) || incoming().agreedToSafetyProtocol is bool) &&
         (!('agreedToSafetyProtocolTimestamp' in incoming()) || incoming().agreedToSafetyProtocolTimestamp is number)
       );
@@ -422,7 +426,7 @@ service cloud.firestore {
       allow create: if isAdmin() && (
         incoming().title is string && incoming().title.size() <= 150 &&
         incoming().message is string && incoming().message.size() <= 3000 &&
-        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
+        incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 300000 &&
         incoming().type in ['announcement', 'alert', 'update', 'promo']
       );
 

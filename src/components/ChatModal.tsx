@@ -21,6 +21,7 @@ import {
   AUTO_DISAPPEAR_DURATION_MS
 } from '../lib/chatService';
 import { ChatEmojiPicker } from './ChatEmojiPicker';
+import { useAndroidHardwareBackButton, triggerMobileHaptic } from '../lib/androidBridge';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -37,6 +38,8 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   currentUser,
   initialMessage = ''
 }) => {
+  useAndroidHardwareBackButton(isOpen && !!recipient, onClose);
+
   if (!isOpen || !recipient) return null;
 
   // Fallback for guest or unauthenticated visitor
@@ -113,6 +116,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
         receiver: recipient,
         text: textToSend
       });
+      triggerMobileHaptic('light');
       scrollToBottom('smooth');
     } catch (err: any) {
       console.error('[ChatModal] Send message failed:', err);

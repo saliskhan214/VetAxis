@@ -36,12 +36,17 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const loadProducts = async () => {
+  const loadProducts = async (force: boolean = false) => {
+    if (force) {
+      swrGlobalCache.delete('marketplace_products');
+    }
     if (!swrGlobalCache.has('marketplace_products')) {
       setLoading(true);
     }
     try {
-      const data = await prefetchSWR('marketplace_products', () => MarketplaceService.fetchProducts());
+      const data = force
+        ? await MarketplaceService.fetchProducts()
+        : await prefetchSWR('marketplace_products', () => MarketplaceService.fetchProducts(), 30000, false);
       if (data) {
         setProducts(data);
       }
@@ -63,7 +68,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   // Automatically refresh marketplace products when tab is reopened, refocused, or updated in another tab
   useTabRevalidation({
     entity: 'marketplace',
-    onRevalidate: loadProducts,
+    onRevalidate: () => loadProducts(true),
   });
 
   useEffect(() => {
