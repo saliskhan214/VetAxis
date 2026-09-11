@@ -34,10 +34,25 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "Deploying to Firebase Hosting with Service Account..."
+            echo "Validating Service Account credentials..."
             SA_FILE="$RUNNER_TEMP/firebase-service-account.json"
-            echo "$FIREBASE_SERVICE_ACCOUNT" > "$SA_FILE"
+            export SA_FILE
+            node -e "
+              try {
+                const creds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+                if (!creds.project_id || !creds.private_key) {
+                  throw new Error('Missing project_id or private_key in credentials');
+                }
+                const fs = require('fs');
+                fs.writeFileSync(process.env.SA_FILE, JSON.stringify(creds, null, 2));
+                console.log('Service account parsed successfully for project: ' + creds.project_id);
+              } catch (e) {
+                console.error('Failed to parse service account JSON:', e.message);
+                process.exit(1);
+              }
+            "
             export GOOGLE_APPLICATION_CREDENTIALS="$SA_FILE"
+            echo "Deploying to Firebase Hosting for project vetaxis360..."
             npx --yes firebase-tools deploy --only hosting --project vetaxis360 --non-interactive
             rm -f "$SA_FILE"
           elif [ -n "$FIREBASE_TOKEN" ]; then
