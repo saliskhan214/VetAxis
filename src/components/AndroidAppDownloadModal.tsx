@@ -89,12 +89,18 @@ export function AndroidAppDownloadModal({ isOpen, onClose }: AndroidAppDownloadM
       // 2. Fallback to direct binary endpoint if needed
       if (!apkBuffer) {
         setDownloadStatus('Streaming APK binary...');
-        const directRes = await fetch(`/downloads/vetaxis360.apk?t=${Date.now()}`, {
+        let directRes = await fetch(`/downloads/vetaxis360.apk?t=${Date.now()}`, {
           credentials: 'include'
-        });
+        }).catch(() => null);
 
-        if (!directRes.ok) {
-          throw new Error(`Server returned HTTP ${directRes.status}`);
+        // If local hosting doesn't serve executable (Firebase Spark plan restriction), fetch from GitHub repository
+        if (!directRes || !directRes.ok) {
+          setDownloadStatus('Connecting to verified release mirror...');
+          directRes = await fetch('https://raw.githubusercontent.com/saliskhan214/VetAxis/main/public/downloads/vetaxis360.apk').catch(() => null);
+        }
+
+        if (!directRes || !directRes.ok) {
+          throw new Error(`APK mirror returned HTTP ${directRes ? directRes.status : 'Network Error'}`);
         }
 
         const buffer = await directRes.arrayBuffer();
