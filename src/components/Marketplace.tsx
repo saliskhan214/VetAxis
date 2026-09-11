@@ -71,6 +71,18 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
     onRevalidate: () => loadProducts(true),
   });
 
+  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
+  useEffect(() => {
+    const handleDirectSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.entity === 'marketplace' && Array.isArray(detail?.payload?.products)) {
+        setProducts(detail.payload.products);
+      }
+    };
+    window.addEventListener('vetaxis_data_update', handleDirectSync);
+    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
+  }, []);
+
   useEffect(() => {
     if (highlightProductId && products.length > 0) {
       setTimeout(() => {

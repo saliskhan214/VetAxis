@@ -19,16 +19,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
-
-      - name: Verify Firebase Secret
-        run: |
-          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 || secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
-            echo "::warning ::FIREBASE_SERVICE_ACCOUNT_VETAXIS360 secret is not configured in GitHub Secrets. Please add it in Repository Settings -> Secrets and variables -> Actions."
-          else
-            echo "Firebase Service Account secret is present."
-          fi
 
       - name: Install dependencies
         run: npm ci || npm install
@@ -36,10 +28,33 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 || secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
-          projectId: vetaxis360
+      - name: Deploy to Firebase Hosting (Service Account)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 != '' || secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 || secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          SA_FILE="$RUNNER_TEMP/firebase-service-account.json"
+          echo "$SERVICE_ACCOUNT_KEY" > "$SA_FILE"
+          export GOOGLE_APPLICATION_CREDENTIALS="$SA_FILE"
+          npx --yes firebase-tools deploy --only hosting --project vetaxis360 --non-interactive
+          rm -f "$SA_FILE"
+
+      - name: Deploy with Firebase Token (Fallback)
+        if: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 == '' && secrets.FIREBASE_SERVICE_ACCOUNT == '') && secrets.FIREBASE_TOKEN != '' }}
+        run: |
+          npx --yes firebase-tools deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project vetaxis360 --non-interactive
+
+      - name: Report Missing Credentials
+        if: ${{ !(secrets.FIREBASE_SERVICE_ACCOUNT_VETAXIS360 || secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_TOKEN) }}
+        run: |
+          echo "::warning ::Firebase deployment credentials are not configured in GitHub Secrets. The build succeeded, but deployment was skipped."
+          echo "### ⚠️ Firebase Deployment Notice" >> $GITHUB_STEP_SUMMARY
+          echo "The project was compiled and built successfully! However, deployment to Firebase Hosting was skipped because the repository secret is not yet configured in GitHub." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### To enable automatic deployment to Firebase Hosting:" >> $GITHUB_STEP_SUMMARY
+          echo "1. In your GitHub repository, open **Settings** > **Secrets and variables** > **Actions**." >> $GITHUB_STEP_SUMMARY
+          echo "2. Click **New repository secret**." >> $GITHUB_STEP_SUMMARY
+          echo "3. Name: \`FIREBASE_SERVICE_ACCOUNT_VETAXIS360\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Secret value: Paste your Firebase/Google Cloud Service Account JSON key (with Firebase Hosting Admin role)." >> $GITHUB_STEP_SUMMARY
+          echo "*(Alternatively, you can add \`FIREBASE_TOKEN\` obtained via \`firebase login:ci\`)*" >> $GITHUB_STEP_SUMMARY
+

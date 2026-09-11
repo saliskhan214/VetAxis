@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { triggerAutoSync } from './autoSyncEngine';
 
 /**
  * VetAxis 360 Android Live App Shell & Cloud Synchronization Bridge
@@ -105,19 +106,27 @@ export function useLiveCloudSync() {
       setSyncState('offline');
     };
 
+    const handleSyncComplete = () => {
+      setLastSyncedAt(new Date());
+      setSyncState('synced');
+      setPendingCount(0);
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('vetaxis-sync-complete', handleSyncComplete);
 
     // Periodic heartbeat to confirm Firestore connectivity
     const syncInterval = setInterval(() => {
       if (navigator.onLine) {
         setLastSyncedAt(new Date());
       }
-    }, 60000);
+    }, 30000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('vetaxis-sync-complete', handleSyncComplete);
       clearInterval(syncInterval);
     };
   }, []);
@@ -126,8 +135,7 @@ export function useLiveCloudSync() {
     if (!navigator.onLine) return;
     setSyncState('syncing');
     try {
-      // Small delay simulating live sync verification
-      await new Promise(r => setTimeout(r, 600));
+      await triggerAutoSync(true);
       setLastSyncedAt(new Date());
       setSyncState('synced');
       setPendingCount(0);

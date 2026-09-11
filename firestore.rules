@@ -196,7 +196,7 @@ service cloud.firestore {
     // PET ADS RULES (Classifieds)
     // ─────────────────────────────────────────────────────────────────
     match /pet_ads/{adId} {
-      allow read: if isSignedIn();
+      allow read: if true;
 
       allow create: if isSignedIn() && (
         (incoming().ownerEmail.lower() == request.auth.token.email.lower() || isAdmin()) &&
@@ -236,7 +236,7 @@ service cloud.firestore {
     // MARKETPLACE PRODUCTS RULES
     // ─────────────────────────────────────────────────────────────────
     match /marketplace_products/{productId} {
-      allow read: if isSignedIn();
+      allow read: if true;
 
       allow create: if isSignedIn() && (
         // Authority check: Clinicians (Doctors or Clinics) or Admin can post marketplace items
@@ -276,7 +276,7 @@ service cloud.firestore {
     // COMMUNITY POSTS RULES
     // ─────────────────────────────────────────────────────────────────
     match /community_posts/{postId} {
-      allow read: if isSignedIn();
+      allow read: if true;
 
       allow create: if isSignedIn() && (
         incoming().get('authorUid', '') == request.auth.uid ||
@@ -302,7 +302,7 @@ service cloud.firestore {
     // JOB POSTS COLLECTION Rules
     // ─────────────────────────────────────────────────────────────────
     match /job_posts/{jobId} {
-      allow read: if isSignedIn();
+      allow read: if true;
 
       allow create: if isSignedIn() && (
         incoming().get('clinicId', '') == request.auth.uid &&

@@ -171,6 +171,18 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     onRevalidate: loadPosts,
   });
 
+  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
+  useEffect(() => {
+    const handleDirectSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.entity === 'community' && Array.isArray(detail?.payload?.posts)) {
+        setPosts(detail.payload.posts);
+      }
+    };
+    window.addEventListener('vetaxis_data_update', handleDirectSync);
+    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
+  }, []);
+
   // Highlighted notification post automatic scroll and filter alignment
   useEffect(() => {
     if (highlightPostId && posts.length > 0) {

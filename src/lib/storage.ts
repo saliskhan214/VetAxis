@@ -2218,13 +2218,17 @@ export const PetAdsService = {
   },
 
   async autoCleanupAds(): Promise<void> {
+    if (!auth?.currentUser) {
+      // Remote deletion requires authenticated owner or admin credentials; skip when not signed in
+      return;
+    }
     let list: PetAd[] = [];
     if (isFirebaseConfigured && db) {
       try {
         const snapshot = await getDocs(collection(db, 'pet_ads'));
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PetAd[];
       } catch (err) {
-        console.error('Failed to fetch ads for cleanup:', err);
+        console.warn('[VetAxis] Skipped ads cleanup pass:', err);
         return;
       }
     } else {
@@ -2380,13 +2384,17 @@ export const MarketplaceService = {
   },
 
   async autoCleanupProducts(): Promise<void> {
+    if (!auth?.currentUser) {
+      // Remote deletion requires authenticated owner or admin credentials; skip when not signed in
+      return;
+    }
     let list: Product[] = [];
     if (isFirebaseConfigured && db) {
       try {
         const snapshot = await getDocs(collection(db, 'marketplace_products'));
         list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       } catch (err) {
-        console.error('Failed to fetch products for cleanup:', err);
+        console.warn('[VetAxis] Skipped products cleanup pass:', err);
         return;
       }
     } else {
@@ -2828,15 +2836,25 @@ export const NotificationService = {
   async fetchNotifications(userId: string): Promise<VetNotification[]> {
     let list: VetNotification[] = [];
     if (isFirebaseConfigured && db) {
-      try {
-        const q = query(
-          collection(db, 'notifications'),
-          where('userId', '==', userId)
-        );
-        const snapshot = await getDocs(q);
-        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as VetNotification[];
-      } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'notifications');
+      if (auth?.currentUser && auth.currentUser.uid === userId) {
+        try {
+          const q = query(
+            collection(db, 'notifications'),
+            where('userId', '==', userId)
+          );
+          const snapshot = await getDocs(q);
+          list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as VetNotification[];
+        } catch (err) {
+          handleFirestoreError(err, OperationType.LIST, 'notifications');
+        }
+      } else {
+        // Fall back to local notifications ledger when not signed into Firebase Auth or during initial auth token bootstrap
+        try {
+          list = JSON.parse(localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+        } catch {
+          list = [];
+        }
+        list = list.filter(n => n.userId === userId);
       }
     } else {
       try {

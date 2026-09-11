@@ -190,9 +190,9 @@ export function useTabRevalidation({
 
     const entities = Array.isArray(entity) ? entity : [entity];
 
-    const executeRevalidation = (reason: string) => {
+    const executeRevalidation = (reason: string, bypassThrottle: boolean = false) => {
       const now = Date.now();
-      if (now - lastRevalidateRef.current < throttleMs) {
+      if (!bypassThrottle && (now - lastRevalidateRef.current < throttleMs)) {
         return; // Throttled to prevent rapid repeated calls
       }
       lastRevalidateRef.current = now;
@@ -221,7 +221,9 @@ export function useTabRevalidation({
         entities.includes(msg.entity);
 
       if (isMatch) {
-        executeRevalidation(`event_${msg.entity}`);
+        // Instantaneous execution for live Firestore events
+        const isRealtime = (msg.payload?.source === 'firestore_snapshot') || (msg.payload?.source === 'automatic_cloud_sync');
+        executeRevalidation(`event_${msg.entity}`, isRealtime);
       }
     };
 

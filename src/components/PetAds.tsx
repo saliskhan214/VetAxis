@@ -164,6 +164,18 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
     },
   });
 
+  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
+  useEffect(() => {
+    const handleDirectSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.entity === 'pet_ads' && Array.isArray(detail?.payload?.ads)) {
+        setAds(detail.payload.ads);
+      }
+    };
+    window.addEventListener('vetaxis_data_update', handleDirectSync);
+    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
+  }, []);
+
   useEffect(() => {
     if (highlightAdId && ads.length > 0) {
       setTimeout(() => {

@@ -9,6 +9,7 @@ import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
 import { useSWR } from './lib/useSWR';
 import { initIdlePrefetch } from './lib/prefetch';
+import { initAutoSyncEngine } from './lib/autoSyncEngine';
 
 export { useSWR };
 export type { SWROptions, SWRResponse } from './lib/useSWR';
@@ -200,6 +201,11 @@ export default function App() {
       }
     }
   }, [currentUser?.uid]);
+
+  // Continuous real-time cloud auto-sync between APK mobile app and website
+  useEffect(() => {
+    initAutoSyncEngine();
+  }, []);
 
   // Predictive background idle prefetch for top application sections
   useEffect(() => {
