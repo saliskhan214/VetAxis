@@ -52,14 +52,14 @@ jobs:
               }
             "
             export GOOGLE_APPLICATION_CREDENTIALS="$SA_FILE"
-            echo "Excluding APK executables from dist to comply with Firebase Spark plan restrictions..."
-            rm -rf dist/downloads/*.apk dist/downloads/*.idsig
+            echo "Excluding downloads binaries from dist to comply with Firebase Spark plan restrictions..."
+            rm -rf dist/downloads
             echo "Deploying to Firebase Hosting for project vetaxis360..."
             npx --yes firebase-tools deploy --only hosting --project vetaxis360 --non-interactive
             rm -f "$SA_FILE"
           elif [ -n "$FIREBASE_TOKEN" ]; then
             echo "Deploying to Firebase Hosting with Firebase Token..."
-            rm -rf dist/downloads/*.apk dist/downloads/*.idsig
+            rm -rf dist/downloads
             npx --yes firebase-tools deploy --only hosting --token "$FIREBASE_TOKEN" --project vetaxis360 --non-interactive
           else
             echo "::warning ::Firebase deployment credentials are not configured in GitHub Secrets. Build succeeded, but deployment was skipped."
