@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <!-- Suppress benign Vite WebSocket HMR errors in AI Studio sandboxed environment -->
     <script>
@@ -638,61 +638,11 @@
           <div class="loader-progress-bar" style="position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, #5a5a40, #8c8c69); border-radius: 9999px;"></div>
         </div>
 
-        <p id="boot-status-text" style="margin: 14px 0 0 0; font-size: 12px; color: #a8a29e; font-weight: 500;">
+        <p style="margin: 14px 0 0 0; font-size: 12px; color: #a8a29e; font-weight: 500;">
           Connecting care network...
         </p>
-
-        <div id="boot-failsafe-box" style="display: none; margin-top: 14px; flex-direction: column; align-items: center; gap: 8px;">
-          <button id="boot-reload-btn" onclick="window.location.reload()" style="background-color: #5a5a40; color: #ffffff; border: none; border-radius: 10px; padding: 7px 16px; font-size: 11px; font-weight: 600; cursor: pointer; letter-spacing: 0.02em;">
-            Reload Workspace
-          </button>
-          <span id="boot-error-message" style="display: none; font-size: 10px; color: #b91c1c; max-width: 240px; word-break: break-word; text-align: center;"></span>
-        </div>
       </div>
     </div>
-    <script>
-      (function() {
-        // Immediate cleanup of service workers in native APK environment
-        var isNativeApk = Boolean(
-          window.AndroidNative ||
-          window.isVetAxisNative ||
-          (navigator.userAgent && (navigator.userAgent.indexOf('VetAxisApp') !== -1 || navigator.userAgent.indexOf('VetAxis360') !== -1))
-        );
-        if (isNativeApk && 'serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(regs) {
-            for (var i = 0; i < regs.length; i++) {
-              regs[i].unregister().catch(function() {});
-            }
-          }).catch(function() {});
-        }
-
-        // Global uncaught error listener during boot
-        window.addEventListener('error', function(e) {
-          var status = document.getElementById('boot-status-text');
-          var errBox = document.getElementById('boot-error-message');
-          var failsafe = document.getElementById('boot-failsafe-box');
-          if (status && errBox && failsafe) {
-            var msg = (e && e.message) ? e.message : 'Error starting workspace';
-            if (msg.indexOf('websocket') === -1 && msg.indexOf('WebSocket') === -1) {
-              errBox.textContent = msg;
-              errBox.style.display = 'block';
-              failsafe.style.display = 'flex';
-              status.textContent = 'Recovering connection...';
-            }
-          }
-        });
-
-        // Watchdog timer: If React doesn't mount within 3 seconds, offer recovery
-        setTimeout(function() {
-          var status = document.getElementById('boot-status-text');
-          var failsafe = document.getElementById('boot-failsafe-box');
-          if (status && failsafe) {
-            status.textContent = 'Synchronizing clinical records...';
-            failsafe.style.display = 'flex';
-          }
-        }, 3200);
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

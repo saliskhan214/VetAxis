@@ -33,21 +33,9 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
-// Register the Service Worker for remote/offline rural usage (Web App only; APK utilizes native asset interceptor)
+// Register the Service Worker for remote/offline rural usage
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    const isNativeApk = Boolean((window as any).AndroidNative?.isNativeApp?.() || (window as any).AndroidNative);
-    if (isNativeApk) {
-      // In native Android APK, static assets are bundled locally in assets/
-      // Unregister any stale service workers to prevent network contention with Firebase
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const reg of registrations) {
-          reg.unregister().catch(() => {});
-        }
-      }).catch(() => {});
-      return;
-    }
-
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('✅ VetAxis Rural ServiceWorker registered successfully with scope:', registration.scope);

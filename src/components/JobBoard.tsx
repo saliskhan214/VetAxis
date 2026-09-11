@@ -180,18 +180,6 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
     onRevalidate: loadJobs,
   });
 
-  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
-  useEffect(() => {
-    const handleDirectSync = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.entity === 'jobs' && Array.isArray(detail?.payload?.jobs)) {
-        setJobs(detail.payload.jobs);
-      }
-    };
-    window.addEventListener('vetaxis_data_update', handleDirectSync);
-    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
-  }, []);
-
   const loadAllApplications = async () => {
     setLoadingAllApps(true);
     try {

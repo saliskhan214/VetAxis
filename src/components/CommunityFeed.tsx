@@ -171,18 +171,6 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     onRevalidate: loadPosts,
   });
 
-  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
-  useEffect(() => {
-    const handleDirectSync = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.entity === 'community' && Array.isArray(detail?.payload?.posts)) {
-        setPosts(detail.payload.posts);
-      }
-    };
-    window.addEventListener('vetaxis_data_update', handleDirectSync);
-    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
-  }, []);
-
   // Highlighted notification post automatic scroll and filter alignment
   useEffect(() => {
     if (highlightPostId && posts.length > 0) {
@@ -1004,7 +992,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     const isAuthor = 
                       (post.authorUid && post.authorUid === currentUser.uid) ||
                       (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
-                    const initials = (post.authorName || post.authorEmail || 'User').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
+                    const initials = post.authorName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
                     
                     const loved = post.reactions?.['❤️']?.includes(currentUser.email);
                     const thanked = post.reactions?.['👍']?.includes(currentUser.email);

@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { UserProfile, VetNotification } from '../types';
-import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2, MessageCircle, Smartphone, Activity } from 'lucide-react';
+import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getPrefetchProps, prefetchSection } from '../lib/prefetch';
-import { isAndroidApp } from '../lib/androidBridge';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -16,7 +15,6 @@ interface NavbarProps {
   onNotificationClick?: (notif: VetNotification) => void;
   onOpenAboutUs?: () => void;
   onOpenMessenger?: () => void;
-  onOpenAndroidDownload?: () => void;
   unreadMessagesCount?: number;
 }
 
@@ -31,7 +29,6 @@ export function Navbar({
   onNotificationClick,
   onOpenAboutUs,
   onOpenMessenger,
-  onOpenAndroidDownload,
   unreadMessagesCount = 0
 }: NavbarProps) {
   if (!user) return null;
@@ -54,13 +51,13 @@ export function Navbar({
     setTimerId(tid);
   };
 
-  const initials = (user?.name || user?.email || 'User')
+  const initials = user.name
     .trim()
     .split(/\s+/)
     .map(w => w[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase() || 'U';
+    .toUpperCase();
 
   const handleMobileNav = (section: string) => {
     onNavigate(section);
@@ -133,7 +130,7 @@ export function Navbar({
 
         {/* Right Header Navigation - Messenger, Notification & Clean Profile Button */}
         <div className="flex items-center gap-2 sm:gap-3">
-
+          
           {/* Messenger Button (Left to Notification Button) */}
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -430,27 +427,6 @@ export function Navbar({
                       );
                     })}
 
-                  {/* Android App APK Download Button in Mobile Drawer */}
-                  <div className="border-t border-[#e3dec9] my-2 pt-3">
-                    <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Android Application</p>
-                    <motion.button
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        setIsSidebarOpen(false);
-                        if (onOpenAndroidDownload) onOpenAndroidDownload();
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold text-emerald-900 bg-emerald-50 hover:bg-emerald-100/90 border border-emerald-300 border-b-[3px] border-b-emerald-500 transition-all text-left cursor-pointer shadow-2xs"
-                    >
-                      <Smartphone className="w-5 h-5 text-emerald-700 shrink-0" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span>Download APK File</span>
-                        </div>
-                      </div>
-                      <span className="text-sm">📲</span>
-                    </motion.button>
-                  </div>
-
                   {/* Clinical Messenger Button in Mobile Drawer */}
                   <div className="border-t border-[#e3dec9] my-2 pt-3">
                     <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Direct Consultations</p>
@@ -473,9 +449,9 @@ export function Navbar({
                     </motion.button>
                   </div>
 
-                  {/* About Us / Platform Guide & Diagnostics */}
-                  <div className="border-t border-[#e3dec9] my-2 pt-3 space-y-2">
-                    <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-1">System &amp; Verification</p>
+                  {/* About Us / Platform Directory Button */}
+                  <div className="border-t border-[#e3dec9] my-2 pt-3">
+                    <p className="px-3 text-[10px] uppercase font-bold text-[#a49f92] tracking-wider mb-2">Platform Guide</p>
                     <motion.button
                       whileTap={{ scale: 0.98 }}
                       {...getPrefetchProps('about_directory', user)}
@@ -483,9 +459,9 @@ export function Navbar({
                         setIsSidebarOpen(false);
                         if (onOpenAboutUs) onOpenAboutUs();
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-[#a0522d] bg-[#fdfbf7] hover:bg-[#fcf9f2] border border-[#e3dec9] border-b-[2px] border-b-[#cdc6ad] transition-all text-left cursor-pointer"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold text-[#a0522d] bg-[#fdfbf7] hover:bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] transition-all text-left cursor-pointer"
                     >
-                      <span className="text-base">ℹ️</span>
+                      <span className="text-lg">ℹ️</span>
                       <span className="flex-1">About Us (Directory)</span>
                       <span className="text-[9px] bg-amber-500 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">NEW</span>
                     </motion.button>

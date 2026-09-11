@@ -117,17 +117,12 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
     return () => clearInterval(interval);
   }, [visibleBoostedPosts.length, isHovered]);
 
-  const loadAds = async (force: boolean = false) => {
-    if (force) {
-      swrGlobalCache.delete('pet_ads');
-    }
+  const loadAds = async () => {
     if (!swrGlobalCache.has('pet_ads')) {
       setLoading(true);
     }
     try {
-      const data = force
-        ? await PetAdsService.fetchAds()
-        : await prefetchSWR('pet_ads', () => PetAdsService.fetchAds(), 30000, false);
+      const data = await prefetchSWR('pet_ads', () => PetAdsService.fetchAds());
       if (data) {
         setAds(data);
       }
@@ -160,21 +155,9 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   useTabRevalidation({
     entity: 'pet_ads',
     onRevalidate: async () => {
-      await Promise.allSettled([loadAds(true), loadBoostedEmergencyPosts()]);
+      await Promise.allSettled([loadAds(), loadBoostedEmergencyPosts()]);
     },
   });
-
-  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
-  useEffect(() => {
-    const handleDirectSync = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.entity === 'pet_ads' && Array.isArray(detail?.payload?.ads)) {
-        setAds(detail.payload.ads);
-      }
-    };
-    window.addEventListener('vetaxis_data_update', handleDirectSync);
-    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
-  }, []);
 
   useEffect(() => {
     if (highlightAdId && ads.length > 0) {

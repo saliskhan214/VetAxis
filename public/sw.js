@@ -42,14 +42,11 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Exclude non-GET, external origins, API, Firebase, Auth, and binary downloads (APK, ZIP)
+  // Exclude non-GET, external origins, API, Firebase, and Auth requests
   if (
     event.request.method !== 'GET' ||
     url.origin !== self.location.origin ||
     url.pathname.includes('/api/') ||
-    url.pathname.includes('/downloads/') ||
-    url.pathname.endsWith('.apk') ||
-    url.pathname.endsWith('.zip') ||
     url.pathname.includes('firebase') ||
     url.pathname.includes('google')
   ) {

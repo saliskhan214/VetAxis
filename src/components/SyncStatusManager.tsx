@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Database, Clock, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { triggerAutoSync } from '../lib/autoSyncEngine';
 
 interface SyncStatusManagerProps {
   onSyncManual?: () => Promise<void>;
@@ -9,7 +8,6 @@ interface SyncStatusManagerProps {
 }
 
 export function SyncStatusManager({ onSyncManual, isSyncing = false }: SyncStatusManagerProps) {
-  const [internalSyncing, setInternalSyncing] = useState<boolean>(false);
   const [lastSyncStr, setLastSyncStr] = useState<string | null>(null);
   const [timeAgo, setTimeAgo] = useState<string>('Never synced');
 
@@ -125,26 +123,16 @@ export function SyncStatusManager({ onSyncManual, isSyncing = false }: SyncStatu
           </div>
         </div>
 
-        <button
-          onClick={async () => {
-            if (onSyncManual) {
-              await onSyncManual();
-            } else {
-              setInternalSyncing(true);
-              try {
-                await triggerAutoSync(true);
-                loadTimestamp();
-              } finally {
-                setInternalSyncing(false);
-              }
-            }
-          }}
-          disabled={isSyncing || internalSyncing}
-          className="w-full sm:w-auto shrink-0 cursor-pointer bg-white hover:bg-[#faf9f0] text-gray-700 hover:text-gray-900 border border-[#cdc6ad] hover:border-[#a39c83] active:bg-[#edece5] select-none text-xs font-bold py-2 px-3.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-3xs disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${(isSyncing || internalSyncing) ? 'animate-spin' : ''}`} />
-          {(isSyncing || internalSyncing) ? 'Synchronizing...' : 'Sync Firestore'}
-        </button>
+        {onSyncManual && (
+          <button
+            onClick={onSyncManual}
+            disabled={isSyncing}
+            className="w-full sm:w-auto shrink-0 cursor-pointer bg-white hover:bg-[#faf9f0] text-gray-700 hover:text-gray-900 border border-[#cdc6ad] hover:border-[#a39c83] active:bg-[#edece5] select-none text-xs font-bold py-2 px-3.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-3xs disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Synchronizing...' : 'Sync Firestore'}
+          </button>
+        )}
       </div>
     </div>
   );

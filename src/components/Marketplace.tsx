@@ -36,17 +36,12 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const loadProducts = async (force: boolean = false) => {
-    if (force) {
-      swrGlobalCache.delete('marketplace_products');
-    }
+  const loadProducts = async () => {
     if (!swrGlobalCache.has('marketplace_products')) {
       setLoading(true);
     }
     try {
-      const data = force
-        ? await MarketplaceService.fetchProducts()
-        : await prefetchSWR('marketplace_products', () => MarketplaceService.fetchProducts(), 30000, false);
+      const data = await prefetchSWR('marketplace_products', () => MarketplaceService.fetchProducts());
       if (data) {
         setProducts(data);
       }
@@ -68,20 +63,8 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   // Automatically refresh marketplace products when tab is reopened, refocused, or updated in another tab
   useTabRevalidation({
     entity: 'marketplace',
-    onRevalidate: () => loadProducts(true),
+    onRevalidate: loadProducts,
   });
-
-  // Direct 0ms real-time listener when cloud sync pushes fresh Firestore snapshot payload
-  useEffect(() => {
-    const handleDirectSync = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.entity === 'marketplace' && Array.isArray(detail?.payload?.products)) {
-        setProducts(detail.payload.products);
-      }
-    };
-    window.addEventListener('vetaxis_data_update', handleDirectSync);
-    return () => window.removeEventListener('vetaxis_data_update', handleDirectSync);
-  }, []);
 
   useEffect(() => {
     if (highlightProductId && products.length > 0) {

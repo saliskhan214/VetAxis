@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { UserProfile, VetNotification } from './types';
 import { getLocalSession, AuthService, NotificationService, BroadcastNotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
-import { testConnection, runFirebaseDiagnostics, isFirebaseConfigured, auth, db, clearQuotaExceeded } from './lib/firebase';
+import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -9,7 +9,6 @@ import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
 import { useSWR } from './lib/useSWR';
 import { initIdlePrefetch } from './lib/prefetch';
-import { initAutoSyncEngine } from './lib/autoSyncEngine';
 
 export { useSWR };
 export type { SWROptions, SWRResponse } from './lib/useSWR';
@@ -20,7 +19,6 @@ import { AuthScreen } from './components/AuthScreen';
 import { ExploreFeed } from './components/ExploreFeed';
 import { Footer } from './components/Footer';
 import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
-import { AuthLoadingSkeleton } from './components/AuthLoadingSkeleton';
 import { ChatService } from './lib/chatService';
 
 // Lazy-loaded route components for high-speed code-splitting & zero initial lag
@@ -40,8 +38,6 @@ const VeterinaryClinicalSuite = lazy(() => import('./components/VeterinaryClinic
 const PageNotFound = lazy(() => import('./components/PageNotFound'));
 const MessengerModal = lazy(() => import('./components/MessengerModal').then(m => ({ default: m.MessengerModal })));
 const ChatModal = lazy(() => import('./components/ChatModal').then(m => ({ default: m.ChatModal })));
-const AndroidAppDownloadModal = lazy(() => import('./components/AndroidAppDownloadModal').then(m => ({ default: m.AndroidAppDownloadModal })));
-import { LiveUpdateBanner } from './components/LiveUpdateBanner';
 
 const TermsOfServicePage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.TermsOfServicePage })));
 const PrivacyPolicyPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.PrivacyPolicyPage })));
@@ -64,9 +60,7 @@ function SectionLoadingFallback() {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
-  // Non-blocking initialization: never block boot UI indefinitely on network auth handshake
-  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(false);
-  const [isLoginTransition, setIsLoginTransition] = useState<boolean>(false);
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(() => !getLocalSession() && isFirebaseConfigured);
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
@@ -107,7 +101,6 @@ export default function App() {
   const [initialClinicalTool, setInitialClinicalTool] = useState<string | undefined>(undefined);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
-  const [isAndroidDownloadModalOpen, setIsAndroidDownloadModalOpen] = useState<boolean>(false);
 
   // Unified dynamic QR code & SEO deep-linking scanner inside app boot
   useEffect(() => {
@@ -123,11 +116,6 @@ export default function App() {
     const filterParam = params.get('filter');
     const petTypeParam = params.get('type');
     const toolParam = params.get('tool');
-    const downloadParam = params.get('download') || params.get('apk') || params.get('app');
-
-    if (downloadParam === 'apk' || downloadParam === 'android' || downloadParam === 'true' || window.location.hash === '#download-apk' || window.location.hash === '#apk') {
-      setIsAndroidDownloadModalOpen(true);
-    }
 
     if (clinicParam) {
       setHighlightClinicId(clinicParam);
@@ -201,11 +189,6 @@ export default function App() {
       }
     }
   }, [currentUser?.uid]);
-
-  // Continuous real-time cloud auto-sync between APK mobile app and website
-  useEffect(() => {
-    initAutoSyncEngine();
-  }, []);
 
   // Predictive background idle prefetch for top application sections
   useEffect(() => {
@@ -377,8 +360,7 @@ export default function App() {
           const userRef = doc(db, 'users', currentUser.uid);
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
-            const data = userSnap.data() as UserProfile;
-            const profile = { ...data, uid: data.uid || userSnap.id };
+            const profile = userSnap.data() as UserProfile;
             return injectTemporaryPlatinum(profile);
           }
         } catch (e) {
@@ -569,14 +551,8 @@ export default function App() {
     }
   };
 
-  // Real-time Auth connection tracker with strict failsafe timeout
+  // Real-time Auth connection tracker to prevent race conditions on startup
   useEffect(() => {
-    // Failsafe: Never let auth initialization block the user for more than 1000ms
-    const safetyTimer = setTimeout(() => {
-      setIsAuthInitializing(false);
-      setIsLoginTransition(false);
-    }, 1000);
-
     if (isFirebaseConfigured && auth) {
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         try {
@@ -585,86 +561,39 @@ export default function App() {
             if (stored && stored.uid === firebaseUser.uid) {
               setCurrentUser(stored);
             } else {
-              // Fetch fresh user profile from DB with timeout
-              try {
-                const userRef = doc(db, 'users', firebaseUser.uid);
-                // 2000ms race timeout prevents indefinite hangs on slow mobile networks
-                const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
-                const userSnap: any = await Promise.race([getDoc(userRef), timeoutPromise]);
-
-                if (userSnap && typeof userSnap.exists === 'function' && userSnap.exists()) {
-                  const data = userSnap.data() as UserProfile;
-                  const profile = { ...data, uid: data.uid || userSnap.id };
-                  const finalized = injectTemporaryPlatinum(profile);
-                  setCurrentUser(finalized);
-                  secureSetItem('va_session', JSON.stringify(finalized));
-                } else if (stored) {
-                  setCurrentUser(stored);
-                } else {
-                  // Fallback: create basic user session from Firebase Auth user
-                  const fallbackProfile: UserProfile = {
-                    uid: firebaseUser.uid,
-                    name: firebaseUser.displayName || 'VetAxis Member',
-                    email: firebaseUser.email || '',
-                    role: 'user',
-                    createdAt: Date.now(),
-                    isVerified: false,
-                    emailVerified: firebaseUser.emailVerified,
-                    subscriptionTier: 'Platinum',
-                  };
-                  setCurrentUser(fallbackProfile);
-                  secureSetItem('va_session', JSON.stringify(fallbackProfile));
-                }
-              } catch (profileErr) {
-                console.warn('[VetAxis] Profile fetch error, falling back to local session:', profileErr);
-                if (stored) setCurrentUser(stored);
+              // Fetch fresh user profile from DB to prevent out-of-sync or missing records
+              const userRef = doc(db, 'users', firebaseUser.uid);
+              const userSnap = await getDoc(userRef);
+              if (userSnap.exists()) {
+                const profile = userSnap.data() as UserProfile;
+                const finalized = injectTemporaryPlatinum(profile);
+                setCurrentUser(finalized);
+                secureSetItem('va_session', JSON.stringify(finalized));
+              } else {
+                setCurrentUser(null);
+                localStorage.removeItem('va_session');
               }
             }
           } else {
             // Sign-out detected or no active Firebase Auth session found
-            // Direct Google authentication is strictly required for all users
             setCurrentUser(null);
             localStorage.removeItem('va_session');
           }
         } catch (authErr) {
           console.error('[VetAxis] Error during auth session restore:', authErr);
         } finally {
-          clearTimeout(safetyTimer);
           setIsAuthInitializing(false);
-          setIsLoginTransition(false);
         }
       });
-      return () => {
-        clearTimeout(safetyTimer);
-        unsubscribe();
-      };
+      return () => unsubscribe();
     } else {
-      clearTimeout(safetyTimer);
       setIsAuthInitializing(false);
     }
   }, []);
 
-  // Unified Firebase test connection check & diagnostic verification on initial system boot
+  // Unified Firebase test connection check on initial system boot
   useEffect(() => {
-    const runConnectionDiagnostics = async () => {
-      console.log('[VetAxis Diagnostic] Initiating mount connection verification for database read/write access...');
-      try {
-        const diag = await runFirebaseDiagnostics();
-        console.log('[VetAxis Diagnostic Report]', {
-          databaseId: diag.databaseId,
-          configured: diag.configured,
-          readAccess: diag.readSuccess ? 'VERIFIED_SUCCESS' : 'FAILED',
-          writeAccess: diag.writeSuccess ? 'VERIFIED_SUCCESS' : 'FAILED',
-          latency: `${diag.latencyMs}ms`,
-          status: (diag.readSuccess && diag.writeSuccess) ? 'FULL_ONLINE_READ_WRITE' : 'OFFLINE_CACHE_OR_RESTRICTED',
-          readError: diag.readError || null,
-          writeError: diag.writeError || null,
-        });
-      } catch (e) {
-        console.error('[VetAxis Diagnostic] Connection verification encountered error:', e);
-      }
-    };
-    runConnectionDiagnostics();
+    testConnection();
   }, []);
 
   // Automated Broadcast Notification Delivery: Checks and delivers global admin alerts to all users (including users returning after days)
@@ -923,14 +852,9 @@ export default function App() {
   }, [currentUser?.uid, dbQuotaExceeded, isAuthInitializing]);
 
   const handleAuthSuccess = (user: UserProfile) => {
-    setIsLoginTransition(true);
     setCurrentUser(user);
     mutateUserProfile(user, false);
     setActiveSection('explore');
-    // Smooth transition timeout to allow React components to hydrate without blank screen
-    setTimeout(() => {
-      setIsLoginTransition(false);
-    }, 550);
   };
 
   const handleLogout = async () => {
@@ -946,17 +870,19 @@ export default function App() {
     mutateUserProfile(updated, false);
   };
 
-  if (isAuthInitializing || isLoginTransition) {
+  if (isAuthInitializing) {
     return (
-      <AuthLoadingSkeleton
-        message={isLoginTransition ? "Authenticating session & loading clinical workspace..." : "Validating veterinary session token..."}
-        subMessage="Securing connection to clinical & farm database..."
-        isLoginTransition={isLoginTransition}
-        onBypass={() => {
-          setIsAuthInitializing(false);
-          setIsLoginTransition(false);
-        }}
-      />
+      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center p-6 select-none relative overflow-hidden">
+        {/* Subtle Background 3D Glow */}
+        <div className="absolute w-96 h-96 rounded-full bg-[#f4efe4] blur-3xl opacity-60 pointer-events-none" />
+        
+        <div className="relative z-10">
+          <ThreeDAnimalLoader
+            message="Connecting to VetAxis 360"
+            subMessage="Securing connection to clinical & farm database..."
+          />
+        </div>
+      </div>
     );
   }
 
@@ -989,7 +915,6 @@ export default function App() {
           onAuthSuccess={handleAuthSuccess} 
           authService={AuthService} 
           onOpenAboutUs={() => setIsAboutUsOpen(true)}
-          onOpenAndroidDownload={() => setIsAndroidDownloadModalOpen(true)}
         />
 
         <AnimatePresence>
@@ -1003,17 +928,6 @@ export default function App() {
             />
           )}
         </AnimatePresence>
-
-        <AnimatePresence>
-          {isAndroidDownloadModalOpen && (
-            <AndroidAppDownloadModal
-              isOpen={isAndroidDownloadModalOpen}
-              onClose={() => setIsAndroidDownloadModalOpen(false)}
-            />
-          )}
-        </AnimatePresence>
-
-        <LiveUpdateBanner onOpenDownloadModal={() => setIsAndroidDownloadModalOpen(true)} />
       </div>
     );
   }
@@ -1033,7 +947,6 @@ export default function App() {
         onNotificationClick={handleNotificationClick}
         onOpenAboutUs={() => setIsAboutUsOpen(true)}
         onOpenMessenger={() => setIsMessengerOpen(true)}
-        onOpenAndroidDownload={() => setIsAndroidDownloadModalOpen(true)}
         unreadMessagesCount={unreadMessagesCount}
       />
 
@@ -1059,19 +972,16 @@ export default function App() {
             We have safely switched your session to offline-caching mode. Your changes will automatically sync once limits reset or upon refresh later.
           </p>
           <button
-            onClick={() => {
-              setDbQuotaExceeded(false);
-              clearQuotaExceeded();
-            }}
+            onClick={() => setDbQuotaExceeded(false)}
             className="ml-2 font-bold hover:text-red-700 bg-stone-200/50 hover:bg-stone-200 px-2 py-1 rounded transition-colors text-stone-800 text-[10px] cursor-pointer"
           >
-            Acknowledge & Reconnect
+            Acknowledge
           </button>
         </div>
       )}
 
       {/* RENDERED FEED ROUTER BOX */}
-      <main className="flex-1 container max-w-7xl mx-auto px-4 pt-8 pb-8 overflow-hidden">
+      <main className="flex-1 container max-w-7xl mx-auto px-4 py-8 overflow-hidden">
         <Suspense fallback={<SectionLoadingFallback />}>
           <AnimatePresence mode="wait">
             <motion.div
@@ -1146,7 +1056,6 @@ export default function App() {
                   currentUser={currentUser}
                   onUpdateUser={handleUpdateUserProfile}
                   onDeleteSuccess={handleLogout}
-                  onOpenAndroidDownload={() => setIsAndroidDownloadModalOpen(true)}
                 />
               )}
 
@@ -1211,11 +1120,7 @@ export default function App() {
       </main>
 
       {/* COMPLIANT GLOBAL FOOTER NAVIGATION */}
-      <Footer 
-        onNavigate={handleNavigate} 
-        activeSection={activeSection} 
-        onOpenAndroidDownload={() => setIsAndroidDownloadModalOpen(true)}
-      />
+      <Footer onNavigate={handleNavigate} activeSection={activeSection} />
 
       {/* Floating Popup Toast Alerts System */}
       <div className="fixed bottom-5 right-5 z-[1000] flex flex-col gap-3 max-w-sm w-[90%] pointer-events-none">
@@ -1336,19 +1241,6 @@ export default function App() {
             />
           )}
         </AnimatePresence>
-
-        {/* GLOBAL ANDROID APP DOWNLOAD & LIVE SYNC MODAL */}
-        <AnimatePresence>
-          {isAndroidDownloadModalOpen && (
-            <AndroidAppDownloadModal
-              isOpen={isAndroidDownloadModalOpen}
-              onClose={() => setIsAndroidDownloadModalOpen(false)}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* REAL-TIME BI-DIRECTIONAL CLOUD SYNC & LIVE UPDATE BANNER */}
-        <LiveUpdateBanner onOpenDownloadModal={() => setIsAndroidDownloadModalOpen(true)} />
       </Suspense>
 
     </div>

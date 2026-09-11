@@ -4,14 +4,7 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**",
-      "**/*.apk",
-      "**/*.apk.idsig",
-      "**/*.zip",
-      "**/*.exe",
-      "**/*.bin",
-      "**/*.dmg",
-      "**/*.ipa"
+      "**/node_modules/**"
     ],
     "rewrites": [
       {

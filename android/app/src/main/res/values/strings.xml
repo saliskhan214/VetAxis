@@ -1,7 +1,0 @@
-<resources>
-    <string name="app_name">VetAxis 360</string>
-    <string name="title_activity_main">VetAxis 360</string>
-    <string name="package_name">com.vetaxis.app</string>
-    <string name="custom_url_scheme">vetaxis</string>
-    <string name="server_url">https://ais-dev-z5sefz4cpfnl2t5cug7unw-366026919204.asia-southeast1.run.app</string>
-</resources>
