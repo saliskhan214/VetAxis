@@ -3,10 +3,12 @@ import { getAuth } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { 
   initializeFirestore, 
+  getFirestore,
   doc, 
   getDoc,
   persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentMultipleTabManager,
+  memoryLocalCache 
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -73,12 +75,26 @@ if (isFirebaseConfigured) {
       ? resolvedConfig.firestoreDatabaseId
       : undefined;
 
-    db = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      }),
-      experimentalForceLongPolling: true,
-    }, firestoreDbId);
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        }),
+        experimentalForceLongPolling: true,
+      }, firestoreDbId);
+    } catch (cacheErr) {
+      console.warn('[VetAxis] Persistent local cache unavailable. Attempting memory cache fallback:', cacheErr);
+      try {
+        db = initializeFirestore(app, {
+          localCache: memoryLocalCache(),
+          experimentalForceLongPolling: true,
+        }, firestoreDbId);
+      } catch (initErr) {
+        // App might already have Firestore instance created
+        db = firestoreDbId ? getFirestore(app, firestoreDbId) : getFirestore(app);
+      }
+    }
+
     auth = getAuth(app);
 
     if (typeof window !== 'undefined' && resolvedConfig.measurementId) {
