@@ -516,7 +516,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
     }
   };
 
-  const initials = currentUser.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const initials = (currentUser?.name || 'User').trim().split(/\s+/).map(w => w[0] || '').slice(0, 2).join('').toUpperCase() || 'U';
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4 text-left">

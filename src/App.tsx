@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { UserProfile, VetNotification } from './types';
+import { UserProfile, VetNotification, GUEST_USER_PROFILE, isGuestUser, requireAuthAction } from './types';
 import { getLocalSession, AuthService, NotificationService, BroadcastNotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -59,7 +59,7 @@ function SectionLoadingFallback() {
 }
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => getLocalSession() || GUEST_USER_PROFILE);
   const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(() => !getLocalSession() && isFirebaseConfigured);
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
@@ -68,6 +68,22 @@ export default function App() {
   const [isMessengerOpen, setIsMessengerOpen] = useState<boolean>(false);
   const [globalChatRecipient, setGlobalChatRecipient] = useState<UserProfile | null>(null);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+
+  // Auth gate modal for guest visitors
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [authModalReason, setAuthModalReason] = useState<string>('Please log in or sign up to make changes.');
+
+  useEffect(() => {
+    const handleRequireAuth = (e: any) => {
+      const reason = e?.detail?.reason || 'Please log in or sign up to make changes.';
+      setAuthModalReason(reason);
+      setAuthModalOpen(true);
+    };
+    window.addEventListener('vetaxis_require_auth', handleRequireAuth);
+    return () => {
+      window.removeEventListener('vetaxis_require_auth', handleRequireAuth);
+    };
+  }, []);
 
   const [dbQuotaExceeded, setDbQuotaExceeded] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -256,9 +272,9 @@ export default function App() {
   const {
     mutate: mutateNotifications,
   } = useSWR<VetNotification[]>(
-    currentUser?.uid && !dbQuotaExceeded ? `user_notifications_${currentUser.uid}` : null,
+    currentUser?.uid && !isGuestUser(currentUser) && !dbQuotaExceeded ? `user_notifications_${currentUser.uid}` : null,
     async () => {
-      if (!currentUser?.uid) return [];
+      if (!currentUser?.uid || isGuestUser(currentUser)) return [];
 
       // ─── Automated 6-hour Appointment reminders (Throttled to once every 120 seconds for performance) ──────────────────
       const nowMs = Date.now();
@@ -279,9 +295,9 @@ export default function App() {
 
           const now = new Date();
           for (const appt of combinedAppts) {
-            if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
-              const [year, month, day] = appt.date.split('-').map(Number);
-              const [hours, minutes] = appt.time.split(':').map(Number);
+            if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId && appt.date && appt.time) {
+              const [year, month, day] = (appt.date || '').split('-').map(Number);
+              const [hours, minutes] = (appt.time || '').split(':').map(Number);
               if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
                 const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
                 const diffMs = apptDate.getTime() - now.getTime();
@@ -352,9 +368,9 @@ export default function App() {
   const {
     mutate: mutateUserProfile,
   } = useSWR<UserProfile | null>(
-    currentUser?.uid && !dbQuotaExceeded ? `user_profile_${currentUser.uid}` : null,
+    currentUser?.uid && !isGuestUser(currentUser) && !dbQuotaExceeded ? `user_profile_${currentUser.uid}` : null,
     async () => {
-      if (!currentUser?.uid) return null;
+      if (!currentUser?.uid || isGuestUser(currentUser)) return null;
       if (isFirebaseConfigured && db) {
         try {
           const userRef = doc(db, 'users', currentUser.uid);
@@ -374,7 +390,7 @@ export default function App() {
       revalidateOnReconnect: true,
       focusThrottleInterval: 4000,
       onSuccess: (freshProfile) => {
-        if (freshProfile && currentUser) {
+        if (freshProfile && currentUser && !isGuestUser(currentUser)) {
           if (
             freshProfile.role !== currentUser.role ||
             freshProfile.isVerified !== currentUser.isVerified ||
@@ -394,7 +410,7 @@ export default function App() {
 
   // Real-time unread messages tracking & synchronization
   useEffect(() => {
-    if (!currentUser?.uid) {
+    if (!currentUser?.uid || isGuestUser(currentUser)) {
       setUnreadMessagesCount(0);
       return;
     }
@@ -565,19 +581,27 @@ export default function App() {
               const userRef = doc(db, 'users', firebaseUser.uid);
               const userSnap = await getDoc(userRef);
               if (userSnap.exists()) {
-                const profile = userSnap.data() as UserProfile;
+                const docData = (userSnap.data() || {}) as UserProfile;
+                const profile: UserProfile = {
+                  ...docData,
+                  uid: docData.uid || firebaseUser.uid
+                };
                 const finalized = injectTemporaryPlatinum(profile);
                 setCurrentUser(finalized);
                 secureSetItem('va_session', JSON.stringify(finalized));
               } else {
-                setCurrentUser(null);
+                setCurrentUser(GUEST_USER_PROFILE);
                 localStorage.removeItem('va_session');
               }
             }
           } else {
             // Sign-out detected or no active Firebase Auth session found
-            setCurrentUser(null);
-            localStorage.removeItem('va_session');
+            const localSess = getLocalSession();
+            if (localSess && !isGuestUser(localSess)) {
+              setCurrentUser(localSess);
+            } else {
+              setCurrentUser(GUEST_USER_PROFILE);
+            }
           }
         } catch (authErr) {
           console.error('[VetAxis] Error during auth session restore:', authErr);
@@ -738,7 +762,7 @@ export default function App() {
     let active = true;
 
     const validateSession = async () => {
-      if (currentUser) {
+      if (currentUser && !isGuestUser(currentUser)) {
         try {
           const isValid = await AuthService.validateUserProfile(currentUser.uid);
           if (active && !isValid) {
@@ -761,7 +785,7 @@ export default function App() {
 
   // Real-time monthly/trial subscription expiration checker (checked once per minute to preserve CPU)
   useEffect(() => {
-    if (isAuthInitializing || !currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || dbQuotaExceeded) return;
+    if (isAuthInitializing || !currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || isGuestUser(currentUser) || dbQuotaExceeded) return;
     
     let active = true;
     const checkExpiry = async () => {
@@ -830,7 +854,7 @@ export default function App() {
 
   // Real-time online presence heartbeat
   useEffect(() => {
-    if (isAuthInitializing || !currentUser || dbQuotaExceeded) return;
+    if (isAuthInitializing || !currentUser || isGuestUser(currentUser) || dbQuotaExceeded) return;
 
     const performHeartbeat = async () => {
       try {
@@ -859,10 +883,11 @@ export default function App() {
 
   const handleLogout = async () => {
     await AuthService.signOut();
-    setCurrentUser(null);
+    setCurrentUser(GUEST_USER_PROFILE);
     setNotifications([]);
     mutateUserProfile(null, false);
     mutateNotifications([], false);
+    localStorage.removeItem('va_session');
   };
 
   const handleUpdateUserProfile = (updated: UserProfile) => {
@@ -887,48 +912,16 @@ export default function App() {
   }
 
   // Intercept guest visits that scanned a veterinary ear-tag/collar code
-  if (!currentUser && scannedAnimalRecordId && !temporaryBypassGuestForAuth) {
+  if (isGuestUser(currentUser) && scannedAnimalRecordId && !temporaryBypassGuestForAuth) {
     return (
       <GuestAnimalViewer 
         animalRecordId={scannedAnimalRecordId}
-        onGoToAuth={() => setTemporaryBypassGuestForAuth(true)}
+        onGoToAuth={() => {
+          setAuthModalReason('Please log in or sign up to manage animal clinical records.');
+          setAuthModalOpen(true);
+        }}
         onClear={() => setScannedAnimalRecordId(null)}
       />
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen text-center relative">
-        {/* Floating return button to easily jump back to scanned passport */}
-        {scannedAnimalRecordId && (
-          <div className="absolute top-4 left-4 z-[9999]">
-            <button
-              onClick={() => setTemporaryBypassGuestForAuth(false)}
-              className="cursor-pointer bg-[#5a5a40] text-white hover:bg-[#3e3e2b] px-4 py-2 rounded-xl text-xs font-bold border-none shadow-md flex items-center gap-1.5 transition-all font-sans"
-            >
-              ← Back to Scanned Digital Passport
-            </button>
-          </div>
-        )}
-        <AuthScreen 
-          onAuthSuccess={handleAuthSuccess} 
-          authService={AuthService} 
-          onOpenAboutUs={() => setIsAboutUsOpen(true)}
-        />
-
-        <AnimatePresence>
-          {isAboutUsOpen && (
-            <AboutUsDirectory
-              isOpen={isAboutUsOpen}
-              onClose={() => setIsAboutUsOpen(false)}
-              onNavigate={handleNavigate}
-              isLoggedIn={false}
-              onTriggerAuth={() => setIsAboutUsOpen(false)}
-            />
-          )}
-        </AnimatePresence>
-      </div>
     );
   }
 
@@ -941,16 +934,26 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
+        onRequireAuth={(reason) => {
+          setAuthModalReason(reason || 'Please log in or sign up to access your account.');
+          setAuthModalOpen(true);
+        }}
         notifications={notifications}
         onMarkAllAsRead={handleMarkAllAsRead}
         onDeleteNotification={handleDeleteNotification}
         onNotificationClick={handleNotificationClick}
         onOpenAboutUs={() => setIsAboutUsOpen(true)}
-        onOpenMessenger={() => setIsMessengerOpen(true)}
+        onOpenMessenger={() => {
+          if (isGuestUser(currentUser)) {
+            requireAuthAction('Please log in or sign up to open your messenger.');
+            return;
+          }
+          setIsMessengerOpen(true);
+        }}
         unreadMessagesCount={unreadMessagesCount}
       />
 
-      {currentUser && !currentUser.emailVerified && (
+      {currentUser && !isGuestUser(currentUser) && !currentUser.emailVerified && (
         <div className="bg-amber-50/80 border-b border-amber-200 text-amber-900 text-xs py-2.5 px-4 text-center font-medium flex items-center justify-center gap-3 animate-fadeIn">
           <span>⚠️ Your email is unverified. Please verify your email to ensure secure access.</span>
           <button
@@ -1239,6 +1242,39 @@ export default function App() {
               recipient={globalChatRecipient}
               currentUser={currentUser}
             />
+          )}
+        </AnimatePresence>
+
+        {/* GLOBAL GUEST AUTHENTICATION MODAL */}
+        <AnimatePresence>
+          {authModalOpen && (
+            <div 
+              className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
+              onClick={() => setAuthModalOpen(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                className="w-full max-w-lg my-8 relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AuthScreen
+                  isModal={true}
+                  reasonMessage={authModalReason}
+                  onClose={() => setAuthModalOpen(false)}
+                  onAuthSuccess={(user) => {
+                    handleAuthSuccess(user);
+                    setAuthModalOpen(false);
+                  }}
+                  authService={AuthService}
+                  onOpenAboutUs={() => {
+                    setAuthModalOpen(false);
+                    setIsAboutUsOpen(true);
+                  }}
+                />
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
       </Suspense>

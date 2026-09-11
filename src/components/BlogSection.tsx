@@ -203,7 +203,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
   // Calculate reading time dynamically
   const calculateReadingTime = (text: string): string => {
     const wordsPerMinute = 200;
-    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+    const wordCount = (text || '').trim().split(/\s+/).filter(Boolean).length;
     const minutes = Math.ceil(wordCount / wordsPerMinute);
     return `${minutes || 1} min read`;
   };
@@ -224,7 +224,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
     setIsSubmitting(true);
     try {
       const readTime = calculateReadingTime(formData.content);
-      const tagsArray = formData.tags
+      const tagsArray = (formData.tags || '')
         .split(',')
         .map(t => t.trim().toLowerCase())
         .filter(Boolean);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
-import { UserProfile, CommunityPost, GeoLocation } from '../types';
+import { UserProfile, CommunityPost, GeoLocation, isGuestUser, requireAuthAction } from '../types';
 import { CommunityService, NotificationService, LocationService, secureGetItem } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
 import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
@@ -270,6 +270,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
   const handleComposeSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to publish a community question or post.');
+      return;
+    }
     if (!newPostText.trim()) {
       triggerToast('Post content is required.', 'error');
       return;
@@ -309,6 +313,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleAddAnswer = async (postId: string) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to reply or post practitioner advice.');
+      return;
+    }
     const text = activeAnswerTexts[postId] || '';
     if (!text.trim()) {
       triggerToast('Answer text cannot be empty.', 'error');
@@ -326,6 +334,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleToggleUpvoteAnswer = async (postId: string, answerId: string) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to upvote answers.');
+      return;
+    }
     try {
       const updated = await CommunityService.upvoteAnswer(postId, answerId, currentUser.uid || currentUser.email);
       setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
@@ -335,6 +347,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleToggleReaction = async (postId: string, emoji: string) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to react to community posts.');
+      return;
+    }
     try {
       const originalPost = posts.find(p => p.id === postId);
       const updated = await CommunityService.toggleReaction(postId, emoji, currentUser.email);
@@ -363,11 +379,19 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleDeletePost = (post: CommunityPost) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to manage posts.');
+      return;
+    }
     setPostToDelete(post);
   };
 
   const confirmDeletePost = async () => {
     if (!postToDelete) return;
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to delete posts.');
+      return;
+    }
     try {
       await CommunityService.deletePost(postToDelete.id);
       setPosts((prev) => prev.filter((p) => p.id !== postToDelete.id));
@@ -380,6 +404,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const openBoostModal = (post: CommunityPost) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to boost emergency alerts.');
+      return;
+    }
     setActiveBoostPost(post);
     setCheckoutStep('details');
     // Set initial address coordinates using user's location if defined
@@ -992,7 +1020,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                     const isAuthor = 
                       (post.authorUid && post.authorUid === currentUser.uid) ||
                       (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
-                    const initials = post.authorName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                    const initials = (post.authorName || 'Author').trim().split(/\s+/).map(w => w[0] || '').slice(0, 2).join('').toUpperCase() || 'A';
                     
                     const loved = post.reactions?.['❤️']?.includes(currentUser.email);
                     const thanked = post.reactions?.['👍']?.includes(currentUser.email);

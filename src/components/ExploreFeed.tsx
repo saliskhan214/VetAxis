@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
-import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
+import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd, isGuestUser, requireAuthAction } from '../types';
 import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
 import { useTabRevalidation } from '../lib/tabSync';
@@ -120,6 +120,10 @@ export function ExploreFeed({
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
   const handleOpenChat = (prof: UserProfile) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to message and consult with veterinarians.');
+      return;
+    }
     if (onOpenChat) {
       onOpenChat(prof);
     } else {
@@ -277,6 +281,10 @@ export function ExploreFeed({
 
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to sponsor and launch billboard ad campaigns.');
+      return;
+    }
     if (!currentUser) return;
     if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim()) {
       setAdError('Please fill in all the required campaign parameters.');
@@ -446,6 +454,10 @@ export function ExploreFeed({
 
   const handleClinicBookingSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to book a clinical appointment.');
+      return;
+    }
     if (!selectedProfile) return;
     if (!bookingForm.patientName || !bookingForm.ownerName || !bookingForm.ownerPhone) {
       setBookingError('Please fill Patient Name, Owner Name, and Owner Direct Phone/WhatsApp.');
@@ -718,6 +730,10 @@ export function ExploreFeed({
   // Submit profile evaluation review
   const handleSubmitReview = async (e: FormEvent) => {
     e.preventDefault();
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to leave a clinical review and rating.');
+      return;
+    }
     if (!selectedProfile) return;
     if (!canUserReview(currentUser.role, selectedProfile.role)) {
       setReviewError('You do not have permission to rate or review this role.');
@@ -1864,7 +1880,7 @@ export function ExploreFeed({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
           {filteredProfessionals.map((prof) => {
-            const initials = prof.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+            const initials = (prof.name || 'Professional').trim().split(/\s+/).map(w => w[0] || '').slice(0, 2).join('').toUpperCase() || 'P';
             
             // Calculate distance strictly for clinic profiles using getDistance
             let distance: number | null = null;
@@ -2018,10 +2034,16 @@ export function ExploreFeed({
                     </a>
                   )}
 
-                  {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
+                  {selectedProfile.role === 'clinic' && (currentUser.role === 'user' || isGuestUser(currentUser)) && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
                     <button
                       type="button"
-                      onClick={() => setIsBookingModeOpen(!isBookingModeOpen)}
+                      onClick={() => {
+                        if (isGuestUser(currentUser)) {
+                          requireAuthAction('Please log in or sign up to book a clinical appointment.');
+                          return;
+                        }
+                        setIsBookingModeOpen(!isBookingModeOpen);
+                      }}
                       className={`btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 border border-emerald-300 font-bold transition-all cursor-pointer rounded-xl ${
                         isBookingModeOpen 
                           ? 'bg-[#5a5a40] text-white border-b-[3px] border-b-[#3c3c2b]' 
@@ -2034,7 +2056,7 @@ export function ExploreFeed({
                 </div>
 
                 {/* INLINE APPOINTMENT BOOKING PANEL */}
-                {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
+                {selectedProfile.role === 'clinic' && (currentUser.role === 'user' || isGuestUser(currentUser)) && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}

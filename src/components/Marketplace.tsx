@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { UserProfile, Product } from '../types';
+import { UserProfile, Product, isGuestUser, requireAuthAction } from '../types';
 import { MarketplaceService } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
 import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
@@ -23,7 +23,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [legalAgreed, setLegalAgreed] = useState<boolean>(false);
 
   // Form compose state (only allowed for doctor, clinic)
-  const isAuthorizedSeller = currentUser.role === 'doctor' || currentUser.role === 'clinic';
+  const isAuthorizedSeller = isGuestUser(currentUser) || currentUser.role === 'doctor' || currentUser.role === 'clinic';
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [prodName, setProdName] = useState<string>('');
   const [prodPrice, setProdPrice] = useState<number>(0);
@@ -106,6 +106,11 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
     e.preventDefault();
     setFormError(null);
 
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to publish product listings on the marketplace.');
+      return;
+    }
+
     if (!legalAgreed) {
       setFormError('⚠️ Safe Trade Consent Required: You must check the legal affirmation box to confirm that you adhere to our anti-scam guidelines and hold the platform harmless.');
       return;
@@ -177,6 +182,10 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   };
 
   const handleDeleteProduct = async (id: string) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to manage your product listings.');
+      return;
+    }
     if (!confirm('Are you sure you want to remove this product listing?')) return;
     try {
       await MarketplaceService.deleteProduct(id);
@@ -300,7 +309,13 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
         <div className="text-left">
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setFormOpen(!formOpen)}
+            onClick={() => {
+              if (isGuestUser(currentUser)) {
+                requireAuthAction('Please log in or sign up to list products on the marketplace.');
+                return;
+              }
+              setFormOpen(!formOpen);
+            }}
             className="cursor-pointer btn-tactile-3d-primary py-3 px-6 text-xs inline-flex items-center gap-2"
           >
             {formOpen ? '✕ Close Composer' : '➕ List a New Product'}

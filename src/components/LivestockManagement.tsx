@@ -38,7 +38,9 @@ import {
   FarmType,
   MixedFarmOptions,
   IndividualAnimalRecord,
-  HerdLevelMasterRecord
+  HerdLevelMasterRecord,
+  isGuestUser,
+  requireAuthAction
 } from '../types';
 
 import FarmAnalyticsDashboard from './FarmAnalyticsDashboard';
@@ -1104,6 +1106,10 @@ export default function LivestockManagement({
 
   const handleCreateFarm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to create a farm workspace.');
+      return;
+    }
     if (!newFarmName.trim() || !newFarmLocation.trim()) return;
 
     // Subscription Limit Check
@@ -1848,7 +1854,13 @@ export default function LivestockManagement({
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setShowCreateFarmModal(true)}
+              onClick={() => {
+                if (isGuestUser(currentUser)) {
+                  requireAuthAction('Please log in or sign up to create and manage livestock farms.');
+                  return;
+                }
+                setShowCreateFarmModal(true);
+              }}
               className="bg-[#5a5a40] hover:bg-[#3e3e2b] text-white text-xs font-bold py-2.5 px-4 rounded-xl border-none cursor-pointer flex items-center gap-1.5 shadow-sm border-b-[3px] border-b-[#3e3e2b]"
             >
               <Plus className="w-4 h-4" /> Register Farm
@@ -1864,18 +1876,28 @@ export default function LivestockManagement({
             🚜
           </div>
           <div className="max-w-md mx-auto">
-            <h3 className="font-serif font-bold text-xl text-[#5a5a40]">No Registered Farms</h3>
+            <h3 className="font-serif font-bold text-xl text-[#5a5a40]">
+              {isGuestUser(currentUser) ? 'Livestock & Herd Workspace' : 'No Registered Farms'}
+            </h3>
             <p className="text-xs text-[#7a766f] mt-2">
-              {isClinician
+              {isGuestUser(currentUser)
+                ? 'The Farm Management suite lets farmers and agricultural teams track herds, schedule immunizations, and link with certified veterinary doctors. Log in or create a free account to register your farm.'
+                : isClinician
                 ? 'You do not have any linked livestock farms yet. Once a farm owner invites you and you accept, their records will populate here.'
                 : 'A Farm Management workspace lets you track herds, assign a doctor, invite your team, and generate automatic vaccine alerts. Start by creating a farm.'}
             </p>
             {!isClinician && (
               <button
-                onClick={() => setShowCreateFarmModal(true)}
+                onClick={() => {
+                  if (isGuestUser(currentUser)) {
+                    requireAuthAction('Please log in or sign up to create and manage livestock farms.');
+                    return;
+                  }
+                  setShowCreateFarmModal(true);
+                }}
                 className="mt-6 cursor-pointer bg-[#5a5a40] hover:bg-[#3e3e2b] text-white text-xs py-2.5 px-5 rounded-xl font-bold border-none shadow-md"
               >
-                Create Your First Farm Workspace
+                {isGuestUser(currentUser) ? 'Log In / Register Farm Workspace →' : 'Create Your First Farm Workspace'}
               </button>
             )}
           </div>

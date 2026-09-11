@@ -95,6 +95,11 @@ export function secureGetItem(key: string): string | null {
 export function injectPresence(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
 
+  // Make sure profile.uid is always set
+  if (!profile.uid && (profile as any).id) {
+    profile.uid = (profile as any).id;
+  }
+
   // Get active session UID
   let activeUid: string | null = null;
   try {
@@ -108,7 +113,7 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
   } catch {}
 
   // If this profile is the logged-in user, they are truly online
-  if (activeUid && activeUid === profile.uid) {
+  if (activeUid && profile.uid && activeUid === profile.uid) {
     profile.isOnline = true;
     profile.lastSeen = Date.now();
     return profile;
@@ -124,7 +129,8 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
 
   // If lastSeen is missing, set a stable fallback timestamp
   if (!profile.lastSeen) {
-    const charSum = profile.uid.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
+    const fallbackId = String(profile.uid || (profile as any).id || profile.email || 'user_presence');
+    const charSum = fallbackId.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
     const hoursAgo = (charSum % 12) + 1;
     profile.lastSeen = Date.now() - (hoursAgo * 60 * 60 * 1000);
   }
@@ -1357,26 +1363,36 @@ export const ExploreService = {
         const snapshots = await getDocs(q);
         
         const list: UserProfile[] = await Promise.all(snapshots.docs.map(async (userDoc) => {
-          const profile = userDoc.data() as UserProfile;
+          const rawData = (userDoc.data() || {}) as UserProfile;
+          const profile: UserProfile = {
+            ...rawData,
+            uid: rawData.uid || userDoc.id
+          };
           try {
             // Parallel subcollection reviews fetch
-            const revSnap = await getDocs(collection(db, 'users', profile.uid, 'reviews'));
-            const reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
-            
-            const filteredReviews = reviews.filter(rev => {
-              const email = (rev.reviewerEmail || '').toLowerCase().trim();
-              return !email || validEmails.has(email);
-            });
-            profile.reviews = filteredReviews;
-            
-            // Recompute stats inline safely
-            if (filteredReviews.length > 0) {
-              const sum = filteredReviews.reduce((s, r) => s + r.rating, 0);
-              profile.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
-              profile.totalReviews = filteredReviews.length;
+            if (profile.uid) {
+              const revSnap = await getDocs(collection(db, 'users', profile.uid, 'reviews'));
+              const reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Review[];
+              
+              const filteredReviews = reviews.filter(rev => {
+                const email = (rev.reviewerEmail || '').toLowerCase().trim();
+                return !email || validEmails.has(email);
+              });
+              profile.reviews = filteredReviews;
+              
+              // Recompute stats inline safely
+              if (filteredReviews.length > 0) {
+                const sum = filteredReviews.reduce((s, r) => s + r.rating, 0);
+                profile.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
+                profile.totalReviews = filteredReviews.length;
+              } else {
+                profile.avgRating = 0;
+                profile.totalReviews = 0;
+              }
             } else {
-              profile.avgRating = 0;
-              profile.totalReviews = 0;
+              profile.reviews = profile.reviews || [];
+              profile.avgRating = profile.avgRating || 0;
+              profile.totalReviews = profile.totalReviews || 0;
             }
           } catch {
             profile.reviews = profile.reviews || [];
@@ -1659,7 +1675,10 @@ export const CommunityService = {
           // Find nearby users and send notifications in database
           let nearbyCount = 0;
           const usersSnap = await getDocs(collection(db, 'users'));
-          const allUsers = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[];
+          const allUsers = usersSnap.docs.map(d => {
+            const dt = d.data() as UserProfile;
+            return { ...dt, uid: dt.uid || d.id };
+          }) as UserProfile[];
 
           for (const user of allUsers) {
             if (user.uid === author.uid) continue;
@@ -1764,7 +1783,10 @@ export const CommunityService = {
         // Find nearby users
         let nearbyCount = 0;
         const usersSnap = await getDocs(collection(db, 'users'));
-        const allUsers = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[];
+        const allUsers = usersSnap.docs.map(d => {
+          const dt = d.data() as UserProfile;
+          return { ...dt, uid: dt.uid || d.id };
+        }) as UserProfile[];
 
         for (const user of allUsers) {
           if (user.uid === currentUser.uid) continue; // skip self
@@ -2637,7 +2659,7 @@ export const NotificationService = {
         const snap = await getDocs(q);
         if (!snap.empty) {
           const docData = snap.docs[0].data();
-          return { uid: snap.docs[0].id, ...docData } as UserProfile;
+          return { ...docData, uid: docData.uid || snap.docs[0].id } as UserProfile;
         }
       } catch (err) {
         console.error('findUserByEmail error:', err);

@@ -4,7 +4,18 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "server.cjs",
+      "server.cjs.map",
+      "**/*.apk",
+      "**/*.aab",
+      "**/*.exe",
+      "**/*.bat",
+      "**/*.cmd",
+      "**/*.dll",
+      "**/*.ipa",
+      "**/*.bin",
+      "**/*.sh"
     ],
     "rewrites": [
       {

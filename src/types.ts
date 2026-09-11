@@ -45,6 +45,32 @@ export interface UserProfile {
   isAdmin?: boolean;
   offersHomeVisit?: boolean; // Doctors & Clinics can offer home visit / farm call services
   homeVisitCharges?: string; // Optional rate or coverage details (e.g. 'Available on-call / Doorstep vaccinations')
+  isGuest?: boolean; // Flag to identify visitor/guest sessions for read-only SEO browsing
+}
+
+export const GUEST_USER_PROFILE: UserProfile = {
+  uid: 'guest_visitor',
+  name: 'Guest Visitor',
+  email: 'guest@vetaxis360.com',
+  role: 'user',
+  address: 'Islamabad',
+  phone: '',
+  createdAt: 0,
+  isGuest: true,
+  isVerified: false,
+};
+
+export function isGuestUser(user: UserProfile | null | undefined): boolean {
+  if (!user) return true;
+  return Boolean(user.isGuest || user.uid === 'guest_visitor');
+}
+
+export function requireAuthAction(reason?: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vetaxis_require_auth', {
+      detail: { reason: reason || 'Please log in or sign up to make changes.' }
+    }));
+  }
 }
 
 export interface ManualPayment {

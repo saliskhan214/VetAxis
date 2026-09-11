@@ -733,10 +733,10 @@ export function ClinicManagement({
       ): number => {
         ctx.font = fontStyle;
         ctx.fillStyle = fillStyle;
-        const paragraphs = text.split('\n');
+        const paragraphs = (text || '').split('\n');
         let currentY = y;
         for (const paragraph of paragraphs) {
-          const words = paragraph.split(' ');
+          const words = (paragraph || '').split(' ');
           let line = '';
           for (let n = 0; n < words.length; n++) {
             let testLine = line + words[n] + ' ';

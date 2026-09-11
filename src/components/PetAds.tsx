@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
-import { UserProfile, PetAd } from '../types';
+import { UserProfile, PetAd, isGuestUser, requireAuthAction } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
 import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
@@ -199,6 +199,11 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
     e.preventDefault();
     setFormError(null);
 
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to publish pet classified advertisements.');
+      return;
+    }
+
     if (!legalAgreed) {
       setFormError('⚠️ Safe Trade Consent Required: You must check the legal affirmation box to confirm that you adhere to our anti-scam guidelines and hold the platform harmless.');
       return;
@@ -270,6 +275,10 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   };
 
   const handleDeleteAd = async (id: string) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to manage your pet ads.');
+      return;
+    }
     if (!confirm('Are you sure you want to remove this classified ad?')) return;
     try {
       await PetAdsService.deleteAd(id);
@@ -717,7 +726,13 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
       <div className="text-left" data-no-scroll="true">
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => setFormOpen(!formOpen)}
+          onClick={() => {
+            if (isGuestUser(currentUser)) {
+              requireAuthAction('Please log in or sign up to post pet classified advertisements.');
+              return;
+            }
+            setFormOpen(!formOpen);
+          }}
           className="cursor-pointer btn-tactile-3d-primary py-3 px-6 text-xs inline-flex items-center gap-2"
         >
           {formOpen ? '✕ Close Composer' : '➕ Post an Ad Listing'}

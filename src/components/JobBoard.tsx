@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
-import { UserProfile, JobPost, JobApplication, UserRole } from '../types';
+import { UserProfile, JobPost, JobApplication, UserRole, isGuestUser, requireAuthAction } from '../types';
 import { JobBoardService, NotificationService } from '../lib/storage';
 import { useTabRevalidation } from '../lib/tabSync';
 import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
@@ -260,6 +260,11 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
     e.preventDefault();
     setFormError(null);
 
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to publish a veterinary job listing.');
+      return;
+    }
+
     if (!title.trim() || !location.trim() || !salaryMin || !salaryMax || !experience.trim() || !workingHours.trim() || !deadline) {
       setFormError('Please fill in all required job fields.');
       return;
@@ -372,6 +377,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   };
 
   const handleDeleteJobPost = (jobId: string) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to manage job postings.');
+      return;
+    }
     setConfirmDialog({
       title: '🚨 Permanent Job Deletion',
       description: 'Are you sure you want to permanently delete this job ad? This action is irreversible. All candidates\' historic job applications will remain preserved in candidate logs but the listing is completely deleted from the feed.',
@@ -396,6 +405,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
 
   // Apply Now actions
   const initiateApply = (job: JobPost) => {
+    if (isGuestUser(currentUser)) {
+      requireAuthAction('Please log in or sign up to apply for this job opening.');
+      return;
+    }
     // Check if already applied
     const alreadyApplied = applications.some(app => app.jobId === job.id && app.applicantId === currentUser.uid);
     if (alreadyApplied) {
@@ -659,7 +672,13 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
         <motion.button
           whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => setIsPostModalOpen(true)}
+          onClick={() => {
+            if (isGuestUser(currentUser)) {
+              requireAuthAction('Please log in or sign up to publish veterinary job vacancies.');
+              return;
+            }
+            setIsPostModalOpen(true);
+          }}
           className="w-full md:w-auto relative cursor-pointer font-bold text-white bg-[#a0522d] border-b-[4px] border-[#69351d] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 select-none shadow-[0_4px_16px_rgba(160,82,45,0.25)] hover:bg-[#8b4513] transition-all"
           id="publish_job_btn"
         >

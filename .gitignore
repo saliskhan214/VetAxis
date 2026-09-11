@@ -6,3 +6,18 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Binaries and mobile artifacts
+*.apk
+*.aab
+*.exe
+*.dll
+*.bat
+*.cmd
+*.bin
+*.ipa
+*.dmg
+*.iso
+*.msi
+android/
+.gradle/
