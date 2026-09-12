@@ -36,6 +36,14 @@ if (typeof window !== 'undefined') {
 // Register the Service Worker for remote/offline rural usage
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('✅ VetAxis Rural ServiceWorker registered successfully with scope:', registration.scope);

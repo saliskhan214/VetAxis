@@ -1,8 +1,7 @@
-const CACHE_NAME = 'vetaxis-rural-offline-v2';
+const CACHE_NAME = 'vetaxis-rural-offline-v3';
 const ASSETS_TO_CACHE = [
   '/',
-  '/index.html',
-  '/src/index.css'
+  '/index.html'
 ];
 
 self.addEventListener('install', (event) => {
