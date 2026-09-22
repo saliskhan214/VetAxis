@@ -1,14 +1,11 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
-import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd, isGuestUser, requireAuthAction } from '../types';
+import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
 import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
-import { useTabRevalidation } from '../lib/tabSync';
-import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 import { InteractiveClinicMap } from './InteractiveClinicMap';
-import { ChatModal } from './ChatModal';
 
 
 interface ExploreFeedProps {
@@ -20,7 +17,6 @@ interface ExploreFeedProps {
   highlightDoctorId?: string | null;
   initialCity?: string | null;
   initialFilter?: string | null;
-  onOpenChat?: (recipient: UserProfile) => void;
 }
 
 const WELCOME_BANNER_SLIDE = {
@@ -60,8 +56,7 @@ export function ExploreFeed({
   highlightClinicId,
   highlightDoctorId,
   initialCity,
-  initialFilter,
-  onOpenChat
+  initialFilter
 }: ExploreFeedProps) {
   const [activeTab, setActiveTab] = useState<UserRole>(() => {
     if (highlightClinicId) return 'clinic';
@@ -69,14 +64,8 @@ export function ExploreFeed({
     return 'doctor';
   });
   const [exploreMenuOpen, setExploreMenuOpen] = useState<boolean>(false);
-  const [professionals, setProfessionals] = useState<UserProfile[]>(() => {
-    const tab = highlightClinicId ? 'clinic' : 'doctor';
-    return swrGlobalCache.get<UserProfile[]>(`professionals_${tab}`) || [];
-  });
-  const [loading, setLoading] = useState<boolean>(() => {
-    const tab = highlightClinicId ? 'clinic' : 'doctor';
-    return !swrGlobalCache.has(`professionals_${tab}`);
-  });
+  const [professionals, setProfessionals] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [homeVisitOnly, setHomeVisitOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
@@ -114,23 +103,6 @@ export function ExploreFeed({
   const [activeContactAdModal, setActiveContactAdModal] = useState<any | null>(null);
   const [adAdvertiserProfile, setAdAdvertiserProfile] = useState<UserProfile | null>(null);
   const [loadingAdProfile, setLoadingAdProfile] = useState<boolean>(false);
-
-  // Direct Consultation Chat Modal state (15-day auto disappearing messages)
-  const [chatRecipient, setChatRecipient] = useState<UserProfile | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-
-  const handleOpenChat = (prof: UserProfile) => {
-    if (isGuestUser(currentUser)) {
-      requireAuthAction('Please log in or sign up to message and consult with veterinarians.');
-      return;
-    }
-    if (onOpenChat) {
-      onOpenChat(prof);
-    } else {
-      setChatRecipient(prof);
-      setIsChatOpen(true);
-    }
-  };
 
   const [activeAds, setActiveAds] = useState<any[]>([]);
   const [deletingAdId, setDeletingAdId] = useState<string | null>(null);
@@ -281,10 +253,6 @@ export function ExploreFeed({
 
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (isGuestUser(currentUser)) {
-      requireAuthAction('Please log in or sign up to sponsor and launch billboard ad campaigns.');
-      return;
-    }
     if (!currentUser) return;
     if (!adTitle.trim() || !adDescription.trim() || !adSponsor.trim() || !adCtaText.trim()) {
       setAdError('Please fill in all the required campaign parameters.');
@@ -454,10 +422,6 @@ export function ExploreFeed({
 
   const handleClinicBookingSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (isGuestUser(currentUser)) {
-      requireAuthAction('Please log in or sign up to book a clinical appointment.');
-      return;
-    }
     if (!selectedProfile) return;
     if (!bookingForm.patientName || !bookingForm.ownerName || !bookingForm.ownerPhone) {
       setBookingError('Please fill Patient Name, Owner Name, and Owner Direct Phone/WhatsApp.');
@@ -623,15 +587,10 @@ export function ExploreFeed({
 
   // Load specialists on mount or tab change
   const loadData = async () => {
-    const cacheKey = `professionals_${activeTab}`;
-    if (!swrGlobalCache.has(cacheKey)) {
-      setLoading(true);
-    }
+    setLoading(true);
     try {
-      const data = await prefetchSWR(cacheKey, () => ExploreService.fetchProfessionals(activeTab as any));
-      if (data) {
-        setProfessionals(data);
-      }
+      const data = await ExploreService.fetchProfessionals(activeTab as any);
+      setProfessionals(data);
     } catch (err) {
       console.error('Failed to load specialists', err);
     } finally {
@@ -642,14 +601,6 @@ export function ExploreFeed({
   useEffect(() => {
     loadData();
   }, [activeTab]);
-
-  // Automatically refresh directory specialists and billboard campaigns when tab is reopened or refocused
-  useTabRevalidation({
-    entity: ['explore', 'campaigns'],
-    onRevalidate: async () => {
-      await Promise.allSettled([loadData(), fetchCampaigns()]);
-    },
-  });
 
   // Deep linking initial state handlers
   useEffect(() => {
@@ -730,10 +681,6 @@ export function ExploreFeed({
   // Submit profile evaluation review
   const handleSubmitReview = async (e: FormEvent) => {
     e.preventDefault();
-    if (isGuestUser(currentUser)) {
-      requireAuthAction('Please log in or sign up to leave a clinical review and rating.');
-      return;
-    }
     if (!selectedProfile) return;
     if (!canUserReview(currentUser.role, selectedProfile.role)) {
       setReviewError('You do not have permission to rate or review this role.');
@@ -937,14 +884,12 @@ export function ExploreFeed({
               // SPONSORED CAMPAIGN SLIDE CONTENT (WITH Z-PERSPECTIVE DEPTH)
               <div className="w-full relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6" style={{ transformStyle: "preserve-3d" }}>
                 <div className="space-y-2 md:space-y-3 max-w-2xl text-left" style={{ transformStyle: "preserve-3d" }}>
-                  <div className="flex items-center gap-2" style={{ transform: "translateZ(30px)" }}>
-                    <span className="inline-flex px-3 py-1 bg-amber-400 text-stone-950 rounded-lg text-[10px] font-black tracking-widest uppercase shadow-sm">
-                      SPONSORED ADVERTISEMENT
-                    </span>
-                    <span className="text-[10px] font-bold text-amber-200 uppercase tracking-wider">
-                      &bull; {currentSlide.sponsorName}
-                    </span>
-                  </div>
+                  <span 
+                    className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[10px] font-black tracking-widest font-mono border border-white/20 uppercase"
+                    style={{ transform: "translateZ(30px)" }}
+                  >
+                    📌 {currentSlide.badge} • Sponsored Campaign
+                  </span>
                   <h2 
                     className="text-xl md:text-3xl font-serif font-black tracking-tight leading-tight flex items-center gap-2"
                     style={{ transform: "translateZ(45px)" }}
@@ -960,7 +905,7 @@ export function ExploreFeed({
                   </p>
                   <div className="flex flex-wrap items-center gap-3 pt-0.5" style={{ transform: "translateZ(15px)" }}>
                     <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">
-                      Promoted by: {currentSlide.sponsorName}
+                      {currentSlide.sponsorName}
                     </span>
                     {currentSlide.couponCode && (
                       <button
@@ -986,13 +931,12 @@ export function ExploreFeed({
                     type="button"
                     onClick={(e) => handleAdCtaClick(currentSlide, e)}
                     className="bg-white hover:bg-stone-50 hover:scale-103 text-stone-900 border-b-4 border-b-stone-300 active:border-b-2 px-4 py-2.5 rounded-2xl text-[10px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 w-full text-center cursor-pointer shadow-md"
-                    title={`Visit ${currentSlide.sponsorName} external sponsored link`}
                   >
                     <span>
-                      {currentSlide.ctaType === 'whatsapp' || currentSlide.ctaUrl?.includes('wa.me') ? '💬 WhatsApp Sponsor' :
-                       currentSlide.ctaType === 'call' || currentSlide.ctaUrl?.startsWith('tel:') ? '📞 Call Sponsor' :
-                       currentSlide.ctaType === 'profile' || currentSlide.ctaUrl?.startsWith('profile:') ? '🩺 View Doctor Profile' : 
-                       (currentSlide.ctaText ? `🔗 ${currentSlide.ctaText}` : '🔗 Visit Sponsor Link')}
+                      {currentSlide.ctaType === 'whatsapp' || currentSlide.ctaUrl?.includes('wa.me') ? '💬 ' :
+                       currentSlide.ctaType === 'call' || currentSlide.ctaUrl?.startsWith('tel:') ? '📞 ' :
+                       currentSlide.ctaType === 'profile' || currentSlide.ctaUrl?.startsWith('profile:') ? '🩺 ' : '🔗 '}
+                      {currentSlide.ctaText || 'Connect'}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-stone-850" />
                   </button>
@@ -1006,7 +950,7 @@ export function ExploreFeed({
                     className="bg-black/30 hover:bg-black/45 text-white/95 hover:text-white border border-white/20 px-3 py-1.5 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all flex items-center justify-center gap-1 w-full text-center cursor-pointer backdrop-blur-xs"
                   >
                     <Sparkles className="w-3 h-3 text-amber-400" />
-                    <span>Sponsor Details & Contact</span>
+                    <span>Quick Contact & Details</span>
                   </button>
                 </div>
               </div>
@@ -1880,7 +1824,7 @@ export function ExploreFeed({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
           {filteredProfessionals.map((prof) => {
-            const initials = (prof.name || 'Professional').trim().split(/\s+/).map(w => w[0] || '').slice(0, 2).join('').toUpperCase() || 'P';
+            const initials = prof.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
             
             // Calculate distance strictly for clinic profiles using getDistance
             let distance: number | null = null;
@@ -1941,8 +1885,6 @@ export function ExploreFeed({
                       src={selectedProfile.profilePic}
                       className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-xl shrink-0 bg-neutral-100"
                       alt=""
-                      loading="lazy"
-                      decoding="async"
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-2xl bg-[#f4f1e9] border-4 border-white shadow-xl text-[#5a5a40] text-3xl font-black font-serif flex items-center justify-center shrink-0 uppercase">
@@ -2001,26 +1943,25 @@ export function ExploreFeed({
 
                 {/* Tactical Communications Strip */}
                 <div className="flex flex-wrap gap-3 mb-6 py-4.5 border-y border-[#f4f1e9]">
-                  {/* DIRECT CHAT FACILITY (15-Day Auto-Disappearing Messages) */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenChat(selectedProfile)}
-                    className="btn-tactile-3d-primary py-2 px-5 text-xs inline-flex items-center gap-2 cursor-pointer shadow-sm"
-                  >
-                    💬 Chat Box ({selectedProfile.role === 'doctor' ? 'Doctor' : selectedProfile.role === 'clinic' ? 'Clinic' : 'Practitioner'})
-                  </button>
-
                   {selectedProfile.phone && (
-                    <a
-                      href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                        `Hi ${selectedProfile.name}, I discovered your clinic portfolio profile on VetAxis with premium clinical registries and would like to schedule an evaluation.`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
-                    >
-                      💬 WhatsApp Consult
-                    </a>
+                    <>
+                      <a
+                        href={`tel:${selectedProfile.phone}`}
+                        className="btn-tactile-3d-primary py-2 px-5 text-xs inline-flex items-center gap-2"
+                      >
+                        📞 Call Professional
+                      </a>
+                      <a
+                        href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                          `Hi ${selectedProfile.name}, I discovered your clinic portfolio profile on VetAxis with premium clinical registries and would like to schedule an evaluation.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
+                      >
+                        💬 WhatsApp Consult
+                      </a>
+                    </>
                   )}
 
                   {selectedProfile.role === 'clinic' && selectedProfile.location?.lat && selectedProfile.location?.lng && (
@@ -2034,16 +1975,10 @@ export function ExploreFeed({
                     </a>
                   )}
 
-                  {selectedProfile.role === 'clinic' && (currentUser.role === 'user' || isGuestUser(currentUser)) && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
+                  {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (isGuestUser(currentUser)) {
-                          requireAuthAction('Please log in or sign up to book a clinical appointment.');
-                          return;
-                        }
-                        setIsBookingModeOpen(!isBookingModeOpen);
-                      }}
+                      onClick={() => setIsBookingModeOpen(!isBookingModeOpen)}
                       className={`btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 border border-emerald-300 font-bold transition-all cursor-pointer rounded-xl ${
                         isBookingModeOpen 
                           ? 'bg-[#5a5a40] text-white border-b-[3px] border-b-[#3c3c2b]' 
@@ -2056,7 +1991,7 @@ export function ExploreFeed({
                 </div>
 
                 {/* INLINE APPOINTMENT BOOKING PANEL */}
-                {selectedProfile.role === 'clinic' && (currentUser.role === 'user' || isGuestUser(currentUser)) && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
+                {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -2638,29 +2573,6 @@ export function ExploreFeed({
                     </a>
                   )}
 
-                  {/* 2b. Direct In-App Chat Box */}
-                  {adAdvertiserProfile && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const target = adAdvertiserProfile;
-                        setActiveContactAdModal(null);
-                        handleOpenChat(target);
-                      }}
-                      className="p-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl flex items-center gap-3 transition-all cursor-pointer shadow-sm text-left border-none"
-                    >
-                      <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg">
-                        💬
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-xs font-black block leading-tight">Direct Chat Box</span>
-                        <span className="text-[9px] text-emerald-100 font-semibold block truncate">
-                          15-Day Auto-Disappearing Messages
-                        </span>
-                      </div>
-                    </button>
-                  )}
-
                   {/* 3. In-App Profile & Reviews */}
                   <button
                     type="button"
@@ -2734,21 +2646,6 @@ export function ExploreFeed({
               </div>
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* DIRECT CONSULTATION CHAT BOX (15-Day Auto-Disappearing Messages) */}
-      <AnimatePresence>
-        {isChatOpen && chatRecipient && (
-          <ChatModal
-            isOpen={isChatOpen}
-            onClose={() => {
-              setIsChatOpen(false);
-              setChatRecipient(null);
-            }}
-            recipient={chatRecipient}
-            currentUser={currentUser}
-          />
         )}
       </AnimatePresence>
 

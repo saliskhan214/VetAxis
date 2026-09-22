@@ -45,32 +45,6 @@ export interface UserProfile {
   isAdmin?: boolean;
   offersHomeVisit?: boolean; // Doctors & Clinics can offer home visit / farm call services
   homeVisitCharges?: string; // Optional rate or coverage details (e.g. 'Available on-call / Doorstep vaccinations')
-  isGuest?: boolean; // Flag to identify visitor/guest sessions for read-only SEO browsing
-}
-
-export const GUEST_USER_PROFILE: UserProfile = {
-  uid: 'guest_visitor',
-  name: 'Guest Visitor',
-  email: 'guest@vetaxis360.com',
-  role: 'user',
-  address: 'Islamabad',
-  phone: '',
-  createdAt: 0,
-  isGuest: true,
-  isVerified: false,
-};
-
-export function isGuestUser(user: UserProfile | null | undefined): boolean {
-  if (!user) return true;
-  return Boolean(user.isGuest || user.uid === 'guest_visitor');
-}
-
-export function requireAuthAction(reason?: string) {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('vetaxis_require_auth', {
-      detail: { reason: reason || 'Please log in or sign up to make changes.' }
-    }));
-  }
 }
 
 export interface ManualPayment {
@@ -198,8 +172,6 @@ export interface JobPost {
   clinicWebsite?: string;
   clinicContactPhone?: string;
   clinicFacilities?: string;
-  agreedToSafetyTerms?: boolean;
-  agreedToSafetyTermsTimestamp?: number;
 }
 
 export interface JobApplication {
@@ -220,8 +192,6 @@ export interface JobApplication {
     references?: string;
   };
   status: 'Pending' | 'Reviewed' | 'Shortlisted' | 'Rejected' | 'Hired';
-  agreedToSafetyProtocol?: boolean;
-  agreedToSafetyProtocolTimestamp?: number;
   createdAt: number;
 }
 
@@ -230,39 +200,12 @@ export interface VetNotification {
   userId: string;
   senderId: string;
   senderName: string;
-  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action' | 'broadcast' | 'chat_message';
+  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action';
   targetId: string;
-  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment' | 'broadcast' | 'chat';
+  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment';
   message: string;
   read: boolean;
   createdAt: number;
-}
-
-export interface BroadcastNotification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'announcement' | 'alert' | 'update' | 'promo';
-  priority?: 'normal' | 'high' | 'urgent';
-  authorId: string;
-  authorName: string;
-  authorEmail: string;
-  createdAt: number;
-  actionUrl?: string;
-  actionLabel?: string;
-}
-
-export interface WebPushSubscriptionRecord {
-  id: string;
-  endpoint: string;
-  keys: {
-    p256dh: string;
-    auth: string;
-  };
-  userId?: string;
-  userRole?: string;
-  createdAt: number;
-  updatedAt?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -733,46 +676,6 @@ export interface BlogArticle {
   tags?: string[];
   views: number;
 }
-
-export interface ChatMessage {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  senderName: string;
-  senderRole: UserRole;
-  senderProfilePic?: string;
-  receiverId: string;
-  receiverName: string;
-  receiverRole: UserRole;
-  text: string;
-  createdAt: number; // millisecond timestamp
-  expiresAt: number; // createdAt + (15 * 24 * 60 * 60 * 1000)
-  delivered?: boolean;
-  read?: boolean;
-  readAt?: number;
-}
-
-export interface ChatConversation {
-  id: string;
-  participants: string[];
-  participantDetails: {
-    [userId: string]: {
-      name: string;
-      role: UserRole;
-      profilePic?: string;
-      email?: string;
-      phone?: string;
-    };
-  };
-  lastMessageText?: string;
-  lastMessageTimestamp?: number;
-  lastSenderId?: string;
-  unreadCount?: { [userId: string]: number };
-  deletedBy?: string[];
-  createdAt: number;
-  updatedAt: number;
-}
-
 
 
 

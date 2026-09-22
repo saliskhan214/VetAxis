@@ -22,8 +22,6 @@ import {
 import { BlogArticle, UserProfile } from '../types';
 import { BlogService } from '../lib/blogService';
 import { AdContainer } from './AdContainer';
-import { useTabRevalidation } from '../lib/tabSync';
-import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 
 interface BlogSectionProps {
   currentUser: UserProfile | null;
@@ -46,8 +44,8 @@ const PRESET_IMAGES = [
 ];
 
 export function BlogSection({ currentUser }: BlogSectionProps) {
-  const [articles, setArticles] = useState<BlogArticle[]>(() => swrGlobalCache.get<BlogArticle[]>('blog_articles') || []);
-  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('blog_articles'));
+  const [articles, setArticles] = useState<BlogArticle[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filter & Search states
@@ -104,14 +102,10 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
 
   // Load articles
   const loadArticles = async () => {
-    if (!swrGlobalCache.has('blog_articles')) {
-      setLoading(true);
-    }
+    setLoading(true);
     try {
-      const data = await prefetchSWR('blog_articles', () => BlogService.fetchArticles());
-      if (data) {
-        setArticles(data);
-      }
+      const data = await BlogService.fetchArticles();
+      setArticles(data);
     } catch (err) {
       setError('Failed to fetch articles. Please check your network connection.');
     } finally {
@@ -136,12 +130,6 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
       }
     });
   }, []);
-
-  // Automatically refresh articles when tab is reopened or refocused
-  useTabRevalidation({
-    entity: 'news',
-    onRevalidate: loadArticles,
-  });
 
   // Update slug automatically from title
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,7 +191,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
   // Calculate reading time dynamically
   const calculateReadingTime = (text: string): string => {
     const wordsPerMinute = 200;
-    const wordCount = (text || '').trim().split(/\s+/).filter(Boolean).length;
+    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
     const minutes = Math.ceil(wordCount / wordsPerMinute);
     return `${minutes || 1} min read`;
   };
@@ -224,7 +212,7 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
     setIsSubmitting(true);
     try {
       const readTime = calculateReadingTime(formData.content);
-      const tagsArray = (formData.tags || '')
+      const tagsArray = formData.tags
         .split(',')
         .map(t => t.trim().toLowerCase())
         .filter(Boolean);
@@ -657,7 +645,6 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               <AdContainer 
                 format="horizontal" 
                 adLabel="Advertisement" 
-                adTitle="Educational Veterinary Sponsor Network"
                 className="shadow-xs"
               />
             </div>
@@ -761,11 +748,10 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               </div>
 
               {/* Policy-Compliant In-Article Google AdSense Unit */}
-              <div className="my-10">
+              <div className="my-8">
                 <AdContainer 
                   format="in-article" 
                   adLabel="Advertisement" 
-                  adTitle="Featured Veterinary Partner"
                   className="shadow-xs"
                 />
               </div>
@@ -834,7 +820,6 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
                 <AdContainer 
                   format="rectangle" 
                   adLabel="Advertisement" 
-                  adTitle="Clinical Research & Services Sponsor"
                   className="shadow-xs"
                 />
               </div>

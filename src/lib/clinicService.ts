@@ -11,7 +11,6 @@ import {
 } from 'firebase/firestore';
 
 import { db, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { broadcastDataUpdate } from './tabSync';
 
 // ─── CLINIC INTERFACES ───────────────────────────────────────────
 
@@ -375,7 +374,6 @@ export const ClinicService = {
       }
       localStorage.setItem(LOCAL_APPTS_KEY, JSON.stringify(all));
     }
-    broadcastDataUpdate('clinic', { apptId: appt.id });
   },
 
   async deleteAppointment(id: string): Promise<void> {
@@ -391,7 +389,6 @@ export const ClinicService = {
       const filtered = all.filter(a => a.id !== id);
       localStorage.setItem(LOCAL_APPTS_KEY, JSON.stringify(filtered));
     }
-    broadcastDataUpdate('clinic', { id });
   },
 
   // ─── SOAP ACTIONS ──────────────────────────────
@@ -444,7 +441,6 @@ export const ClinicService = {
       }
       localStorage.setItem(LOCAL_SOAP_KEY, JSON.stringify(all));
     }
-    broadcastDataUpdate('clinic', { soapId: soap.id });
   },
 
   async deleteSoapRecord(id: string): Promise<void> {
@@ -460,7 +456,6 @@ export const ClinicService = {
       const filtered = all.filter(s => s.id !== id);
       localStorage.setItem(LOCAL_SOAP_KEY, JSON.stringify(filtered));
     }
-    broadcastDataUpdate('clinic', { id });
   },
 
   // ─── PRESCRIPTION ACTIONS ──────────────────────
@@ -503,7 +498,6 @@ export const ClinicService = {
       }
       localStorage.setItem(LOCAL_PRESC_KEY, JSON.stringify(all));
     }
-    broadcastDataUpdate('clinic', { prescId: presc.id });
   },
 
   async deletePrescription(id: string): Promise<void> {
@@ -519,7 +513,6 @@ export const ClinicService = {
       const filtered = all.filter(p => p.id !== id);
       localStorage.setItem(LOCAL_PRESC_KEY, JSON.stringify(filtered));
     }
-    broadcastDataUpdate('clinic', { id });
   },
 
   // ─── INVOICE ACTIONS ───────────────────────────
@@ -564,7 +557,6 @@ export const ClinicService = {
       }
       localStorage.setItem(LOCAL_INVOICE_KEY, JSON.stringify(all));
     }
-    broadcastDataUpdate('clinic', { invoiceId: invoice.id });
   },
 
   // ─── AUX ACTIONS: SERVICE CATALOG & DRUGS ───────────

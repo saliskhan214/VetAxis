@@ -51,7 +51,11 @@ export const AdminService = {
         });
       } catch (err) {
         console.error('AdminService: Error fetching all users:', err);
-        handleFirestoreError(err, OperationType.LIST, 'users');
+        try {
+          handleFirestoreError(err, OperationType.LIST, 'users');
+        } catch {
+          // Allow fallback to localStorage
+        }
       }
     }
 

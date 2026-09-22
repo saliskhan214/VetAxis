@@ -1,8 +1,6 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { UserProfile, Product, isGuestUser, requireAuthAction } from '../types';
+import { UserProfile, Product } from '../types';
 import { MarketplaceService } from '../lib/storage';
-import { useTabRevalidation } from '../lib/tabSync';
-import { swrGlobalCache, prefetchSWR } from '../lib/useSWR';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -14,16 +12,16 @@ interface MarketplaceProps {
 }
 
 export function Marketplace({ currentUser, onNavigate, highlightProductId }: MarketplaceProps) {
-  const [products, setProducts] = useState<Product[]>(() => swrGlobalCache.get<Product[]>('marketplace_products') || []);
+  const [products, setProducts] = useState<Product[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(() => !swrGlobalCache.has('marketplace_products'));
+  const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(true);
   const [legalAgreed, setLegalAgreed] = useState<boolean>(false);
 
   // Form compose state (only allowed for doctor, clinic)
-  const isAuthorizedSeller = isGuestUser(currentUser) || currentUser.role === 'doctor' || currentUser.role === 'clinic';
+  const isAuthorizedSeller = currentUser.role === 'doctor' || currentUser.role === 'clinic';
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [prodName, setProdName] = useState<string>('');
   const [prodPrice, setProdPrice] = useState<number>(0);
@@ -37,14 +35,10 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadProducts = async () => {
-    if (!swrGlobalCache.has('marketplace_products')) {
-      setLoading(true);
-    }
+    setLoading(true);
     try {
-      const data = await prefetchSWR('marketplace_products', () => MarketplaceService.fetchProducts());
-      if (data) {
-        setProducts(data);
-      }
+      const data = await MarketplaceService.fetchProducts();
+      setProducts(data);
     } catch (err) {
       console.error('Failed to load marketplace products', err);
     } finally {
@@ -59,12 +53,6 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
       setProdWhatsapp(currentUser.phone);
     }
   }, []);
-
-  // Automatically refresh marketplace products when tab is reopened, refocused, or updated in another tab
-  useTabRevalidation({
-    entity: 'marketplace',
-    onRevalidate: loadProducts,
-  });
 
   useEffect(() => {
     if (highlightProductId && products.length > 0) {
@@ -105,11 +93,6 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
-
-    if (isGuestUser(currentUser)) {
-      requireAuthAction('Please log in or sign up to publish product listings on the marketplace.');
-      return;
-    }
 
     if (!legalAgreed) {
       setFormError('⚠️ Safe Trade Consent Required: You must check the legal affirmation box to confirm that you adhere to our anti-scam guidelines and hold the platform harmless.');
@@ -182,10 +165,6 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (isGuestUser(currentUser)) {
-      requireAuthAction('Please log in or sign up to manage your product listings.');
-      return;
-    }
     if (!confirm('Are you sure you want to remove this product listing?')) return;
     try {
       await MarketplaceService.deleteProduct(id);
@@ -309,13 +288,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
         <div className="text-left">
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => {
-              if (isGuestUser(currentUser)) {
-                requireAuthAction('Please log in or sign up to list products on the marketplace.');
-                return;
-              }
-              setFormOpen(!formOpen);
-            }}
+            onClick={() => setFormOpen(!formOpen)}
             className="cursor-pointer btn-tactile-3d-primary py-3 px-6 text-xs inline-flex items-center gap-2"
           >
             {formOpen ? '✕ Close Composer' : '➕ List a New Product'}
@@ -543,13 +516,13 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
 
             const isHighlighted = highlightProductId === p.id;
             return (
-              <motion.div
-                key={p.id}
-                id={`product-${p.id}`}
-                layout
-                whileHover={{ y: -5 }}
-                className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
-              >
+              <React.Fragment key={p.id}>
+                <motion.div
+                  id={`product-${p.id}`}
+                  layout
+                  whileHover={{ y: -5 }}
+                  className={`${cardStyle} ${isHighlighted ? 'ring-4 ring-[#5a5a40] shadow-2xl scale-[1.02]' : ''}`}
+                >
                 <div>
                   {/* Thumbnail Banner */}
                   <div className={headerGradient}>
@@ -633,20 +606,20 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
                 </div>
 
               </motion.div>
+
+              {/* Policy-Compliant Google AdSense Placement inside Product Grid */}
+              {(pIdx + 1) % 6 === 0 && (
+                <div className="col-span-1 h-full flex flex-col justify-center">
+                  <AdContainer 
+                    format="rectangle" 
+                    adLabel="Advertisement" 
+                    className="h-full min-h-[320px] flex flex-col justify-between m-0"
+                  />
+                </div>
+              )}
+            </React.Fragment>
             );
           })}
-        </div>
-      )}
-
-      {/* Policy-Compliant Google AdSense Placement Separated from Product Grid */}
-      {filteredProducts.length > 0 && (
-        <div className="pt-6">
-          <AdContainer 
-            format="horizontal" 
-            adLabel="Advertisement" 
-            adTitle="Veterinary Supplies & Equipment Sponsors"
-            className="shadow-xs"
-          />
         </div>
       )}
 

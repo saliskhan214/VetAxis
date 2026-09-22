@@ -5,6 +5,7 @@ import {
   Droplet, 
   Activity, 
   ShieldAlert, 
+  Utensils, 
   Calendar, 
   TrendingUp, 
   Copy, 
@@ -29,9 +30,12 @@ import {
   DrugReference,
   SPECIES_VITALS_MATRIX, 
   calculateFluidTherapy, 
+  calculatePetEnergyRequirements, 
   TOXIC_SUBSTANCE_DATABASE, 
   calculateLivestockGestation, 
-  calculateDairyFarmEconomics
+  calculateDairyFarmEconomics,
+  PetLifeStage,
+  PET_ENERGY_FACTORS
 } from '../lib/veterinaryFormulas';
 import { UserProfile } from '../types';
 
@@ -39,7 +43,6 @@ interface VeterinaryClinicalSuiteProps {
   currentUser?: UserProfile | null;
   onNavigate?: (section: string) => void;
   initialTab?: 'wave1' | 'wave2' | 'wave3';
-  initialTool?: string;
 }
 
 const LOCAL_STORAGE_CUSTOM_DRUGS_KEY = 'vetaxis_custom_drugs_v1';
@@ -47,46 +50,15 @@ const LOCAL_STORAGE_CUSTOM_DRUGS_KEY = 'vetaxis_custom_drugs_v1';
 export function VeterinaryClinicalSuite({
   currentUser,
   onNavigate,
-  initialTab = 'wave1',
-  initialTool
+  initialTab = 'wave1'
 }: VeterinaryClinicalSuiteProps) {
   // Main Wave Selector
   const [activeWave, setActiveWave] = useState<'wave1' | 'wave2' | 'wave3'>(initialTab);
 
   // Sub-tab selectors for each wave
   const [wave1SubTab, setWave1SubTab] = useState<'drug_dosing' | 'fluid_therapy' | 'vitals_matrix'>('drug_dosing');
-  const [wave2SubTab, setWave2SubTab] = useState<'toxicity_checker' | 'vaccine_schedule' | 'age_calc'>('toxicity_checker');
+  const [wave2SubTab, setWave2SubTab] = useState<'calorie_calc' | 'toxicity_checker' | 'vaccine_schedule' | 'age_calc'>('calorie_calc');
   const [wave3SubTab, setWave3SubTab] = useState<'gestation_timeline' | 'dairy_economics' | 'mastitis_cmt'>('gestation_timeline');
-
-  // Activate deep-linked tool if provided via props or URL params
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tool = initialTool || params.get('tool');
-    if (!tool) return;
-
-    if (tool === 'drug_dosing' || tool === 'fluid_therapy' || tool === 'vitals_matrix') {
-      setActiveWave('wave1');
-      setWave1SubTab(tool);
-    } else if (tool === 'toxicity_checker' || tool === 'vaccine_schedule' || tool === 'age_calc') {
-      setActiveWave('wave2');
-      setWave2SubTab(tool as any);
-    } else if (tool === 'gestation_timeline' || tool === 'dairy_economics' || tool === 'mastitis_cmt') {
-      setActiveWave('wave3');
-      setWave3SubTab(tool as any);
-    }
-  }, [initialTool]);
-
-  // Sync active tool with URL parameters for instant shareability and SEO deep indexing
-  const syncToolUrl = (toolKey: string) => {
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', 'clinical_tools');
-      url.searchParams.set('tool', toolKey);
-      window.history.replaceState({}, document.title, url.toString());
-    } catch {
-      // Ignore URL sync failure in restricted sandboxes
-    }
-  };
 
   // Copy feedback state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -287,8 +259,14 @@ export function VeterinaryClinicalSuite({
   // WAVE 2: PET PARENT SUITE STATES
   // ----------------------------------------------------
   // Calorie & Portion
-  // Pet Parent Suite (Species used by Age Calculator)
   const [petSpecies, setPetSpecies] = useState<'dog' | 'cat'>('dog');
+  const [petWeightKg, setPetWeightKg] = useState<number>(12);
+  const [petLifeStage, setPetLifeStage] = useState<PetLifeStage>('neutered_adult');
+  const [kibbleCalDensity, setKibbleCalDensity] = useState<number>(375);
+
+  const energyResults = useMemo(() => {
+    return calculatePetEnergyRequirements(petSpecies, petWeightKg, petLifeStage, kibbleCalDensity);
+  }, [petSpecies, petWeightKg, petLifeStage, kibbleCalDensity]);
 
   // Toxicity Search
   const [toxicSearchQuery, setToxicSearchQuery] = useState<string>('');
@@ -452,9 +430,9 @@ export function VeterinaryClinicalSuite({
             🐾
           </div>
           <div>
-            <span className="text-[10px] font-black uppercase tracking-wider block opacity-80">Pets & Health</span>
-            <h2 className="text-sm font-black m-0 leading-tight">Pet Health & Toxicity Tools</h2>
-            <p className="text-[11px] opacity-75 mt-0.5">Emergency toxic foods and pet age calculator</p>
+            <span className="text-[10px] font-black uppercase tracking-wider block opacity-80">Pets & Nutrition</span>
+            <h2 className="text-sm font-black m-0 leading-tight">Pet Nutrition & Health Tools</h2>
+            <p className="text-[11px] opacity-75 mt-0.5">Calorie portions, toxic foods, and age calculator</p>
           </div>
         </button>
 
@@ -485,7 +463,7 @@ export function VeterinaryClinicalSuite({
           {/* Sub Navigation Bar */}
           <div className="flex items-center gap-2 border-b border-[#e3dec9] pb-3 overflow-x-auto">
             <button
-              onClick={() => { setWave1SubTab('drug_dosing'); syncToolUrl('drug_dosing'); }}
+              onClick={() => setWave1SubTab('drug_dosing')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave1SubTab === 'drug_dosing'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
@@ -497,7 +475,7 @@ export function VeterinaryClinicalSuite({
             </button>
 
             <button
-              onClick={() => { setWave1SubTab('fluid_therapy'); syncToolUrl('fluid_therapy'); }}
+              onClick={() => setWave1SubTab('fluid_therapy')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave1SubTab === 'fluid_therapy'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
@@ -509,7 +487,7 @@ export function VeterinaryClinicalSuite({
             </button>
 
             <button
-              onClick={() => { setWave1SubTab('vitals_matrix'); syncToolUrl('vitals_matrix'); }}
+              onClick={() => setWave1SubTab('vitals_matrix')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave1SubTab === 'vitals_matrix'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
@@ -1476,7 +1454,19 @@ export function VeterinaryClinicalSuite({
           
           <div className="flex items-center gap-2 border-b border-[#e3dec9] pb-3 overflow-x-auto">
             <button
-              onClick={() => { setWave2SubTab('toxicity_checker'); syncToolUrl('toxicity_checker'); }}
+              onClick={() => setWave2SubTab('calorie_calc')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
+                wave2SubTab === 'calorie_calc'
+                  ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
+                  : 'bg-white text-[#5a5a40] border-[#e3dec9] hover:bg-[#fcf9f2]'
+              }`}
+            >
+              <Utensils className="w-3.5 h-3.5" />
+              <span>WSAVA / NRC Daily Calorie & Kibble Portion Calculator</span>
+            </button>
+
+            <button
+              onClick={() => setWave2SubTab('toxicity_checker')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave2SubTab === 'toxicity_checker'
                   ? 'bg-rose-800 text-white border-rose-800 shadow-xs'
@@ -1488,7 +1478,7 @@ export function VeterinaryClinicalSuite({
             </button>
 
             <button
-              onClick={() => { setWave2SubTab('age_calc'); syncToolUrl('age_calc'); }}
+              onClick={() => setWave2SubTab('age_calc')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave2SubTab === 'age_calc'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
@@ -1499,6 +1489,157 @@ export function VeterinaryClinicalSuite({
               <span>Pet Age in Human Years & Life Stage Milestones</span>
             </button>
           </div>
+
+          {/* 2.1 CALORIE & PORTION CALCULATOR */}
+          {wave2SubTab === 'calorie_calc' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              <div className="lg:col-span-5 space-y-4">
+                <div className="bg-white p-5 rounded-2xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-4">
+                  <h3 className="font-serif font-black text-base text-[#3c3c3b]">
+                    Pet Nutrition Profile (WSAVA Global Guidelines)
+                  </h3>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-[#7a766f] mb-1.5">
+                      Species
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setPetSpecies('dog')}
+                        className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                          petSpecies === 'dog'
+                            ? 'bg-[#2d4a39] text-white border-[#2d4a39]'
+                            : 'bg-[#fdfbf7] text-[#5a5a40] border-[#e3dec9] hover:bg-[#f4efe4]'
+                        }`}
+                      >
+                        🐕 Dog (Canine)
+                      </button>
+                      <button
+                        onClick={() => setPetSpecies('cat')}
+                        className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                          petSpecies === 'cat'
+                            ? 'bg-[#2d4a39] text-white border-[#2d4a39]'
+                            : 'bg-[#fdfbf7] text-[#5a5a40] border-[#e3dec9] hover:bg-[#f4efe4]'
+                        }`}
+                      >
+                        🐈 Cat (Feline)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[11px] font-black uppercase tracking-wider text-[#7a766f]">
+                        Pet Weight: <strong className="text-[#2d4a39]">{petWeightKg} kg</strong>
+                      </label>
+                      <span className="text-xs text-stone-500 font-semibold">~{(petWeightKg * 2.20462).toFixed(1)} lbs</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={petSpecies === 'dog' ? 80 : 12}
+                      step={0.5}
+                      value={petWeightKg}
+                      onChange={(e) => setPetWeightKg(Number(e.target.value))}
+                      className="w-full accent-[#2d4a39]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-[#7a766f] mb-1">
+                      Life Stage & Activity Level
+                    </label>
+                    <select
+                      value={petLifeStage}
+                      onChange={(e) => setPetLifeStage(e.target.value as PetLifeStage)}
+                      className="w-full p-2.5 text-xs rounded-xl border border-[#e3dec9] bg-[#fdfbf7] font-semibold text-[#3c3c3b]"
+                    >
+                      {Object.keys(PET_ENERGY_FACTORS[petSpecies]).map(k => (
+                        <option key={k} value={k}>
+                          {PET_ENERGY_FACTORS[petSpecies][k as PetLifeStage].label} ({PET_ENERGY_FACTORS[petSpecies][k as PetLifeStage].factor}x RER)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[11px] font-black uppercase tracking-wider text-[#7a766f]">
+                        Food Caloric Density (kcal / standard measuring cup)
+                      </label>
+                      <span className="text-xs font-bold text-[#5a5a40]">{kibbleCalDensity} kcal</span>
+                    </div>
+                    <input
+                      type="number"
+                      min={200}
+                      max={600}
+                      value={kibbleCalDensity}
+                      onChange={(e) => setKibbleCalDensity(Number(e.target.value))}
+                      className="w-full p-2 text-xs rounded-xl border border-[#e3dec9] bg-[#fdfbf7]"
+                    />
+                    <span className="text-[10px] text-stone-500 block mt-1">
+                      Standard dry kibble is ~350-400 kcal/cup (1 cup ~ 100-105 grams).
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Energy Results */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="bg-gradient-to-br from-amber-950 via-[#422e1d] to-[#24170d] text-white p-6 rounded-3xl border border-amber-700 shadow-xl space-y-5">
+                  <div className="flex items-center justify-between border-b border-amber-800 pb-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 block">
+                        WSAVA DAILY ENERGY & PORTION PRESCRIPTION
+                      </span>
+                      <h4 className="text-lg font-serif font-black text-white m-0">
+                        {petWeightKg} kg {petSpecies === 'dog' ? 'Dog' : 'Cat'} • {energyResults.lifeStageLabel}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-xs border border-white/10">
+                      <span className="text-[10px] font-bold text-amber-200 uppercase block">Daily Calorie Target (MER)</span>
+                      <p className="text-2xl font-black text-amber-300 mt-1">
+                        {energyResults.merKcal} <span className="text-xs font-normal text-white">kcal / day</span>
+                      </p>
+                      <span className="text-[10px] text-stone-300">Base RER: {energyResults.rerKcal} kcal</span>
+                    </div>
+
+                    <div className="bg-amber-500/20 p-4 rounded-2xl backdrop-blur-xs border border-amber-400/30">
+                      <span className="text-[10px] font-bold text-amber-200 uppercase block">Total Daily Kibble</span>
+                      <p className="text-2xl font-black text-white mt-1">
+                        {energyResults.dailyGrams} <span className="text-xs font-normal">grams</span>
+                      </p>
+                      <span className="text-[10px] text-amber-200">~{energyResults.dailyCups} measuring cups</span>
+                    </div>
+
+                    <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-xs border border-white/10">
+                      <span className="text-[10px] font-bold text-amber-200 uppercase block">Split: 2 Meals / Day</span>
+                      <p className="text-2xl font-black text-emerald-300 mt-1">
+                        {energyResults.twoMealsPortionGrams} <span className="text-xs font-normal text-white">g / meal</span>
+                      </p>
+                      <span className="text-[10px] text-stone-300">~{energyResults.twoMealsPortionCups} cups morning & evening</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/30 p-4 rounded-2xl border border-white/10 text-xs text-stone-200 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-300 font-bold">
+                      <Info className="w-4 h-4" />
+                      <span>The 10% Treat Allowance Rule (WSAVA Standard):</span>
+                    </div>
+                    <p className="leading-relaxed">
+                      Treats, table tidbits, and dental chews should NEVER exceed 10% of total daily energy intake (max <strong>{Math.round(energyResults.merKcal * 0.10)} kcal</strong>/day). Feeding excess treats dilutes vital micronutrients and predisposes to obesity and pancreatitis.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
 
           {/* 2.2 TOXICITY SAFETY CHECKER */}
           {wave2SubTab === 'toxicity_checker' && (
@@ -1693,7 +1834,7 @@ export function VeterinaryClinicalSuite({
           
           <div className="flex items-center gap-2 border-b border-[#e3dec9] pb-3 overflow-x-auto">
             <button
-              onClick={() => { setWave3SubTab('gestation_timeline'); syncToolUrl('gestation_timeline'); }}
+              onClick={() => setWave3SubTab('gestation_timeline')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave3SubTab === 'gestation_timeline'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
@@ -1705,7 +1846,7 @@ export function VeterinaryClinicalSuite({
             </button>
 
             <button
-              onClick={() => { setWave3SubTab('dairy_economics'); syncToolUrl('dairy_economics'); }}
+              onClick={() => setWave3SubTab('dairy_economics')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave3SubTab === 'dairy_economics'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'
@@ -1717,7 +1858,7 @@ export function VeterinaryClinicalSuite({
             </button>
 
             <button
-              onClick={() => { setWave3SubTab('mastitis_cmt'); syncToolUrl('mastitis_cmt'); }}
+              onClick={() => setWave3SubTab('mastitis_cmt')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
                 wave3SubTab === 'mastitis_cmt'
                   ? 'bg-[#2d4a39] text-white border-[#2d4a39] shadow-xs'

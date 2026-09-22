@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Newspaper, RefreshCw, AlertTriangle, ExternalLink, Calendar, Clock, BookOpen } from 'lucide-react';
 import { AdContainer } from './AdContainer';
-import { useTabRevalidation } from '../lib/tabSync';
 
 interface NewsItem {
   id: string;
@@ -126,12 +125,6 @@ export default function VeterinaryNewsBrief() {
   useEffect(() => {
     fetchNews(activeCategory);
   }, [activeCategory]);
-
-  // Automatically refresh veterinary news when tab is reopened or refocused
-  useTabRevalidation({
-    entity: 'news',
-    onRevalidate: () => fetchNews(activeCategory),
-  });
 
   const getCategoryColor = (category: string) => {
     const cat = category.toLowerCase();
@@ -318,11 +311,10 @@ export default function VeterinaryNewsBrief() {
       </AnimatePresence>
 
       {/* Policy-Compliant Google AdSense Placement for News & Clinical Updates */}
-      <div className="pt-4">
+      <div className="pt-2">
         <AdContainer 
           format="horizontal" 
-          adLabel="Sponsored Links" 
-          adTitle="Veterinary News & Science Network"
+          adLabel="SPONSORED LINKS" 
           className="shadow-xs"
         />
       </div>

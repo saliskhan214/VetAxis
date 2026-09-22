@@ -1,89 +1,42 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { UserProfile, VetNotification, GUEST_USER_PROFILE, isGuestUser, requireAuthAction } from './types';
-import { getLocalSession, AuthService, NotificationService, BroadcastNotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
+import { useState, useEffect } from 'react';
+import { UserProfile, VetNotification } from './types';
+import { getLocalSession, AuthService, NotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
-import { useSWR } from './lib/useSWR';
-import { initIdlePrefetch } from './lib/prefetch';
 
-export { useSWR };
-export type { SWROptions, SWRResponse } from './lib/useSWR';
-
-// Immediate core components for instant 0ms first-paint
+// Import modular layouts
 import { Navbar } from './components/Navbar';
 import { AuthScreen } from './components/AuthScreen';
 import { ExploreFeed } from './components/ExploreFeed';
-import { Footer } from './components/Footer';
+import { CommunityFeed } from './components/CommunityFeed';
+import { AdminPanel } from './components/AdminPanel';
+import { Marketplace } from './components/Marketplace';
+import { PetAds } from './components/PetAds';
+import { ProfilePage } from './components/ProfilePage';
+import { JobBoard } from './components/JobBoard';
+import LivestockManagement from './components/LivestockManagement';
+import { SubscriptionPortal } from './components/SubscriptionPortal';
+import { GuestAnimalViewer } from './components/GuestAnimalViewer';
+import { ClinicManagement } from './components/ClinicManagement';
+import { AboutUsDirectory } from './components/AboutUsDirectory';
 import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
-import { ChatService } from './lib/chatService';
-
-// Lazy-loaded route components for high-speed code-splitting & zero initial lag
-const CommunityFeed = lazy(() => import('./components/CommunityFeed').then(m => ({ default: m.CommunityFeed })));
-const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
-const Marketplace = lazy(() => import('./components/Marketplace').then(m => ({ default: m.Marketplace })));
-const PetAds = lazy(() => import('./components/PetAds').then(m => ({ default: m.PetAds })));
-const ProfilePage = lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
-const JobBoard = lazy(() => import('./components/JobBoard').then(m => ({ default: m.JobBoard })));
-const LivestockManagement = lazy(() => import('./components/LivestockManagement'));
-const SubscriptionPortal = lazy(() => import('./components/SubscriptionPortal').then(m => ({ default: m.SubscriptionPortal })));
-const GuestAnimalViewer = lazy(() => import('./components/GuestAnimalViewer').then(m => ({ default: m.GuestAnimalViewer })));
-const ClinicManagement = lazy(() => import('./components/ClinicManagement').then(m => ({ default: m.ClinicManagement })));
-const AboutUsDirectory = lazy(() => import('./components/AboutUsDirectory').then(m => ({ default: m.AboutUsDirectory })));
-const BlogSection = lazy(() => import('./components/BlogSection').then(m => ({ default: m.BlogSection })));
-const VeterinaryClinicalSuite = lazy(() => import('./components/VeterinaryClinicalSuite').then(m => ({ default: m.VeterinaryClinicalSuite })));
-const PageNotFound = lazy(() => import('./components/PageNotFound'));
-const MessengerModal = lazy(() => import('./components/MessengerModal').then(m => ({ default: m.MessengerModal })));
-const ChatModal = lazy(() => import('./components/ChatModal').then(m => ({ default: m.ChatModal })));
-
-const TermsOfServicePage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.TermsOfServicePage })));
-const PrivacyPolicyPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.PrivacyPolicyPage })));
-const AboutUsPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.AboutUsPage })));
-const ContactSupportPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.ContactSupportPage })));
-const CareersSafetyProtocolPage = lazy(() => import('./components/LegalAndAbout').then(m => ({ default: m.CareersSafetyProtocolPage })));
-
-function SectionLoadingFallback() {
-  return (
-    <div className="w-full py-24 flex flex-col items-center justify-center space-y-3 select-none">
-      <div className="w-10 h-10 rounded-2xl bg-[#2d4a39]/10 border border-[#2d4a39]/20 flex items-center justify-center text-lg animate-pulse">
-        🩺
-      </div>
-      <p className="text-[11px] font-bold text-[#7a766f] tracking-wider uppercase">
-        Loading facility...
-      </p>
-    </div>
-  );
-}
+import { BlogSection } from './components/BlogSection';
+import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage } from './components/LegalAndAbout';
+import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
+import { Footer } from './components/Footer';
+import PageNotFound from './components/PageNotFound';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => getLocalSession() || GUEST_USER_PROFILE);
-  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(() => !getLocalSession() && isFirebaseConfigured);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(isFirebaseConfigured);
   const [activeSection, setActiveSection] = useState<string>('explore');
   const [notifications, setNotifications] = useState<VetNotification[]>([]);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: string; notif?: VetNotification }[]>([]);
   const [isAboutUsOpen, setIsAboutUsOpen] = useState<boolean>(false);
-  const [isMessengerOpen, setIsMessengerOpen] = useState<boolean>(false);
-  const [globalChatRecipient, setGlobalChatRecipient] = useState<UserProfile | null>(null);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
-
-  // Auth gate modal for guest visitors
-  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
-  const [authModalReason, setAuthModalReason] = useState<string>('Please log in or sign up to make changes.');
-
-  useEffect(() => {
-    const handleRequireAuth = (e: any) => {
-      const reason = e?.detail?.reason || 'Please log in or sign up to make changes.';
-      setAuthModalReason(reason);
-      setAuthModalOpen(true);
-    };
-    window.addEventListener('vetaxis_require_auth', handleRequireAuth);
-    return () => {
-      window.removeEventListener('vetaxis_require_auth', handleRequireAuth);
-    };
-  }, []);
 
   const [dbQuotaExceeded, setDbQuotaExceeded] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -114,7 +67,6 @@ export default function App() {
   const [initialCity, setInitialCity] = useState<string | null>(null);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
   const [initialPetType, setInitialPetType] = useState<string | null>(null);
-  const [initialClinicalTool, setInitialClinicalTool] = useState<string | undefined>(undefined);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
 
@@ -131,7 +83,6 @@ export default function App() {
     const cityParam = params.get('city');
     const filterParam = params.get('filter');
     const petTypeParam = params.get('type');
-    const toolParam = params.get('tool');
 
     if (clinicParam) {
       setHighlightClinicId(clinicParam);
@@ -148,11 +99,6 @@ export default function App() {
     } else if (adParam) {
       setHighlightAdId(adParam);
       setActiveSection('pet_ads');
-    }
-
-    if (toolParam) {
-      setInitialClinicalTool(toolParam);
-      setActiveSection('clinical_tools');
     }
 
     if (cityParam) {
@@ -173,8 +119,7 @@ export default function App() {
         'livestock', 'profile', 'subscription', 'admin', 'news', 
         'blogs', 'articles', 'about', 'about_us', 'terms', 
         'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
-        'support', 'clinic_management', 'clinical_tools', 'clinical_suite',
-        'calculators', 'tools'
+        'support', 'clinic_management'
       ];
       let targetSection = tabParam.toLowerCase();
       if (targetSection === 'pets') targetSection = 'pet_ads';
@@ -183,7 +128,6 @@ export default function App() {
       if (targetSection === 'terms_of_service') targetSection = 'terms';
       if (targetSection === 'privacy_policy') targetSection = 'privacy';
       if (targetSection === 'support') targetSection = 'contact';
-      if (targetSection === 'calculators' || targetSection === 'tools' || targetSection === 'clinical_suite') targetSection = 'clinical_tools';
 
       if (validSections.includes(targetSection) || validSections.includes(tabParam.toLowerCase())) {
         setActiveSection(targetSection);
@@ -206,16 +150,9 @@ export default function App() {
     }
   }, [currentUser?.uid]);
 
-  // Predictive background idle prefetch for top application sections
-  useEffect(() => {
-    initIdlePrefetch(currentUser);
-  }, [currentUser]);
-
   // Dynamic SEO meta tags and Title management per active section
   useEffect(() => {
     const titles: Record<string, string> = {
-      clinical_tools: "Veterinary Drug Dosage & Fluid Rate Calculators | VetAxis 360",
-      clinical_suite: "Veterinary Clinical Calculation Suite & Multi-Species Solvers | VetAxis 360",
       explore: "Find Verified Veterinary Clinics, DVM Doctors & Emergency Animal Hospitals | VetAxis 360",
       jobs: "DVM Veterinary Careers, Hospital Jobs & Staff Recruitment | VetAxis 360",
       pet_ads: "Lost & Found Pets SOS Network, Pet Adoption & Classifieds | VetAxis 360",
@@ -231,24 +168,8 @@ export default function App() {
       contact: "Contact & Support | VetAxis 360"
     };
 
-    const descriptions: Record<string, string> = {
-      clinical_tools: "Calculate veterinary drug doses (mg/kg), AAHA IV fluid therapy drip rates, pet daily calorie portions, toxic emergency alerts, and cattle calving timelines.",
-      clinical_suite: "Evidence-based veterinary calculations, Plumb's pharmacology, AAHA hydration resuscitation, and dairy farm economics optimizer.",
-      explore: "Find certified veterinary clinics, 24/7 emergency pet doctors, and DVM specialists across Islamabad, Lahore, Karachi, Rawalpindi, and Peshawar.",
-      jobs: "Browse latest veterinary surgeon, dairy farm consultant, and pet hospital job vacancies across Pakistan.",
-      pet_ads: "Report lost dogs & cats, adopt rescue animals, and broadcast missing pet emergency alerts nationwide.",
-      livestock: "Manage dairy cattle and buffalo herds, milk yield records, vaccination schedules, and disease alerts.",
-      marketplace: "Buy and sell authentic veterinary pharmaceutical drugs, surgical instruments, diagnostic equipment, and animal feeds."
-    };
-
     if (titles[activeSection]) {
       document.title = titles[activeSection];
-    }
-    if (descriptions[activeSection]) {
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        metaDesc.setAttribute('content', descriptions[activeSection]);
-      }
     }
   }, [activeSection]);
 
@@ -264,88 +185,86 @@ export default function App() {
     }, durationMs);
   };
 
-  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
-  const isFirstNotificationRunRef = useRef<boolean>(true);
-  const lastReminderCheckRef = useRef<number>(0);
+  // Polling loop for real-time popup notifications
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
 
-  // Lightweight SWR Data-Fetching Hook: Automatically revalidates notifications from Firestore on focus / tab return
-  const {
-    mutate: mutateNotifications,
-  } = useSWR<VetNotification[]>(
-    currentUser?.uid && !isGuestUser(currentUser) && !dbQuotaExceeded ? `user_notifications_${currentUser.uid}` : null,
-    async () => {
-      if (!currentUser?.uid || isGuestUser(currentUser)) return [];
+    if (dbQuotaExceeded) {
+      console.warn('[VetAxis] Background notifications polling suspended due to database quota exhaustion.');
+      return;
+    }
 
-      // ─── Automated 6-hour Appointment reminders (Throttled to once every 120 seconds for performance) ──────────────────
-      const nowMs = Date.now();
-      if (isFirstNotificationRunRef.current || nowMs - lastReminderCheckRef.current > 120 * 1000) {
-        lastReminderCheckRef.current = nowMs;
-        try {
-          // Fetch appointments where the user is either the pet owner or the clinic
-          const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
-          const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
-          
-          // Combine both lists uniquely
-          const combinedAppts = [...myUserAppts];
-          myClinicAppts.forEach(ca => {
-            if (!combinedAppts.some(a => a.id === ca.id)) {
-              combinedAppts.push(ca);
-            }
-          });
+    let isMounted = true;
+    const seenIds = new Set<string>();
+    let lastReminderCheck = 0;
 
-          const now = new Date();
-          for (const appt of combinedAppts) {
-            if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId && appt.date && appt.time) {
-              const [year, month, day] = (appt.date || '').split('-').map(Number);
-              const [hours, minutes] = (appt.time || '').split(':').map(Number);
-              if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
-                const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-                const diffMs = apptDate.getTime() - now.getTime();
-                const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
+    const checkNotifications = async (isFirstRun: boolean) => {
+      try {
+        // ─── Automated 6-hour Appointment reminders (Throttled to once every 120 seconds for performance) ──────────────────
+        const nowMs = Date.now();
+        if (isFirstRun || nowMs - lastReminderCheck > 120 * 1000) {
+          lastReminderCheck = nowMs;
+          try {
+            // Fetch appointments where the user is either the pet owner or the clinic
+            const myUserAppts = await ClinicService.fetchAppointmentsByUserId(currentUser.uid);
+            const myClinicAppts = await ClinicService.fetchAppointments(currentUser.uid);
+            
+            // Combine both lists uniquely
+            const combinedAppts = [...myUserAppts];
+            myClinicAppts.forEach(ca => {
+              if (!combinedAppts.some(a => a.id === ca.id)) {
+                combinedAppts.push(ca);
+              }
+            });
 
-                // Trigger if scheduled time is within 6 hours (and is in the future)
-                if (diffMs > 0 && diffMs <= sixHoursMs) {
-                  appt.sent6hReminder = true;
-                  await ClinicService.saveAppointment(appt);
+            const now = new Date();
+            for (const appt of combinedAppts) {
+              if (appt.status === 'Scheduled' && !appt.sent6hReminder && appt.userId) {
+                const [year, month, day] = appt.date.split('-').map(Number);
+                const [hours, minutes] = appt.time.split(':').map(Number);
+                if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hours) && !isNaN(minutes)) {
+                  const apptDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                  const diffMs = apptDate.getTime() - now.getTime();
+                  const sixHoursMs = 6 * 1000 * 60 * 60; // 6 hours
 
-                  await NotificationService.createNotification({
-                    userId: appt.userId,
-                    senderId: appt.clinicId,
-                    senderName: appt.vetName || 'Vet Clinic',
-                    type: 'status_change',
-                    targetId: appt.id,
-                    targetType: 'appointment',
-                    message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
-                    read: false
-                  });
+                  // Trigger if scheduled time is within 6 hours (and is in the future)
+                  if (diffMs > 0 && diffMs <= sixHoursMs) {
+                    appt.sent6hReminder = true;
+                    await ClinicService.saveAppointment(appt);
+
+                    await NotificationService.createNotification({
+                      userId: appt.userId,
+                      senderId: appt.clinicId,
+                      senderName: appt.vetName || 'Vet Clinic',
+                      type: 'status_change',
+                      targetId: appt.id,
+                      targetType: 'appointment',
+                      message: `⏰ Reminder: Your pet ${appt.patientName}'s scheduled appointment at ${appt.vetName} is in 6 hours (at ${appt.time}).`,
+                      read: false
+                    });
+                  }
                 }
               }
             }
+          } catch (err) {
+            console.error("6h reminder checking failed:", err);
           }
-        } catch (err) {
-          console.error("6h reminder checking failed:", err);
         }
-      }
 
-      const list = await NotificationService.fetchNotifications(currentUser.uid);
-      return list;
-    },
-    {
-      revalidateOnFocus: true, // Automatically revalidates when user returns from another tab
-      revalidateOnReconnect: true,
-      focusThrottleInterval: 3000,
-      refreshInterval: 25000,
-      onSuccess: (list) => {
-        if (!list) return;
-        if (isFirstNotificationRunRef.current) {
+        const list = await NotificationService.fetchNotifications(currentUser.uid);
+        if (!isMounted) return;
+
+        if (isFirstRun) {
           // On first boot, mark existing unread notifications as seen so we don't spam popups for old interactions
-          isFirstNotificationRunRef.current = false;
-          list.forEach(n => seenNotificationIdsRef.current.add(n.id));
+          list.forEach(n => seenIds.add(n.id));
         } else {
           // Find any unread notification that we haven't seen in this session yet
-          const newUnreads = list.filter(n => !n.read && !seenNotificationIdsRef.current.has(n.id));
+          const newUnreads = list.filter(n => !n.read && !seenIds.has(n.id));
           newUnreads.forEach(n => {
-            seenNotificationIdsRef.current.add(n.id);
+            seenIds.add(n.id);
             const toastId = 'toast_' + n.id + '_' + Date.now();
             
             // Push toast popup with full notification ref for click handling
@@ -353,102 +272,39 @@ export default function App() {
             
             // Auto fade out after 5 seconds
             setTimeout(() => {
-              setToasts(prev => prev.filter(t => t.id !== toastId));
+              if (isMounted) {
+                setToasts(prev => prev.filter(t => t.id !== toastId));
+              }
             }, 5000);
           });
         }
 
         // Always sync the overall notifications list to keep badging correct
         setNotifications(list);
+      } catch (err) {
+        console.error('Error fetching notification logs:', err);
       }
-    }
-  );
-
-  // Lightweight SWR Data-Fetching Hook: Automatically revalidates user profile from Firestore on tab focus
-  const {
-    mutate: mutateUserProfile,
-  } = useSWR<UserProfile | null>(
-    currentUser?.uid && !isGuestUser(currentUser) && !dbQuotaExceeded ? `user_profile_${currentUser.uid}` : null,
-    async () => {
-      if (!currentUser?.uid || isGuestUser(currentUser)) return null;
-      if (isFirebaseConfigured && db) {
-        try {
-          const userRef = doc(db, 'users', currentUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const profile = userSnap.data() as UserProfile;
-            return injectTemporaryPlatinum(profile);
-          }
-        } catch (e) {
-          console.warn('[VetAxis SWR] Error revalidating user profile on focus:', e);
-        }
-      }
-      return currentUser;
-    },
-    {
-      revalidateOnFocus: true, // When user returns from another browser tab, fetch latest Firestore profile state
-      revalidateOnReconnect: true,
-      focusThrottleInterval: 4000,
-      onSuccess: (freshProfile) => {
-        if (freshProfile && currentUser && !isGuestUser(currentUser)) {
-          if (
-            freshProfile.role !== currentUser.role ||
-            freshProfile.isVerified !== currentUser.isVerified ||
-            freshProfile.subscriptionTier !== currentUser.subscriptionTier ||
-            freshProfile.name !== currentUser.name ||
-            freshProfile.emailVerified !== currentUser.emailVerified ||
-            freshProfile.profilePic !== currentUser.profilePic
-          ) {
-            console.log('[VetAxis SWR] User profile revalidated from Firestore on focus:', freshProfile.email);
-            setCurrentUser(freshProfile);
-            secureSetItem('va_session', JSON.stringify(freshProfile));
-          }
-        }
-      }
-    }
-  );
-
-  // Real-time unread messages tracking & synchronization
-  useEffect(() => {
-    if (!currentUser?.uid || isGuestUser(currentUser)) {
-      setUnreadMessagesCount(0);
-      return;
-    }
-
-    const refreshUnread = () => {
-      const count = ChatService.getUnreadMessagesCount(currentUser.uid);
-      setUnreadMessagesCount(count);
     };
 
-    refreshUnread();
+    // Run immediately first time
+    checkNotifications(true);
 
-    const handleNewChatMessage = () => {
-      refreshUnread();
-      mutateNotifications();
-    };
-
-    window.addEventListener('vetaxis_chat_new_message', handleNewChatMessage);
-    window.addEventListener('vetaxis_notification_received', handleNewChatMessage);
-    window.addEventListener('storage', refreshUnread);
-
-    const unsubscribe = ChatService.subscribeToUserConversations(currentUser.uid, () => {
-      refreshUnread();
-    });
+    // Polling interval throttled to every 25 seconds to respect Firestore free tier limits and prevent quota exhaustion
+    const interval = setInterval(() => {
+      checkNotifications(false);
+    }, 25000);
 
     return () => {
-      window.removeEventListener('vetaxis_chat_new_message', handleNewChatMessage);
-      window.removeEventListener('vetaxis_notification_received', handleNewChatMessage);
-      window.removeEventListener('storage', refreshUnread);
-      unsubscribe();
+      isMounted = false;
+      clearInterval(interval);
     };
-  }, [currentUser?.uid, mutateNotifications]);
+  }, [currentUser?.uid, dbQuotaExceeded]);
 
   const handleMarkAllAsRead = async () => {
     if (!currentUser) return;
     try {
       await NotificationService.markAllAsRead(currentUser.uid);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      mutateNotifications(prev => (prev || []).map(n => ({ ...n, read: true })), false);
     } catch (err) {
       console.error('Failed to mark notifications read:', err);
     }
@@ -456,9 +312,8 @@ export default function App() {
 
   const handleDeleteNotification = async (id: string) => {
     try {
-      await NotificationService.deleteNotification(id, currentUser?.uid);
+      await NotificationService.deleteNotification(id);
       setNotifications(prev => prev.filter(n => n.id !== id));
-      mutateNotifications(prev => (prev || []).filter(n => n.id !== id), false);
     } catch (err) {
       console.error('Failed to delete notification:', err);
     }
@@ -470,9 +325,7 @@ export default function App() {
     setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
     try {
       // Also sync all or this status to DB/localStorage
-      if (currentUser?.uid) {
-        await NotificationService.markAllAsRead(currentUser.uid);
-      }
+      await NotificationService.markAllAsRead(currentUser!.uid);
     } catch (err) {
       console.warn('Failed to sync notification read status on click:', err);
     }
@@ -500,43 +353,6 @@ export default function App() {
     } else if (notif.targetType === 'appointment') {
       setHighlightAppointmentId(notif.targetId);
       setActiveSection('clinic_management');
-    } else if (notif.targetType === 'broadcast' || notif.type === 'broadcast') {
-      if (notif.targetId && notif.targetId !== notif.id && !notif.targetId.startsWith('bcast_')) {
-        if (notif.targetId.startsWith('http://') || notif.targetId.startsWith('https://')) {
-          try {
-            window.open(notif.targetId, '_blank', 'noopener,noreferrer');
-          } catch (e) {
-            console.warn('Could not open external url:', e);
-          }
-        } else {
-          handleNavigate(notif.targetId);
-        }
-      }
-    } else if (notif.targetType === 'chat' || notif.type === 'chat_message') {
-      const targetSenderId = notif.senderId;
-      if (targetSenderId) {
-        AuthService.fetchUserProfile(targetSenderId)
-          .then((userObj) => {
-            if (userObj) {
-              setGlobalChatRecipient(userObj);
-            } else {
-              setGlobalChatRecipient({
-                uid: targetSenderId,
-                name: notif.senderName || 'Veterinarian',
-                role: 'doctor',
-                isVerified: true
-              });
-            }
-          })
-          .catch(() => {
-            setGlobalChatRecipient({
-              uid: targetSenderId,
-              name: notif.senderName || 'Veterinarian',
-              role: 'doctor',
-              isVerified: true
-            });
-          });
-      }
     }
   };
 
@@ -549,6 +365,7 @@ export default function App() {
     if (normalized === 'privacy_policy') normalized = 'privacy';
     if (normalized === 'support') normalized = 'contact';
 
+    triggerLoading(`Opening ${normalized.replace('_', ' ').toUpperCase()}...`, 400);
     setActiveSection(normalized);
     // Clear highlight tags during manual user shifts
     setHighlightPostId(null);
@@ -581,27 +398,20 @@ export default function App() {
               const userRef = doc(db, 'users', firebaseUser.uid);
               const userSnap = await getDoc(userRef);
               if (userSnap.exists()) {
-                const docData = (userSnap.data() || {}) as UserProfile;
-                const profile: UserProfile = {
-                  ...docData,
-                  uid: docData.uid || firebaseUser.uid
-                };
+                const data = userSnap.data() as UserProfile;
+                const profile: UserProfile = { ...data, uid: data.uid || firebaseUser.uid };
                 const finalized = injectTemporaryPlatinum(profile);
                 setCurrentUser(finalized);
                 secureSetItem('va_session', JSON.stringify(finalized));
               } else {
-                setCurrentUser(GUEST_USER_PROFILE);
+                setCurrentUser(null);
                 localStorage.removeItem('va_session');
               }
             }
           } else {
             // Sign-out detected or no active Firebase Auth session found
-            const localSess = getLocalSession();
-            if (localSess && !isGuestUser(localSess)) {
-              setCurrentUser(localSess);
-            } else {
-              setCurrentUser(GUEST_USER_PROFILE);
-            }
+            setCurrentUser(null);
+            localStorage.removeItem('va_session');
           }
         } catch (authErr) {
           console.error('[VetAxis] Error during auth session restore:', authErr);
@@ -620,116 +430,51 @@ export default function App() {
     testConnection();
   }, []);
 
-  // Automated Broadcast Notification Delivery: Checks and delivers global admin alerts to all users (including users returning after days)
-  useEffect(() => {
-    const handleCheckBroadcasts = async () => {
-      try {
-        await BroadcastNotificationService.checkAndDispatchUnseenBroadcasts((bcast) => {
-          const toastId = 'bcast_toast_' + bcast.id + '_' + Date.now();
-          setToasts(prev => [
-            ...prev,
-            {
-              id: toastId,
-              message: `${bcast.title}: ${bcast.message}`,
-              type: 'broadcast',
-              notif: {
-                id: 'bcast_notif_' + bcast.id,
-                userId: currentUser?.uid || 'guest',
-                senderId: bcast.authorId,
-                senderName: bcast.authorName,
-                type: 'broadcast',
-                targetId: bcast.actionUrl || bcast.id,
-                targetType: 'broadcast',
-                message: `${bcast.title}: ${bcast.message}`,
-                read: false,
-                createdAt: bcast.createdAt
-              }
-            }
-          ]);
-
-          // Auto dismiss toast after 8 seconds
-          setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== toastId));
-          }, 8000);
-
-          if (currentUser?.uid) {
-            mutateNotifications();
-          }
-        });
-      } catch (err) {
-        console.warn('Error checking unseen broadcast notifications:', err);
-      }
-    };
-
-    // Initial check on startup and when user profile is ready
-    handleCheckBroadcasts();
-
-    // Auto-register Web Push API subscription if notification permission is already granted
-    if (BroadcastNotificationService.isPushManagerSupported() && BroadcastNotificationService.getNotificationPermission() === 'granted') {
-      BroadcastNotificationService.subscribeToPushNotifications(currentUser).catch(err => {
-        console.warn('[Web Push] Auto-subscription update error:', err);
-      });
-    }
-
-    // Listen for Service Worker push messages delivered to the active window
-    const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'PUSH_NOTIFICATION_RECEIVED') {
-        console.log('[Web Push] Received real-time push message in client:', event.data.payload);
-        handleCheckBroadcasts();
-        if (currentUser?.uid) {
-          mutateNotifications();
-        }
-      }
-    };
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-    }
-
-    // Listen for live broadcast notifications fired across browser tabs/windows
-    const handleDataUpdate = (e: any) => {
-      if (e.detail?.entity === 'broadcasts' || e.detail?.entity === 'notifications') {
-        handleCheckBroadcasts();
-        if (currentUser?.uid) {
-          mutateNotifications();
-        }
-      }
-    };
-
-    window.addEventListener('vetaxis_data_update', handleDataUpdate);
-    return () => {
-      window.removeEventListener('vetaxis_data_update', handleDataUpdate);
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-      }
-    };
-  }, [currentUser, mutateNotifications]);
-
-  // Lightweight auto-scroller when any popup modal/dialog opens
+  // Global auto-scroller when any popup modal/dialog opens
   useEffect(() => {
     let lastActionTime = 0;
     
     const handlePopupOpened = (element: HTMLElement) => {
       const now = Date.now();
+      // Debounce slightly to prevent recursive triggers within 300ms
       if (now - lastActionTime < 300) return;
       lastActionTime = now;
 
       // Scroll the main screen viewport to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      element.scrollTo?.({ top: 0, behavior: 'smooth' });
-      const dialogArea = element.querySelector?.('[role="dialog"]');
+
+      // Scroll the popup container/overlay itself to its top
+      element.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Also scroll any internal scrollable panels within the modal to their top
+      const scrollables = element.querySelectorAll('.overflow-y-auto');
+      scrollables.forEach(el => {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      // If there's an active dialog card inside the overlay, scroll it elegantly into view
+      const dialogArea = element.querySelector('[role="dialog"], .bg-white, .bg-neutral-900, .bg-\\[\\#fcf9f2\\]');
       if (dialogArea) {
-        dialogArea.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+        dialogArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     };
 
     const isModalElement = (node: Node): node is HTMLElement => {
       if (!(node instanceof HTMLElement)) return false;
-      if (node.closest?.('[data-no-scroll="true"]')) return false;
+      
+      // If the node or any parent/ancestor has data-no-scroll="true", do not treat as a modal to prevent unwanted scrolling
+      if (node.closest('[data-no-scroll="true"]') || node.querySelector('[data-no-scroll="true"]')) {
+        return false;
+      }
+
       const cn = node.className;
       if (typeof cn !== 'string') return false;
-      return (node.classList.contains('fixed') && !node.classList.contains('pointer-events-none')) ||
-             node.getAttribute('role') === 'dialog';
+      
+      const isFixed = node.classList.contains('fixed') && !node.classList.contains('pointer-events-none');
+      const hasBackdrop = (cn.includes('bg-black/') || cn.includes('backdrop-blur') || cn.includes('bg-stone-900/')) && node.classList.contains('fixed');
+      const hasDialog = node.getAttribute('role') === 'dialog' || node.querySelector('[role="dialog"]') !== null;
+      
+      return isFixed || hasBackdrop || hasDialog;
     };
 
     const observer = new MutationObserver((mutations) => {
@@ -740,6 +485,22 @@ export default function App() {
               handlePopupOpened(node);
               return;
             }
+            if (node instanceof HTMLElement) {
+              const innerModal = Array.from(node.querySelectorAll('*')).find(el => isModalElement(el));
+              if (innerModal instanceof HTMLElement) {
+                handlePopupOpened(innerModal);
+                return;
+              }
+            }
+          }
+        } else if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (isModalElement(target)) {
+            const isHidden = target.classList.contains('hidden') || target.style.display === 'none';
+            if (!isHidden) {
+              handlePopupOpened(target);
+              return;
+            }
           }
         }
       }
@@ -747,7 +508,9 @@ export default function App() {
 
     observer.observe(document.body, {
       childList: true,
-      subtree: false
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
     });
 
     return () => observer.disconnect();
@@ -762,7 +525,7 @@ export default function App() {
     let active = true;
 
     const validateSession = async () => {
-      if (currentUser && !isGuestUser(currentUser)) {
+      if (currentUser) {
         try {
           const isValid = await AuthService.validateUserProfile(currentUser.uid);
           if (active && !isValid) {
@@ -783,9 +546,9 @@ export default function App() {
     };
   }, [currentUser?.uid, dbQuotaExceeded, isAuthInitializing]);
 
-  // Real-time monthly/trial subscription expiration checker (checked once per minute to preserve CPU)
+  // Real-time precise monthly/trial subscription expiration checker
   useEffect(() => {
-    if (isAuthInitializing || !currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || isGuestUser(currentUser) || dbQuotaExceeded) return;
+    if (isAuthInitializing || !currentUser?.subscriptionTier || !currentUser?.subscriptionExpiresAt || dbQuotaExceeded) return;
     
     let active = true;
     const checkExpiry = async () => {
@@ -794,7 +557,7 @@ export default function App() {
         console.warn(`[VetAxis] Active premium ${expiredTier} subscription has ended. Auto-downgrading.`);
         
         try {
-          // 1. Create a persistent system notification in the DB
+          // 1. Create a beautiful persistent system notification in the DB
           const newNotif = await NotificationService.createNotification({
             userId: currentUser.uid,
             senderId: 'admin',
@@ -843,8 +606,8 @@ export default function App() {
     // Check instantly on mount or tier update
     checkExpiry();
 
-    // Check every 60 seconds to eliminate unnecessary CPU cycles
-    const timerId = setInterval(checkExpiry, 60000);
+    // Check memory every 1000ms to catch the exact moment of expiry (e.g. for counting down trials)
+    const timerId = setInterval(checkExpiry, 1000);
     
     return () => {
       active = false;
@@ -854,7 +617,7 @@ export default function App() {
 
   // Real-time online presence heartbeat
   useEffect(() => {
-    if (isAuthInitializing || !currentUser || isGuestUser(currentUser) || dbQuotaExceeded) return;
+    if (isAuthInitializing || !currentUser || dbQuotaExceeded) return;
 
     const performHeartbeat = async () => {
       try {
@@ -877,22 +640,16 @@ export default function App() {
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
-    mutateUserProfile(user, false);
     setActiveSection('explore');
   };
 
   const handleLogout = async () => {
     await AuthService.signOut();
-    setCurrentUser(GUEST_USER_PROFILE);
-    setNotifications([]);
-    mutateUserProfile(null, false);
-    mutateNotifications([], false);
-    localStorage.removeItem('va_session');
+    setCurrentUser(null);
   };
 
   const handleUpdateUserProfile = (updated: UserProfile) => {
     setCurrentUser(updated);
-    mutateUserProfile(updated, false);
   };
 
   if (isAuthInitializing) {
@@ -912,16 +669,48 @@ export default function App() {
   }
 
   // Intercept guest visits that scanned a veterinary ear-tag/collar code
-  if (isGuestUser(currentUser) && scannedAnimalRecordId && !temporaryBypassGuestForAuth) {
+  if (!currentUser && scannedAnimalRecordId && !temporaryBypassGuestForAuth) {
     return (
       <GuestAnimalViewer 
         animalRecordId={scannedAnimalRecordId}
-        onGoToAuth={() => {
-          setAuthModalReason('Please log in or sign up to manage animal clinical records.');
-          setAuthModalOpen(true);
-        }}
+        onGoToAuth={() => setTemporaryBypassGuestForAuth(true)}
         onClear={() => setScannedAnimalRecordId(null)}
       />
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen text-center relative">
+        {/* Floating return button to easily jump back to scanned passport */}
+        {scannedAnimalRecordId && (
+          <div className="absolute top-4 left-4 z-[9999]">
+            <button
+              onClick={() => setTemporaryBypassGuestForAuth(false)}
+              className="cursor-pointer bg-[#5a5a40] text-white hover:bg-[#3e3e2b] px-4 py-2 rounded-xl text-xs font-bold border-none shadow-md flex items-center gap-1.5 transition-all font-sans"
+            >
+              ← Back to Scanned Digital Passport
+            </button>
+          </div>
+        )}
+        <AuthScreen 
+          onAuthSuccess={handleAuthSuccess} 
+          authService={AuthService} 
+          onOpenAboutUs={() => setIsAboutUsOpen(true)}
+        />
+
+        <AnimatePresence>
+          {isAboutUsOpen && (
+            <AboutUsDirectory
+              isOpen={isAboutUsOpen}
+              onClose={() => setIsAboutUsOpen(false)}
+              onNavigate={handleNavigate}
+              isLoggedIn={false}
+              onTriggerAuth={() => setIsAboutUsOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     );
   }
 
@@ -934,26 +723,14 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
-        onRequireAuth={(reason) => {
-          setAuthModalReason(reason || 'Please log in or sign up to access your account.');
-          setAuthModalOpen(true);
-        }}
         notifications={notifications}
         onMarkAllAsRead={handleMarkAllAsRead}
         onDeleteNotification={handleDeleteNotification}
         onNotificationClick={handleNotificationClick}
         onOpenAboutUs={() => setIsAboutUsOpen(true)}
-        onOpenMessenger={() => {
-          if (isGuestUser(currentUser)) {
-            requireAuthAction('Please log in or sign up to open your messenger.');
-            return;
-          }
-          setIsMessengerOpen(true);
-        }}
-        unreadMessagesCount={unreadMessagesCount}
       />
 
-      {currentUser && !isGuestUser(currentUser) && !currentUser.emailVerified && (
+      {currentUser && !currentUser.emailVerified && (
         <div className="bg-amber-50/80 border-b border-amber-200 text-amber-900 text-xs py-2.5 px-4 text-center font-medium flex items-center justify-center gap-3 animate-fadeIn">
           <span>⚠️ Your email is unverified. Please verify your email to ensure secure access.</span>
           <button
@@ -985,141 +762,133 @@ export default function App() {
 
       {/* RENDERED FEED ROUTER BOX */}
       <main className="flex-1 container max-w-7xl mx-auto px-4 py-8 overflow-hidden">
-        <Suspense fallback={<SectionLoadingFallback />}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeSection}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              {activeSection === 'explore' && (
-                <ExploreFeed
-                  currentUser={currentUser}
-                  onUpdateUser={handleUpdateUserProfile}
-                  activeSection={activeSection}
-                  onNavigate={handleNavigate}
-                  highlightClinicId={highlightClinicId}
-                  highlightDoctorId={highlightDoctorId}
-                  initialCity={initialCity}
-                  initialFilter={initialFilter}
-                  onOpenChat={(prof) => setGlobalChatRecipient(prof)}
-                />
-              )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeSection}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+          >
+            {activeSection === 'explore' && (
+              <ExploreFeed
+                currentUser={currentUser}
+                onUpdateUser={handleUpdateUserProfile}
+                activeSection={activeSection}
+                onNavigate={handleNavigate}
+                highlightClinicId={highlightClinicId}
+                highlightDoctorId={highlightDoctorId}
+                initialCity={initialCity}
+                initialFilter={initialFilter}
+              />
+            )}
 
-              {activeSection === 'community' && (
-                <CommunityFeed 
-                  currentUser={currentUser} 
-                  highlightPostId={highlightPostId}
-                />
-              )}
+            {activeSection === 'community' && (
+              <CommunityFeed 
+                currentUser={currentUser} 
+                highlightPostId={highlightPostId}
+              />
+            )}
 
-              {activeSection === 'marketplace' && (
-                <Marketplace 
-                  currentUser={currentUser} 
-                  onNavigate={setActiveSection} 
-                  highlightProductId={highlightProductId}
-                />
-              )}
+            {activeSection === 'marketplace' && (
+              <Marketplace 
+                currentUser={currentUser} 
+                onNavigate={setActiveSection} 
+                highlightProductId={highlightProductId}
+              />
+            )}
 
-              {activeSection === 'pet_ads' && (
-                <PetAds 
-                  currentUser={currentUser} 
-                  onNavigate={(section, highlightId) => {
-                    if (highlightId) {
-                      setHighlightPostId(highlightId);
-                    }
-                    setActiveSection(section);
-                  }}
-                  highlightAdId={highlightAdId}
-                  initialType={initialPetType}
-                />
-              )}
+            {activeSection === 'pet_ads' && (
+              <PetAds 
+                currentUser={currentUser} 
+                onNavigate={(section, highlightId) => {
+                  if (highlightId) {
+                    setHighlightPostId(highlightId);
+                  }
+                  setActiveSection(section);
+                }}
+                highlightAdId={highlightAdId}
+                initialType={initialPetType}
+              />
+            )}
 
-              {activeSection === 'jobs' && (
-                <JobBoard 
-                  currentUser={currentUser} 
-                  highlightJobId={highlightJobId}
-                  highlightApplicationId={highlightApplicationId}
-                />
-              )}
+            {activeSection === 'jobs' && (
+              <JobBoard 
+                currentUser={currentUser} 
+                highlightJobId={highlightJobId}
+                highlightApplicationId={highlightApplicationId}
+              />
+            )}
 
-              {activeSection === 'livestock' && (
-                <LivestockManagement 
-                  currentUser={currentUser} 
-                  highlightFarmId={highlightFarmId}
-                  scannedAnimalRecordId={scannedAnimalRecordId}
-                  onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
-                />
-              )}
+            {activeSection === 'livestock' && (
+              <LivestockManagement 
+                currentUser={currentUser} 
+                highlightFarmId={highlightFarmId}
+                scannedAnimalRecordId={scannedAnimalRecordId}
+                onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
+              />
+            )}
 
-              {activeSection === 'profile' && (
-                <ProfilePage
-                  currentUser={currentUser}
-                  onUpdateUser={handleUpdateUserProfile}
-                  onDeleteSuccess={handleLogout}
-                />
-              )}
+            {activeSection === 'profile' && (
+              <ProfilePage
+                currentUser={currentUser}
+                onUpdateUser={handleUpdateUserProfile}
+                onDeleteSuccess={handleLogout}
+              />
+            )}
 
-              {activeSection === 'subscription' && (
-                <SubscriptionPortal
-                  currentUser={currentUser}
-                  onUpdateUser={handleUpdateUserProfile}
-                  onNavigateToSection={handleNavigate}
-                />
-              )}
+            {activeSection === 'subscription' && (
+              <SubscriptionPortal
+                currentUser={currentUser}
+                onUpdateUser={handleUpdateUserProfile}
+                onNavigateToSection={handleNavigate}
+              />
+            )}
 
-              {activeSection === 'admin' && currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
-                <AdminPanel currentUser={currentUser} />
-              )}
+            {activeSection === 'admin' && currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
+              <AdminPanel currentUser={currentUser} />
+            )}
 
-              {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (
-                <ClinicManagement 
-                  user={currentUser} 
-                  highlightAppointmentId={highlightAppointmentId}
-                  onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
-                />
-              )}
+            {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (
+              <ClinicManagement 
+                user={currentUser} 
+                highlightAppointmentId={highlightAppointmentId}
+                onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
+              />
+            )}
 
-              {activeSection === 'news' && (
-                <BlogSection currentUser={currentUser} />
-              )}
+            {activeSection === 'news' && (
+              <BlogSection currentUser={currentUser} />
+            )}
 
-              {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
-                <VeterinaryClinicalSuite 
-                  currentUser={currentUser}
-                  onNavigate={handleNavigate}
-                  initialTool={initialClinicalTool}
-                />
-              )}
+            {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
+              <VeterinaryClinicalSuite 
+                currentUser={currentUser}
+                onNavigate={handleNavigate}
+              />
+            )}
 
-              {activeSection === 'about' && (
-                <AboutUsPage onNavigate={handleNavigate} />
-              )}
+            {activeSection === 'about' && (
+              <AboutUsPage onNavigate={handleNavigate} />
+            )}
 
-              {activeSection === 'terms' && (
-                <TermsOfServicePage onNavigate={handleNavigate} />
-              )}
+            {activeSection === 'terms' && (
+              <TermsOfServicePage onNavigate={handleNavigate} />
+            )}
 
-              {activeSection === 'privacy' && (
-                <PrivacyPolicyPage onNavigate={handleNavigate} />
-              )}
+            {activeSection === 'privacy' && (
+              <PrivacyPolicyPage onNavigate={handleNavigate} />
+            )}
 
-              {activeSection === 'careers_safety' && (
-                <CareersSafetyProtocolPage onNavigate={handleNavigate} />
-              )}
+            {activeSection === 'contact' && (
+              <ContactSupportPage onNavigate={handleNavigate} />
+            )}
 
-              {activeSection === 'contact' && (
-                <ContactSupportPage onNavigate={handleNavigate} />
-              )}
-
-              {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'careers_safety'].includes(activeSection) && (
-                <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </Suspense>
+            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
+              <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* COMPLIANT GLOBAL FOOTER NAVIGATION */}
@@ -1140,34 +909,16 @@ export default function App() {
                   setToasts(prev => prev.filter(t => t.id !== toast.id));
                 }
               }}
-              className={`rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto cursor-pointer transition-colors ${
-                toast.type === 'broadcast'
-                  ? 'bg-amber-50/95 border-2 border-amber-400 border-b-[5px] border-b-amber-500 hover:bg-amber-100/90'
-                  : 'bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
-              }`}
+              className="bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] rounded-xl p-4 shadow-xl flex items-start gap-3 relative overflow-hidden text-[#3c3c3b] pointer-events-auto cursor-pointer hover:bg-[#fcf9f2] transition-colors"
             >
               <div className="text-xl filter drop-shadow select-none mt-0.5">
                 {toast.type === 'like' && '❤️'}
                 {toast.type === 'comment' && '💬'}
                 {toast.type === 'apply' && '📄'}
                 {toast.type === 'status_change' && '✨'}
-                {toast.type === 'broadcast' && '📢'}
-                {(toast.type === 'chat_message' || toast.type === 'chat') && '🩺'}
               </div>
               <div className="flex-1 pr-6 text-left">
-                <span className={`text-[9px] tracking-wider uppercase font-black block leading-none ${
-                  toast.type === 'broadcast' 
-                    ? 'text-amber-800' 
-                    : (toast.type === 'chat_message' || toast.type === 'chat')
-                    ? 'text-emerald-800'
-                    : 'text-[#5a5a40]'
-                }`}>
-                  {toast.type === 'broadcast' 
-                    ? '🚨 ADMIN BROADCAST ANNOUNCEMENT (CLICK TO VIEW)' 
-                    : (toast.type === 'chat_message' || toast.type === 'chat')
-                    ? '💬 CLINICAL CONSULTATION MESSAGE (CLICK TO REPLY)'
-                    : 'ACTIVITY BULLETIN (CLICK TO VIEW)'}
-                </span>
+                <span className="text-[9px] tracking-wider uppercase font-black text-[#5a5a40] block leading-none">ACTIVITY BULLETIN (CLICK to view)</span>
                 <p className="text-[11px] text-[#3c3c3b] font-bold leading-tight mt-1.5">
                   {toast.message}
                 </p>
@@ -1206,78 +957,44 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <Suspense fallback={null}>
-        <AnimatePresence>
-          {isAboutUsOpen && (
-            <AboutUsDirectory
-              isOpen={isAboutUsOpen}
-              onClose={() => setIsAboutUsOpen(false)}
-              onNavigate={handleNavigate}
-              isLoggedIn={true}
-            />
-          )}
-        </AnimatePresence>
+      {/* GLOBAL FLOATING WHATSAPP BUTTON */}
+      <div className="fixed bottom-6 left-6 z-[9999]">
+        <a
+          href="https://wa.me/923001216272?text=Hello%20VetAxis!%20I%20have%20a%20query%20about%20the%20platform."
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group flex items-center gap-2 bg-[#128c7e] hover:bg-[#075e54] text-white text-xs font-bold px-4 py-3 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-105 select-none border border-emerald-500/20"
+          id="global-whatsapp-float"
+        >
+          {/* Pulsing Dot Indicator */}
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
 
-        {/* GLOBAL CLINICAL MESSENGER MODAL (15-Day Auto Disappearing Conversations) */}
-        <AnimatePresence>
-          {isMessengerOpen && currentUser && (
-            <MessengerModal
-              isOpen={isMessengerOpen}
-              onClose={() => setIsMessengerOpen(false)}
-              currentUser={currentUser}
-              onOpenChatWith={(targetUser) => {
-                setGlobalChatRecipient(targetUser);
-              }}
-              onExploreClinicians={() => handleNavigate('explore')}
-            />
-          )}
-        </AnimatePresence>
+          {/* Official WhatsApp SVG Path */}
+          <svg
+            className="w-4 h-4 fill-current text-white group-hover:rotate-12 transition-transform duration-300"
+            viewBox="0 0 448 512"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7 .9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z" />
+          </svg>
 
-        {/* GLOBAL DIRECT CONSULTATION CHAT MODAL */}
-        <AnimatePresence>
-          {globalChatRecipient && currentUser && (
-            <ChatModal
-              isOpen={!!globalChatRecipient}
-              onClose={() => setGlobalChatRecipient(null)}
-              recipient={globalChatRecipient}
-              currentUser={currentUser}
-            />
-          )}
-        </AnimatePresence>
+          <span className="font-sans text-[10px] uppercase tracking-wider font-extrabold">Contact with us</span>
+        </a>
+      </div>
 
-        {/* GLOBAL GUEST AUTHENTICATION MODAL */}
-        <AnimatePresence>
-          {authModalOpen && (
-            <div 
-              className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
-              onClick={() => setAuthModalOpen(false)}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                className="w-full max-w-lg my-8 relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <AuthScreen
-                  isModal={true}
-                  reasonMessage={authModalReason}
-                  onClose={() => setAuthModalOpen(false)}
-                  onAuthSuccess={(user) => {
-                    handleAuthSuccess(user);
-                    setAuthModalOpen(false);
-                  }}
-                  authService={AuthService}
-                  onOpenAboutUs={() => {
-                    setAuthModalOpen(false);
-                    setIsAboutUsOpen(true);
-                  }}
-                />
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-      </Suspense>
+      <AnimatePresence>
+        {isAboutUsOpen && (
+          <AboutUsDirectory
+            isOpen={isAboutUsOpen}
+            onClose={() => setIsAboutUsOpen(false)}
+            onNavigate={handleNavigate}
+            isLoggedIn={true}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   );

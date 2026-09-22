@@ -165,9 +165,9 @@
         "userId": { "type": "string", "description": "The recipient's user UID" },
         "senderId": { "type": "string", "description": "The initiator's user UID" },
         "senderName": { "type": "string", "description": "Display name of the initiator" },
-        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change", "farm_assign", "farm_response", "farm_reminder", "appointment_booked", "appointment_action", "broadcast", "chat_message"], "description": "Type of event" },
-        "targetId": { "type": "string", "description": "ID of post or job or application or farm or chat" },
-        "targetType": { "type": "string", "enum": ["post", "job", "application", "farm", "appointment", "broadcast", "chat"], "description": "Target entity category" },
+        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change", "farm_assign", "farm_response", "farm_reminder"], "description": "Type of event" },
+        "targetId": { "type": "string", "description": "ID of post or job or application or farm" },
+        "targetType": { "type": "string", "enum": ["post", "job", "application", "farm"], "description": "Target entity category" },
         "message": { "type": "string", "description": "Display text of the alert" },
         "read": { "type": "boolean", "description": "Whether the user read the notification" },
         "createdAt": { "type": "number", "description": "Event timestamp" }
@@ -298,44 +298,6 @@
       },
       "required": ["farmId", "animalId", "createdAt"]
     },
-    "PushSubscription": {
-      "title": "PushSubscription",
-      "description": "Web Push API browser and mobile subscription endpoints for real-time push notifications",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "endpoint": { "type": "string" },
-        "keys": {
-          "type": "object",
-          "properties": {
-            "p256dh": { "type": "string" },
-            "auth": { "type": "string" }
-          }
-        },
-        "userId": { "type": "string" },
-        "userRole": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "updatedAt": { "type": "number" }
-      },
-      "required": ["endpoint", "keys", "createdAt"]
-    },
-    "BroadcastNotification": {
-      "title": "BroadcastNotification",
-      "description": "Global administrator broadcast announcement pushed to all users",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "type": { "type": "string", "enum": ["announcement", "alert", "update", "promo"] },
-        "priority": { "type": "string", "enum": ["normal", "high", "urgent"] },
-        "actionUrl": { "type": "string" },
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["title", "message", "type", "priority", "createdAt"]
-    },
     "HerdLevelMasterRecord": {
       "title": "HerdLevelMasterRecord",
       "description": "Comprehensive herd-level registry stats, demographics and inventory",
@@ -348,47 +310,6 @@
         "createdAt": { "type": "number" }
       },
       "required": ["farmId", "farmName", "totalHerdSize", "createdAt"]
-    },
-    "ChatConversation": {
-      "title": "ChatConversation",
-      "description": "Direct consultation session between pet owners, clients, and veterinary professionals",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "participants": { "type": "array" },
-        "participantDetails": { "type": "object" },
-        "lastMessageText": { "type": "string" },
-        "lastMessageTimestamp": { "type": "number" },
-        "lastSenderId": { "type": "string" },
-        "unreadCount": { "type": "object" },
-        "deletedBy": { "type": "array" },
-        "createdAt": { "type": "number" },
-        "updatedAt": { "type": "number" }
-      },
-      "required": ["id", "participants", "createdAt", "updatedAt"]
-    },
-    "ChatMessage": {
-      "title": "ChatMessage",
-      "description": "Individual consultation message with 15-day auto-disappearing expiration timer",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "conversationId": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "senderRole": { "type": "string" },
-        "senderProfilePic": { "type": "string" },
-        "receiverId": { "type": "string" },
-        "receiverName": { "type": "string" },
-        "receiverRole": { "type": "string" },
-        "text": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "expiresAt": { "type": "number" },
-        "delivered": { "type": "boolean" },
-        "read": { "type": "boolean" },
-        "readAt": { "type": "number" }
-      },
-      "required": ["id", "conversationId", "senderId", "receiverId", "text", "createdAt", "expiresAt"]
     }
   },
   "firestore": {
@@ -399,14 +320,6 @@
     "/users/{userId}/reviews/{reviewId}": {
       "schema": "Review",
       "description": "Feedback reviews left for a specific doctor, clinic, or assistant"
-    },
-    "/chat_conversations/{conversationId}": {
-      "schema": "ChatConversation",
-      "description": "Active direct consultation threads between practitioners and clients"
-    },
-    "/chat_messages/{messageId}": {
-      "schema": "ChatMessage",
-      "description": "Direct consultation messages with 15-day automatic privacy expiration"
     },
     "/pet_ads/{adId}": {
       "schema": "PetAd",
