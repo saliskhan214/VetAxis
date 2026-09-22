@@ -1,6 +1,7 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, CommunityPost, GeoLocation } from '../types';
 import { CommunityService, NotificationService, LocationService, secureGetItem } from '../lib/storage';
+import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
 import VeterinaryNewsBrief from './VeterinaryNewsBrief';
 import { BlogSection } from './BlogSection';
@@ -45,8 +46,13 @@ interface CommunityFeedProps {
 }
 
 export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedProps) {
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [posts, setPosts] = useState<CommunityPost[]>(() => {
+    return PrefetchService.getCachedCommunityPosts() || [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = PrefetchService.getCachedCommunityPosts();
+    return !cached || cached.length === 0;
+  });
   const [activeFilter, setActiveFilter] = useState<string>('all');
   
   const [cityFilter, setCityFilter] = useState<string>(() => {
@@ -118,11 +124,17 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const isVerifiedPractitioner = (currentUser.role === 'doctor' || currentUser.role === 'clinic') &&
     (currentUser.subscriptionTier === 'Silver' || currentUser.subscriptionTier === 'Gold' || currentUser.subscriptionTier === 'Platinum');
 
-  // Load posts
+  // Load posts with predictive pre-fetch instant cache + live revalidation
   const loadPosts = async () => {
-    setLoading(true);
+    const cached = PrefetchService.getCachedCommunityPosts();
+    if (cached && cached.length > 0) {
+      setPosts(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const data = await CommunityService.fetchPosts();
+      const data = await PrefetchService.prefetchCommunity(true);
       setPosts(data);
     } catch (err) {
       console.error('Failed to load posts', err);
@@ -130,6 +142,17 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Subscribe to live predictive cache updates
+    const unsub = PrefetchService.subscribe('community', (data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setPosts(data);
+        setLoading(false);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const handleLocatePost = (postId: string) => {
     const post = posts.find((p) => p.id === postId);

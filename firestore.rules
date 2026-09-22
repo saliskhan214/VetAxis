@@ -625,5 +625,25 @@ service cloud.firestore {
         (existing().authorId == request.auth.uid)
       );
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // MESSENGER CONVERSATIONS & CHAT MESSAGES RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /conversations/{conversationId} {
+      allow get: if isSignedIn() && (resource == null || request.auth.uid in resource.data.participantIds || isAdmin());
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && (request.auth.uid in incoming().participantIds || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid in existing().participantIds || request.auth.uid in incoming().participantIds || isAdmin());
+      allow delete: if isSignedIn() && (request.auth.uid in existing().participantIds || isAdmin());
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn() && incoming().senderId == request.auth.uid;
+        allow update: if isSignedIn() && (existing().senderId == request.auth.uid || existing().receiverId == request.auth.uid || isAdmin());
+        allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || existing().receiverId == request.auth.uid || isAdmin());
+      }
+    }
   }
 }
+

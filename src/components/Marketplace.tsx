@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { UserProfile, Product } from '../types';
 import { MarketplaceService } from '../lib/storage';
+import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -12,9 +13,14 @@ interface MarketplaceProps {
 }
 
 export function Marketplace({ currentUser, onNavigate, highlightProductId }: MarketplaceProps) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => {
+    return PrefetchService.getCachedProducts() || [];
+  });
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = PrefetchService.getCachedProducts();
+    return !cached || cached.length === 0;
+  });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(true);
@@ -35,9 +41,15 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadProducts = async () => {
-    setLoading(true);
+    const cached = PrefetchService.getCachedProducts();
+    if (cached && cached.length > 0) {
+      setProducts(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const data = await MarketplaceService.fetchProducts();
+      const data = await PrefetchService.prefetchMarketplace(true);
       setProducts(data);
     } catch (err) {
       console.error('Failed to load marketplace products', err);
@@ -52,6 +64,15 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
     if (currentUser.phone) {
       setProdWhatsapp(currentUser.phone);
     }
+
+    // Subscribe to live predictive updates
+    const unsub = PrefetchService.subscribe('marketplace', (data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setProducts(data);
+        setLoading(false);
+      }
+    });
+    return () => unsub();
   }, []);
 
   useEffect(() => {

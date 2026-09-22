@@ -677,6 +677,48 @@ export interface BlogArticle {
   views: number;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// MESSENGER TYPES
+// ─────────────────────────────────────────────────────────────────
+export type MessageStatus = 'sent' | 'delivered' | 'seen';
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole?: UserRole;
+  senderPic?: string;
+  receiverId: string;
+  text: string;
+  timestamp: number; // in milliseconds
+  status: MessageStatus;
+  createdAt: number;
+}
+
+export interface ConversationParticipant {
+  uid: string;
+  name: string;
+  email?: string;
+  role: UserRole;
+  profilePic?: string;
+  isOnline?: boolean;
+  lastSeen?: number;
+}
+
+export interface Conversation {
+  id: string;
+  participantIds: string[];
+  participants: Record<string, ConversationParticipant>;
+  lastMessage?: string;
+  lastMessageTime?: number;
+  lastSenderId?: string;
+  unreadCounts: Record<string, number>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+
 
 
 

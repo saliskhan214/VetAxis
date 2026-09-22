@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UserProfile, VetNotification } from '../types';
 import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { MessengerService } from '../lib/messengerService';
+import { PrefetchService } from '../lib/prefetchService';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -32,6 +34,15 @@ export function Navbar({
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [lockPopupMessage, setLockPopupMessage] = useState<string | null>(null);
   const [timerId, setTimerId] = useState<any>(null);
+  const [unreadMessages, setUnreadMessages] = useState<number>(0);
+
+  useEffect(() => {
+    if (!user.uid) return;
+    const unsub = MessengerService.subscribeToTotalUnreadCount(user.uid, (cnt) => {
+      setUnreadMessages(cnt);
+    });
+    return () => unsub();
+  }, [user.uid]);
 
   const isClinicSubscribed = user.subscriptionTier === 'Silver' || user.subscriptionTier === 'Gold' || user.subscriptionTier === 'Platinum';
 
@@ -61,6 +72,7 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
+    { id: 'messenger', label: 'Messenger', icon: '💬' },
     { id: 'clinical_tools', label: 'Vet & Pet Calculators', icon: '🧮' },
     { id: 'clinic_management', label: 'Clinic Management', icon: '🏥' },
     { id: 'livestock', label: 'Farm Management', icon: '🐄' },
@@ -80,6 +92,8 @@ export function Navbar({
           <motion.button
             whileHover={{ scale: 1.05, y: -1 }}
             whileTap={{ scale: 0.95 }}
+            onMouseEnter={() => PrefetchService.prefetchHome()}
+            onTouchStart={() => PrefetchService.prefetchHome()}
             onClick={() => onNavigate('explore')}
             className="flex items-center gap-2 font-serif text-2xl font-bold text-[#5a5a40] bg-transparent border-none cursor-pointer select-none font-display"
           >
@@ -218,39 +232,58 @@ export function Navbar({
             </AnimatePresence>
           </div>
 
-          {/* Unified Profile & Menu Trigger Button */}
+          {/* Top Bar Live Messenger Button near Notification Button */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setIsSidebarOpen(true)}
-            className={`flex items-center justify-center p-0.5 rounded-full border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
-              isSidebarOpen 
-                ? 'border-[#5a5a40] border-b-[#3e3e2b]' 
-                : 'border-[#e3dec9] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
+            onMouseEnter={() => PrefetchService.prefetchHome()}
+            onClick={() => onNavigate('messenger')}
+            className={`relative flex items-center justify-center p-2.5 rounded-xl border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
+              activeSection === 'messenger'
+                ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[#3e3e2b]'
+                : 'bg-white text-[#5a5a40] border-[#e3dec9] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
             }`}
-            title="Open Menu & Account Options"
+            aria-label="Messenger"
+            title="VetAxis Live Messenger"
           >
-            {user.profilePic && user.profilePic !== 'default' ? (
-              <img
-                src={user.profilePic}
-                alt={user.name}
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 shadow-xs ${
-                  user.subscriptionTier === 'Platinum' ? 'border-indigo-500' :
-                  user.subscriptionTier === 'Gold' ? 'border-amber-400' :
-                  user.subscriptionTier === 'Silver' ? 'border-slate-400' :
-                  user.isVerified ? 'border-amber-400' : 'border-white'
-                }`}
-              />
-            ) : (
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-black flex items-center justify-center text-xs shadow-xs ${
-                user.subscriptionTier === 'Platinum' ? 'bg-indigo-600 text-white' :
-                user.subscriptionTier === 'Gold' ? 'bg-amber-500 text-[#3c3c3b]' :
-                user.subscriptionTier === 'Silver' ? 'bg-slate-500 text-white' :
-                user.isVerified ? 'bg-amber-500 text-[#3c3c3b]' : 'bg-[#5a5a40] text-white'
-              }`}>
-                {initials}
-              </div>
+            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+            {unreadMessages > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-black text-white border border-white animate-bounce shadow">
+                {unreadMessages}
+              </span>
             )}
+          </motion.button>
+
+          {/* Three Lines Menu Button */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onMouseEnter={() => {
+              PrefetchService.prefetchHome();
+            }}
+            onTouchStart={() => {
+              PrefetchService.prefetchHome();
+            }}
+            onClick={() => {
+              setIsSidebarOpen(true);
+              PrefetchService.prefetchHome();
+              PrefetchService.prefetchCommunity();
+              PrefetchService.prefetchMarketplace();
+              PrefetchService.prefetchPetAds();
+              PrefetchService.prefetchJobs();
+              if (user?.uid) {
+                PrefetchService.prefetchLivestock(user.uid);
+              }
+            }}
+            className={`flex items-center justify-center p-2.5 rounded-xl border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
+              isSidebarOpen 
+                ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[#3e3e2b]' 
+                : 'bg-white text-[#5a5a40] border-[#e3dec9] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
+            }`}
+            title="Open Menu"
+            aria-label="Open Navigation Menu"
+          >
+            <Menu className="w-5 h-5" />
           </motion.button>
         </div>
       </nav>
@@ -329,6 +362,9 @@ export function Navbar({
                         <motion.button
                           key={item.id}
                           whileTap={{ scale: 0.98 }}
+                          onMouseEnter={() => PrefetchService.prefetchOnIntent(item.id, user.uid)}
+                          onTouchStart={() => PrefetchService.prefetchOnIntent(item.id, user.uid)}
+                          onFocus={() => PrefetchService.prefetchOnIntent(item.id, user.uid)}
                           onClick={() => {
                             if (isLocked) {
                               triggerLockPopup();
@@ -346,6 +382,11 @@ export function Navbar({
                             <span className="text-lg">{item.icon}</span>
                             <span>{item.label}</span>
                           </div>
+                          {item.id === 'messenger' && unreadMessages > 0 && (
+                            <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-black flex items-center justify-center text-[10px] shadow-xs">
+                              {unreadMessages}
+                            </span>
+                          )}
                           {isLocked && (
                             <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-lg font-black flex items-center gap-1 uppercase tracking-wider text-[8px]">
                               🔒 Lock

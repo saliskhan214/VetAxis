@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent, useRef } from 'react';
 import { UserProfile, PetAd } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
+import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X } from 'lucide-react';
 import { AdContainer } from './AdContainer';
@@ -13,9 +14,14 @@ interface PetAdsProps {
 }
 
 export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: PetAdsProps) {
-  const [ads, setAds] = useState<PetAd[]>([]);
+  const [ads, setAds] = useState<PetAd[]>(() => {
+    return PrefetchService.getCachedPetAds() || [];
+  });
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = PrefetchService.getCachedPetAds();
+    return !cached || cached.length === 0;
+  });
   const [speciesFilter, setSpeciesFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>(() => {
     if (initialType === 'adoption' || initialType === 'sale') return initialType;
@@ -116,9 +122,15 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   }, [visibleBoostedPosts.length, isHovered]);
 
   const loadAds = async () => {
-    setLoading(true);
+    const cached = PrefetchService.getCachedPetAds();
+    if (cached && cached.length > 0) {
+      setAds(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const data = await PetAdsService.fetchAds();
+      const data = await PrefetchService.prefetchPetAds(true);
       setAds(data);
     } catch (err) {
       console.error('Failed to load pet ads', err);
@@ -126,6 +138,17 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Subscribe to live predictive updates
+    const unsub = PrefetchService.subscribe('pet_ads', (data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setAds(data);
+        setLoading(false);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const loadBoostedEmergencyPosts = async () => {
     try {

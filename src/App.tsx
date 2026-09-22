@@ -27,8 +27,10 @@ import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
 import { BlogSection } from './components/BlogSection';
 import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage } from './components/LegalAndAbout';
 import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
+import { Messenger } from './components/Messenger';
 import { Footer } from './components/Footer';
 import PageNotFound from './components/PageNotFound';
+import { PrefetchService } from './lib/prefetchService';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -69,6 +71,12 @@ export default function App() {
   const [initialPetType, setInitialPetType] = useState<string | null>(null);
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
+  const [messengerTargetUser, setMessengerTargetUser] = useState<UserProfile | null>(null);
+
+  const handleStartChatWith = (targetUser: UserProfile) => {
+    setMessengerTargetUser(targetUser);
+    setActiveSection('messenger');
+  };
 
   // Unified dynamic QR code & SEO deep-linking scanner inside app boot
   useEffect(() => {
@@ -172,6 +180,20 @@ export default function App() {
       document.title = titles[activeSection];
     }
   }, [activeSection]);
+
+  // Predictive Movement & Pre-fetching Engine initialization
+  useEffect(() => {
+    PrefetchService.warmupIdle(currentUser?.uid);
+  }, [currentUser?.uid]);
+
+  // Predictive prefetch on active section transition
+  useEffect(() => {
+    if (activeSection === 'explore') {
+      PrefetchService.prefetchHome();
+    } else {
+      PrefetchService.prefetchOnIntent(activeSection, currentUser?.uid);
+    }
+  }, [activeSection, currentUser?.uid]);
 
   // Advanced Global Loading State
   const [isLoadingSystem, setIsLoadingSystem] = useState<boolean>(false);
@@ -780,6 +802,16 @@ export default function App() {
                 highlightDoctorId={highlightDoctorId}
                 initialCity={initialCity}
                 initialFilter={initialFilter}
+                onStartChat={handleStartChatWith}
+              />
+            )}
+
+            {activeSection === 'messenger' && (
+              <Messenger
+                currentUser={currentUser}
+                initialTargetUser={messengerTargetUser}
+                onClearInitialTarget={() => setMessengerTargetUser(null)}
+                onNavigateHome={() => setActiveSection('explore')}
               />
             )}
 
@@ -884,7 +916,7 @@ export default function App() {
               <ContactSupportPage onNavigate={handleNavigate} />
             )}
 
-            {!['explore', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
+            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>

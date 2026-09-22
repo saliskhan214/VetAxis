@@ -2,6 +2,7 @@ import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
 import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
+import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
@@ -17,6 +18,7 @@ interface ExploreFeedProps {
   highlightDoctorId?: string | null;
   initialCity?: string | null;
   initialFilter?: string | null;
+  onStartChat?: (profile: UserProfile) => void;
 }
 
 const WELCOME_BANNER_SLIDE = {
@@ -56,7 +58,8 @@ export function ExploreFeed({
   highlightClinicId,
   highlightDoctorId,
   initialCity,
-  initialFilter
+  initialFilter,
+  onStartChat
 }: ExploreFeedProps) {
   const [activeTab, setActiveTab] = useState<UserRole>(() => {
     if (highlightClinicId) return 'clinic';
@@ -64,8 +67,18 @@ export function ExploreFeed({
     return 'doctor';
   });
   const [exploreMenuOpen, setExploreMenuOpen] = useState<boolean>(false);
-  const [professionals, setProfessionals] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [professionals, setProfessionals] = useState<UserProfile[]>(() => {
+    const cached = PrefetchService.getCachedProfessionals(
+      highlightClinicId ? 'clinic' : highlightDoctorId ? 'doctor' : 'doctor'
+    );
+    return cached || [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = PrefetchService.getCachedProfessionals(
+      highlightClinicId ? 'clinic' : highlightDoctorId ? 'doctor' : 'doctor'
+    );
+    return !cached || cached.length === 0;
+  });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [homeVisitOnly, setHomeVisitOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SORT_TYPES>(SORT_TYPES.HIGHEST);
@@ -585,11 +598,18 @@ export function ExploreFeed({
     }
   }, [activeSlides.length, currentSlideIdx]);
 
-  // Load specialists on mount or tab change
+  // Load specialists on mount or tab change with predictive pre-fetch instant cache + live background update
   const loadData = async () => {
-    setLoading(true);
+    const cached = PrefetchService.getCachedProfessionals(activeTab as any);
+    if (cached && cached.length > 0) {
+      setProfessionals(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
-      const data = await ExploreService.fetchProfessionals(activeTab as any);
+      const data = await PrefetchService.prefetchProfessionals(activeTab as any, true);
       setProfessionals(data);
     } catch (err) {
       console.error('Failed to load specialists', err);
@@ -600,6 +620,16 @@ export function ExploreFeed({
 
   useEffect(() => {
     loadData();
+
+    // Subscribe to live predictive cache updates for real-time reactivity
+    const unsub = PrefetchService.subscribe(`professionals_${activeTab}`, (data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setProfessionals(data);
+        setLoading(false);
+      }
+    });
+
+    return () => unsub();
   }, [activeTab]);
 
   // Deep linking initial state handlers
@@ -1943,25 +1973,34 @@ export function ExploreFeed({
 
                 {/* Tactical Communications Strip */}
                 <div className="flex flex-wrap gap-3 mb-6 py-4.5 border-y border-[#f4f1e9]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = selectedProfile;
+                      setSelectedProfile(null);
+                      if (onStartChat) {
+                        onStartChat(target);
+                      } else if (onNavigate) {
+                        onNavigate('messenger');
+                      }
+                    }}
+                    className="btn-tactile-3d-primary py-2 px-5 text-xs inline-flex items-center gap-2 cursor-pointer font-bold"
+                  >
+                    <MessageSquare className="w-4 h-4 text-white" />
+                    <span>Send Message</span>
+                  </button>
+
                   {selectedProfile.phone && (
-                    <>
-                      <a
-                        href={`tel:${selectedProfile.phone}`}
-                        className="btn-tactile-3d-primary py-2 px-5 text-xs inline-flex items-center gap-2"
-                      >
-                        📞 Call Professional
-                      </a>
-                      <a
-                        href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                          `Hi ${selectedProfile.name}, I discovered your clinic portfolio profile on VetAxis with premium clinical registries and would like to schedule an evaluation.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
-                      >
-                        💬 WhatsApp Consult
-                      </a>
-                    </>
+                    <a
+                      href={`https://wa.me/${selectedProfile.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        `Hi ${selectedProfile.name}, I discovered your clinic portfolio profile on VetAxis with premium clinical registries and would like to schedule an evaluation.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 bg-[#a0522d] border-[#7d3e20]/60 border-b-[#733517] text-white hover:bg-[#b05d36]"
+                    >
+                      💬 WhatsApp Consult
+                    </a>
                   )}
 
                   {selectedProfile.role === 'clinic' && selectedProfile.location?.lat && selectedProfile.location?.lng && (

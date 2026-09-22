@@ -134,6 +134,14 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
               </li>
               <li>
                 <button
+                  onClick={(e) => handleNavClick('messenger', e)}
+                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'messenger' ? 'font-bold text-[#5a5a40]' : ''}`}
+                >
+                  💬 Live Messenger
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={(e) => handleNavClick('community', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'community' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { motion, useMotionValue, useTransform, useSpring } from 'motion/react';
-import { ChevronRight, Phone, MessageSquare, Award, Compass, Sparkles, Star } from 'lucide-react';
+import { ChevronRight, Phone, Award, Compass, Sparkles, Star } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface ThreeDPremiumCardProps {
@@ -26,7 +26,7 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
   profile,
   onClick,
   distance,
-  initials
+  initials,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
@@ -332,14 +332,16 @@ export const ThreeDPremiumCard: React.FC<ThreeDPremiumCardProps> = ({
               <div />
             )}
 
-            <span className={`text-xs font-black flex items-center gap-1 transition-transform ${hovered ? 'translate-x-1' : ''} ${
-              tier === 'Gold' ? 'text-amber-950' :
-              tier === 'Platinum' ? 'text-neutral-100' :
-              'text-[#5a5a40]'
-            }`}>
-              <span>View Profile</span>
-              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-black flex items-center gap-1 transition-transform ${hovered ? 'translate-x-1' : ''} ${
+                tier === 'Gold' ? 'text-amber-950' :
+                tier === 'Platinum' ? 'text-neutral-100' :
+                'text-[#5a5a40]'
+              }`}>
+                <span>View Profile</span>
+                <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+              </span>
+            </div>
           </div>
         </div>
       </motion.div>

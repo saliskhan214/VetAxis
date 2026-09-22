@@ -310,6 +310,38 @@
         "createdAt": { "type": "number" }
       },
       "required": ["farmId", "farmName", "totalHerdSize", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A direct consultation conversation between a pet owner/farmer and veterinary doctor/clinic",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participantIds": { "type": "array" },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "number" },
+        "lastSenderId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["participantIds", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "An instant chat message within a conversation with 15-day retention and sent/delivered/seen ticks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "seen"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["conversationId", "senderId", "receiverId", "text", "timestamp", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -372,6 +404,14 @@
     "/livestock_herd_records/{recordId}": {
       "schema": "HerdLevelMasterRecord",
       "description": "Comprehensive monthly/yearly herd registers and inventories"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct clinical consultations between users and veterinary providers"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Individual consultation messages retained for 15 days with live single/double/blue ticks"
     }
   }
 }

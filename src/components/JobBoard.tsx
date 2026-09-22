@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { UserProfile, JobPost, JobApplication, UserRole } from '../types';
 import { JobBoardService, NotificationService } from '../lib/storage';
+import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Briefcase, Search, MapPin, DollarSign, Calendar, Clock, UserCheck, 
@@ -15,9 +16,14 @@ interface JobBoardProps {
 }
 
 export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }: JobBoardProps) {
-  const [jobs, setJobs] = useState<JobPost[]>([]);
+  const [jobs, setJobs] = useState<JobPost[]>(() => {
+    return PrefetchService.getCachedJobs() || [];
+  });
   const [applications, setApplications] = useState<JobApplication[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = PrefetchService.getCachedJobs();
+    return !cached || cached.length === 0;
+  });
   const [loadingApps, setLoadingApps] = useState<boolean>(false);
   const [loadingAllApps, setLoadingAllApps] = useState<boolean>(false);
 
@@ -149,9 +155,15 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   };
 
   const loadJobs = async () => {
-    setLoading(true);
+    const cached = PrefetchService.getCachedJobs();
+    if (cached && cached.length > 0) {
+      setJobs(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const allJobs = await JobBoardService.fetchJobs();
+      const allJobs = await PrefetchService.prefetchJobs(true);
       setJobs(allJobs);
     } catch (err) {
       console.error('Failed to fetch job postings:', err);
@@ -159,6 +171,17 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Subscribe to live predictive updates
+    const unsub = PrefetchService.subscribe('jobs', (data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setJobs(data);
+        setLoading(false);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const loadAllApplications = async () => {
     setLoadingAllApps(true);

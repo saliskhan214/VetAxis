@@ -28,6 +28,7 @@ import {
 import { LivestockService, addDays, addMonths } from '../lib/livestockService';
 import { NotificationService } from '../lib/storage';
 import { ExploreService, PromotionalAdsService } from '../lib/storage';
+import { PrefetchService } from '../lib/prefetchService';
 import {
   UserProfile,
   LivestockFarm,
@@ -58,7 +59,9 @@ export default function LivestockManagement({
   onClearScannedAnimal
 }: LivestockManagementProps) {
   // Services & list state
-  const [farms, setFarms] = useState<LivestockFarm[]>([]);
+  const [farms, setFarms] = useState<LivestockFarm[]>(() => {
+    return PrefetchService.getCachedFarms(currentUser.uid) || [];
+  });
   const [selectedFarm, setSelectedFarm] = useState<LivestockFarm | null>(null);
   const [animals, setAnimals] = useState<LivestockAnimal[]>([]);
   const [batches, setBatches] = useState<LivestockBatch[]>([]);
@@ -67,7 +70,10 @@ export default function LivestockManagement({
 
   // UI state navigation within Livestock tab
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'analytics' | 'animals' | 'batches' | 'tasks' | 'team'>('dashboard');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    const cached = PrefetchService.getCachedFarms(currentUser.uid);
+    return !cached || cached.length === 0;
+  });
 
   // Search clinicians & assign states
   const [vetSearchQuery, setVetSearchQuery] = useState('');
@@ -519,10 +525,17 @@ export default function LivestockManagement({
   };
 
   const loadGlobalData = async () => {
-    setIsLoading(true);
+    const cached = PrefetchService.getCachedFarms(currentUser.uid);
+    if (cached && cached.length > 0) {
+      setFarms(cached);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
     try {
       // 1. Fetch farms isolated strictly to current user's UID (ownerId / authorizedUsers / invited manager)
-      const farmList = await LivestockService.fetchFarms(currentUser.uid);
+      const farmList = await PrefetchService.prefetchLivestock(currentUser.uid, true);
       const userFarms = farmList.filter(f =>
         f.ownerId === currentUser.uid ||
         f.ownerUid === currentUser.uid ||
@@ -532,6 +545,7 @@ export default function LivestockManagement({
         (f.team && Array.isArray(f.team) && f.team.some(member => member.uid === currentUser.uid))
       );
       setFarms(userFarms);
+      PrefetchService.setFarmsCache(userFarms, currentUser.uid);
 
       // 2. Load potential clinicians
       const docs = await ExploreService.fetchProfessionals('doctor');
