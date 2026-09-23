@@ -27,14 +27,16 @@ import {
   Clock,
   MapPin,
   DollarSign,
-  FileText
+  FileText,
+  Bell
 } from 'lucide-react';
+import { AdminBroadcastManager } from './AdminBroadcastManager';
 
 interface AdminPanelProps {
   currentUser: UserProfile;
 }
 
-type AdminTab = 'users' | 'farms' | 'payments' | 'ads' | 'jobs';
+type AdminTab = 'users' | 'farms' | 'payments' | 'ads' | 'jobs' | 'broadcast';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -794,6 +796,17 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
               {stats.pendingAdsCount}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab('broadcast')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all cursor-pointer relative ${
+            activeTab === 'broadcast'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+          }`}
+        >
+          <Bell className="w-4 h-4 text-amber-300" />
+          Broadcast to Users
         </button>
       </div>
 
@@ -1661,8 +1674,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
       )}
 
       {/* ───────────────────────────────────────────────────────────────── */}
-      {/* MODAL 1: ROLE MODIFICATION & DEMOTION DIALOG */}
+      {/* TAB 6: BROADCAST NOTIFICATIONS TO ALL USERS & BROWSER */}
       {/* ───────────────────────────────────────────────────────────────── */}
+      {activeTab === 'broadcast' && (
+        <AdminBroadcastManager
+          currentUser={currentUser}
+          users={users}
+          onShowNotification={showNotification}
+        />
+      )}
       {roleModalUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-stone-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">

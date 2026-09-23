@@ -200,11 +200,29 @@ export interface VetNotification {
   userId: string;
   senderId: string;
   senderName: string;
-  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action';
+  type: 'like' | 'comment' | 'apply' | 'status_change' | 'farm_assign' | 'farm_response' | 'farm_reminder' | 'appointment_booked' | 'appointment_action' | 'admin_broadcast';
   targetId: string;
-  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment';
+  targetType: 'post' | 'job' | 'application' | 'farm' | 'appointment' | 'broadcast' | 'announcement';
+  title?: string;
   message: string;
   read: boolean;
+  createdAt: number;
+  priority?: 'normal' | 'urgent' | 'high';
+}
+
+export interface AdminBroadcast {
+  id: string;
+  adminUid: string;
+  adminName: string;
+  adminEmail: string;
+  title: string;
+  message: string;
+  category: 'announcement' | 'emergency' | 'maintenance' | 'update' | 'advisory';
+  targetAudience: 'all' | 'doctor' | 'clinic' | 'assistant' | 'user';
+  priority: 'normal' | 'urgent';
+  recipientCount: number;
+  sendInApp: boolean;
+  sendBrowser: boolean;
   createdAt: number;
 }
 

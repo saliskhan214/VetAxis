@@ -342,9 +342,34 @@
         "createdAt": { "type": "number" }
       },
       "required": ["conversationId", "senderId", "receiverId", "text", "timestamp", "status", "createdAt"]
+    },
+    "AdminBroadcast": {
+      "title": "AdminBroadcast",
+      "description": "System-wide broadcast notification sent by administrator to all users with in-app and browser notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminUid": { "type": "string" },
+        "adminName": { "type": "string" },
+        "adminEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "priority": { "type": "string" },
+        "recipientCount": { "type": "number" },
+        "sendInApp": { "type": "boolean" },
+        "sendBrowser": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "adminUid", "title", "message", "category", "targetAudience", "createdAt"]
     }
   },
   "firestore": {
+    "/admin_broadcasts/{broadcastId}": {
+      "schema": "AdminBroadcast",
+      "description": "System-wide broadcast notifications sent by platform administrators to all users"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "Subscribers' personal configuration, location, role details"

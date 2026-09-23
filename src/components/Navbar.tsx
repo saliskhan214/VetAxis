@@ -4,6 +4,7 @@ import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell,
 import { motion, AnimatePresence } from 'motion/react';
 import { MessengerService } from '../lib/messengerService';
 import { PrefetchService } from '../lib/prefetchService';
+import { BrowserNotificationService } from '../lib/browserNotification';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -35,6 +36,13 @@ export function Navbar({
   const [lockPopupMessage, setLockPopupMessage] = useState<string | null>(null);
   const [timerId, setTimerId] = useState<any>(null);
   const [unreadMessages, setUnreadMessages] = useState<number>(0);
+  const [browserPerm, setBrowserPerm] = useState<string>('default');
+
+  useEffect(() => {
+    if (BrowserNotificationService.isSupported()) {
+      setBrowserPerm(BrowserNotificationService.getPermission());
+    }
+  }, [isNotifOpen]);
 
   useEffect(() => {
     if (!user.uid) return;
@@ -171,6 +179,32 @@ export function Navbar({
                       )}
                     </div>
 
+                    {/* Browser Notifications Permission Banner */}
+                    {BrowserNotificationService.isSupported() && browserPerm !== 'granted' && (
+                      <div className="mb-2.5 p-2 rounded-xl bg-amber-50/90 border border-amber-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-[10px] text-amber-900 font-bold">
+                          <Bell className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Enable browser alerts</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const res = await BrowserNotificationService.requestPermission();
+                            setBrowserPerm(res);
+                            if (res === 'granted') {
+                              BrowserNotificationService.showNotification('VetAxis Alerts Active', {
+                                body: 'Browser notifications are now enabled on this device!'
+                              });
+                            }
+                          }}
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors cursor-pointer shrink-0"
+                        >
+                          Turn On
+                        </button>
+                      </div>
+                    )}
+
                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                       {notifications.length === 0 ? (
                         <div className="py-8 text-center flex flex-col items-center justify-center gap-1 text-[#7a766f]">
@@ -201,8 +235,14 @@ export function Navbar({
                                 {n.type === 'comment' && '💬'}
                                 {n.type === 'apply' && '📄'}
                                 {n.type === 'status_change' && '✨'}
+                                {n.type === 'admin_broadcast' && '📢'}
                               </span>
                               <div className="flex flex-col gap-0.5">
+                                {n.title && (
+                                  <span className="text-[10px] font-black text-amber-900 leading-tight">
+                                    {n.title}
+                                  </span>
+                                )}
                                 <p className="text-[11px] text-[#3c3c3b] font-medium leading-tight">
                                   {n.message}
                                 </p>

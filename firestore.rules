@@ -408,6 +408,14 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // ADMIN BROADCASTS RULES
+    // ─────────────────────────────────────────────────────────────────
+    match /admin_broadcasts/{broadcastId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // LIVESTOCK FARMS RULES
     // ─────────────────────────────────────────────────────────────────
     match /livestock_farms/{farmId} {
