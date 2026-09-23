@@ -41,11 +41,12 @@ const PAKISTAN_CITIES = [
 ];
 
 interface CommunityFeedProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   highlightPostId?: string | null;
+  onRequireAuth?: (actionContext?: string) => void;
 }
 
-export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedProps) {
+export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: CommunityFeedProps) {
   const [posts, setPosts] = useState<CommunityPost[]>(() => {
     return PrefetchService.getCachedCommunityPosts() || [];
   });
@@ -56,13 +57,13 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [activeFilter, setActiveFilter] = useState<string>('all');
   
   const [cityFilter, setCityFilter] = useState<string>(() => {
-    const userCity = currentUser.address || '';
+    const userCity = currentUser?.address || '';
     const hasCity = PAKISTAN_CITIES.some(c => c.name.toLowerCase() === userCity.toLowerCase());
     return hasCity ? userCity : 'all';
   });
 
   const [newPostCity, setNewPostCity] = useState<string>(() => {
-    const userCity = currentUser.address || '';
+    const userCity = currentUser?.address || '';
     const hasCity = PAKISTAN_CITIES.some(c => c.name.toLowerCase() === userCity.toLowerCase());
     return hasCity ? userCity : 'Islamabad';
   });
@@ -116,13 +117,13 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   const [newsActiveTab, setNewsActiveTab] = useState<'guides' | 'news'>('news');
 
   // Subscription Alert privilege evaluations
-  const userTier = currentUser.subscriptionTier;
+  const userTier = currentUser?.subscriptionTier;
   const maxFreeAlerts = userTier === 'Silver' ? 15 : userTier === 'Gold' ? 30 : userTier === 'Platinum' ? Infinity : 0;
-  const myAlertsCount = posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length;
+  const myAlertsCount = currentUser?.email ? posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length : 0;
   const isAlertFree = userTier ? (myAlertsCount < maxFreeAlerts) : false;
 
-  const isVerifiedPractitioner = (currentUser.role === 'doctor' || currentUser.role === 'clinic') &&
-    (currentUser.subscriptionTier === 'Silver' || currentUser.subscriptionTier === 'Gold' || currentUser.subscriptionTier === 'Platinum');
+  const isVerifiedPractitioner = currentUser ? (currentUser.role === 'doctor' || currentUser.role === 'clinic') &&
+    (currentUser.subscriptionTier === 'Silver' || currentUser.subscriptionTier === 'Gold' || currentUser.subscriptionTier === 'Platinum') : false;
 
   // Load posts with predictive pre-fetch instant cache + live revalidation
   const loadPosts = async () => {
@@ -271,7 +272,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       }
       let count = 0;
       users.forEach(u => {
-        if (u.uid !== currentUser.uid && u.location?.lat && u.location?.lng) {
+        if ((!currentUser || u.uid !== currentUser.uid) && u.location?.lat && u.location?.lng) {
           const d = LocationService.haversine(loc.lat, loc.lng, u.location.lat, u.location.lng);
           if (d <= radius) count++;
         }
@@ -284,6 +285,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
 
   const handleComposeSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to post a clinical question or case discussion');
+      return;
+    }
     if (!newPostText.trim()) {
       triggerToast('Post content is required.', 'error');
       return;
@@ -323,6 +328,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleAddAnswer = async (postId: string) => {
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to answer or comment on this discussion');
+      return;
+    }
     const text = activeAnswerTexts[postId] || '';
     if (!text.trim()) {
       triggerToast('Answer text cannot be empty.', 'error');
@@ -340,6 +349,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleToggleUpvoteAnswer = async (postId: string, answerId: string) => {
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to upvote answers');
+      return;
+    }
     try {
       const updated = await CommunityService.upvoteAnswer(postId, answerId, currentUser.uid || currentUser.email);
       setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
@@ -349,6 +362,10 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const handleToggleReaction = async (postId: string, emoji: string) => {
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to react to clinical posts');
+      return;
+    }
     try {
       const originalPost = posts.find(p => p.id === postId);
       const updated = await CommunityService.toggleReaction(postId, emoji, currentUser.email);
@@ -394,10 +411,14 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const openBoostModal = (post: CommunityPost) => {
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to boost an emergency lost pet alert');
+      return;
+    }
     setActiveBoostPost(post);
     setCheckoutStep('details');
     // Set initial address coordinates using user's location if defined
-    if (currentUser.location) {
+    if (currentUser?.location) {
       setLastSeenAddress(currentUser.location.address || 'Capital Area, Islamabad');
       setLastSeenLat(currentUser.location.lat || 33.6844);
       setLastSeenLng(currentUser.location.lng || 73.0479);
@@ -408,7 +429,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
     }
     setSelectedRadius(5);
     setPayerAccount('');
-    setPayerName(currentUser.name);
+    setPayerName(currentUser?.name || '');
     setPayerCvvOrPin('');
   };
 
@@ -451,13 +472,17 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
   };
 
   const openPremiumAlertModal = () => {
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to create an emergency lost pet broadcast');
+      return;
+    }
     setIsPremiumModalOpen(true);
     setPremiumStep('details');
     setPremiumTitle('');
     setPremiumText('');
     setPremiumRadius(5);
     setPremiumImages([]);
-    if (currentUser.location) {
+    if (currentUser?.location) {
       setPremiumAddress(currentUser.location.address || 'Capital Area, Islamabad');
       setPremiumLat(currentUser.location.lat || 33.6844);
       setPremiumLng(currentUser.location.lng || 73.0479);
@@ -467,7 +492,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
       setPremiumLng(73.0044);
     }
     setPremiumPayerAccount('');
-    setPremiumPayerName(currentUser.name);
+    setPremiumPayerName(currentUser?.name || '');
     setPremiumPayerCvv('');
   };
 
@@ -804,6 +829,32 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
         {/* LEFT COMPOSER & FEEDS (8 columns) */}
         <div className="col-span-1 lg:col-span-8 space-y-6 w-full">
           
+          {/* GUEST VISITOR CALLOUT BANNER */}
+          {!currentUser && (
+            <div className="bg-gradient-to-r from-[#5a5a40]/10 via-[#a0522d]/10 to-amber-500/10 border-2 border-[#5a5a40]/20 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#5a5a40] text-white flex items-center justify-center text-xl shrink-0 shadow-md">
+                  🐾
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-[#5a5a40] text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Public Access</span>
+                    <h4 className="font-serif font-black text-stone-900 text-sm sm:text-base">Welcome to the VetAxis Community Forum</h4>
+                  </div>
+                  <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                    You can freely read all veterinary discussions, clinical cases, and community alerts. Sign in anytime to ask clinical questions, share case advice, or react.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => onRequireAuth?.('sign in to post questions or contribute to discussions')}
+                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-[#5a5a40] hover:bg-[#3e3e2b] text-white font-black text-xs uppercase tracking-wider border-b-[3px] border-b-[#2a2a1d] shadow transition-all cursor-pointer whitespace-nowrap"
+              >
+                🔐 Sign In / Register
+              </button>
+            </div>
+          )}
+
           {/* UPFRONT EMERGENCY TRIGGER CARD */}
           <div className="bg-gradient-to-r from-red-50 to-orange-50/80 border-2 border-dashed border-red-300 rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-sm text-left">
             <div className="flex items-center gap-4">
@@ -834,7 +885,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
             
             <form onSubmit={handleComposeSubmit} className="space-y-4">
               <div className="flex gap-4 items-start">
-                {currentUser.profilePic && currentUser.profilePic !== 'default' ? (
+                {currentUser?.profilePic && currentUser?.profilePic !== 'default' ? (
                   <img
                     src={currentUser.profilePic}
                     className="w-12 h-12 rounded-2xl object-cover shrink-0 border-2 border-[#e3dec9] shadow-sm bg-stone-100"
@@ -843,7 +894,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-2xl bg-[#5a5a40] text-white text-base font-black flex items-center justify-center font-serif shrink-0 border-2 border-white shadow-sm uppercase">
-                    {currentUser.name[0]}
+                    {currentUser?.name ? currentUser.name[0] : '🐾'}
                   </div>
                 )}
                 
@@ -1011,14 +1062,15 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
               <div className="space-y-5 text-left">
                 <AnimatePresence mode="popLayout">
                   {filteredPosts.map((post, postIdx) => {
-                    const isAuthor = 
+                    const isAuthor = currentUser ? (
                       (post.authorUid && post.authorUid === currentUser.uid) ||
-                      (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim();
+                      (post.authorEmail || '').toLowerCase().trim() === (currentUser.email || '').toLowerCase().trim()
+                    ) : false;
                     const initials = post.authorName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
                     
-                    const loved = post.reactions?.['❤️']?.includes(currentUser.email);
-                    const thanked = post.reactions?.['👍']?.includes(currentUser.email);
-                    const warned = post.reactions?.['❗']?.includes(currentUser.email);
+                    const loved = currentUser?.email ? post.reactions?.['❤️']?.includes(currentUser.email) : false;
+                    const thanked = currentUser?.email ? post.reactions?.['👍']?.includes(currentUser.email) : false;
+                    const warned = currentUser?.email ? post.reactions?.['❗']?.includes(currentUser.email) : false;
 
                     return (
                       <React.Fragment key={post.id}>
@@ -1279,7 +1331,7 @@ export function CommunityFeed({ currentUser, highlightPostId }: CommunityFeedPro
                                 </div>
                               ) : (
                                 post.answers.map((ans) => {
-                                  const alreadyUpvoted = ans.upvotes?.includes(currentUser.uid || currentUser.email);
+                                  const alreadyUpvoted = currentUser ? ans.upvotes?.includes(currentUser.uid || currentUser.email) : false;
                                   return (
                                     <div key={ans.id} className="bg-[#fcf9f2] border border-[#e3dec9] rounded-2xl p-4 space-y-2 relative transition-all hover:shadow-xs">
                                       {/* Answer header */}

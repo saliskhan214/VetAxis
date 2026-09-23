@@ -73,6 +73,13 @@ export default function App() {
   const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
   const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
   const [messengerTargetUser, setMessengerTargetUser] = useState<UserProfile | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalContext, setAuthModalContext] = useState<string | null>(null);
+
+  const triggerAuthWall = (context?: string) => {
+    setAuthModalContext(context || 'sign in to continue');
+    setIsAuthModalOpen(true);
+  };
 
   const handleStartChatWith = (targetUser: UserProfile) => {
     setMessengerTargetUser(targetUser);
@@ -177,8 +184,55 @@ export default function App() {
       contact: "Contact & Support | VetAxis 360"
     };
 
+    const descriptions: Record<string, string> = {
+      explore: "Find verified veterinary clinics, 24/7 emergency pet hospitals, DVM doctors, vaccination centers, and animal specialists across Islamabad, Lahore, Karachi, and Pakistan.",
+      jobs: "Browse open veterinary jobs, hospital vacancies, and farm assistant positions across Pakistan, or recruit verified DVM professionals on VetAxis 360.",
+      pet_ads: "Post lost pet SOS alerts, find missing dogs & cats, or adopt verified companion pets across Pakistan on VetAxis 360.",
+      livestock: "Dairy and livestock health management: maintain animal records, track vaccinations, lactation logs, and herd disease alerts.",
+      marketplace: "Buy and sell livestock, farm animals, veterinary supplies, and animal pharmaceuticals with verified sellers nationwide.",
+      community: "Connect with veterinarians, farmers, and pet parents across Pakistan. Share clinical cases, advice, and pet health tips.",
+      news: "Read evidence-based veterinary articles, animal care advice, clinical disease prevention, and pet health guides authored by licensed DVMs.",
+      subscription: "Veterinary practitioner subscriptions: verify clinical credentials, publish billboard listings, and enable direct appointment booking.",
+      profile: "Manage your veterinary practitioner credentials, client bookings, and pet medical health passports.",
+      about: "Learn about VetAxis 360, Pakistan's premier veterinary care and clinical intelligence ecosystem.",
+      terms: "Terms of Service and clinical usage policies for the VetAxis 360 platform.",
+      privacy: "Privacy policy and veterinary medical data protection standards on VetAxis 360.",
+      contact: "Get in touch with the VetAxis 360 customer support and clinical emergency response triage team."
+    };
+
     if (titles[activeSection]) {
       document.title = titles[activeSection];
+
+      // Update meta description
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc && descriptions[activeSection]) {
+        metaDesc.setAttribute('content', descriptions[activeSection]);
+      }
+
+      // Update og:title & twitter:title
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', titles[activeSection]);
+      const twTitle = document.querySelector('meta[name="twitter:title"]');
+      if (twTitle) twTitle.setAttribute('content', titles[activeSection]);
+
+      // Update og:description & twitter:description
+      if (descriptions[activeSection]) {
+        const ogDesc = document.querySelector('meta[property="og:description"]');
+        if (ogDesc) ogDesc.setAttribute('content', descriptions[activeSection]);
+        const twDesc = document.querySelector('meta[name="twitter:description"]');
+        if (twDesc) twDesc.setAttribute('content', descriptions[activeSection]);
+      }
+
+      // Update canonical URL & og:url
+      try {
+        const canonicalUrl = `${window.location.origin}/?tab=${activeSection}`;
+        const canonical = document.querySelector('link[rel="canonical"]');
+        if (canonical) canonical.setAttribute('href', canonicalUrl);
+        const ogUrl = document.querySelector('meta[property="og:url"]');
+        if (ogUrl) ogUrl.setAttribute('content', canonicalUrl);
+      } catch (e) {
+        // Ignored in non-browser context
+      }
     }
   }, [activeSection]);
 
@@ -455,6 +509,12 @@ export default function App() {
     if (normalized === 'privacy_policy') normalized = 'privacy';
     if (normalized === 'support') normalized = 'contact';
 
+    const PRIVATE_SECTIONS = ['messenger', 'livestock', 'profile', 'subscription', 'clinic_management', 'clinical_suite', 'clinical_tools', 'admin'];
+    if (!currentUser && PRIVATE_SECTIONS.includes(normalized)) {
+      triggerAuthWall(`sign in to access ${normalized.replace('_', ' ')}`);
+      return;
+    }
+
     triggerLoading(`Opening ${normalized.replace('_', ' ').toUpperCase()}...`, 400);
     setActiveSection(normalized);
     // Clear highlight tags during manual user shifts
@@ -730,12 +790,15 @@ export default function App() {
 
   const handleAuthSuccess = (user: UserProfile) => {
     setCurrentUser(user);
-    setActiveSection('explore');
+    setIsAuthModalOpen(false);
+    setAuthModalContext(null);
+    setTemporaryBypassGuestForAuth(false);
   };
 
   const handleLogout = async () => {
     await AuthService.signOut();
     setCurrentUser(null);
+    setActiveSection('explore');
   };
 
   const handleUpdateUserProfile = (updated: UserProfile) => {
@@ -763,44 +826,12 @@ export default function App() {
     return (
       <GuestAnimalViewer 
         animalRecordId={scannedAnimalRecordId}
-        onGoToAuth={() => setTemporaryBypassGuestForAuth(true)}
+        onGoToAuth={() => {
+          setTemporaryBypassGuestForAuth(true);
+          triggerAuthWall('sign in or create an account to view full clinical details');
+        }}
         onClear={() => setScannedAnimalRecordId(null)}
       />
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen text-center relative">
-        {/* Floating return button to easily jump back to scanned passport */}
-        {scannedAnimalRecordId && (
-          <div className="absolute top-4 left-4 z-[9999]">
-            <button
-              onClick={() => setTemporaryBypassGuestForAuth(false)}
-              className="cursor-pointer bg-[#5a5a40] text-white hover:bg-[#3e3e2b] px-4 py-2 rounded-xl text-xs font-bold border-none shadow-md flex items-center gap-1.5 transition-all font-sans"
-            >
-              ← Back to Scanned Digital Passport
-            </button>
-          </div>
-        )}
-        <AuthScreen 
-          onAuthSuccess={handleAuthSuccess} 
-          authService={AuthService} 
-          onOpenAboutUs={() => setIsAboutUsOpen(true)}
-        />
-
-        <AnimatePresence>
-          {isAboutUsOpen && (
-            <AboutUsDirectory
-              isOpen={isAboutUsOpen}
-              onClose={() => setIsAboutUsOpen(false)}
-              onNavigate={handleNavigate}
-              isLoggedIn={false}
-              onTriggerAuth={() => setIsAboutUsOpen(false)}
-            />
-          )}
-        </AnimatePresence>
-      </div>
     );
   }
 
@@ -818,6 +849,7 @@ export default function App() {
         onDeleteNotification={handleDeleteNotification}
         onNotificationClick={handleNotificationClick}
         onOpenAboutUs={() => setIsAboutUsOpen(true)}
+        onSignInClick={() => triggerAuthWall()}
       />
 
       {currentUser && !currentUser.emailVerified && (
@@ -871,22 +903,41 @@ export default function App() {
                 initialCity={initialCity}
                 initialFilter={initialFilter}
                 onStartChat={handleStartChatWith}
+                onRequireAuth={triggerAuthWall}
               />
             )}
 
             {activeSection === 'messenger' && (
-              <Messenger
-                currentUser={currentUser}
-                initialTargetUser={messengerTargetUser}
-                onClearInitialTarget={() => setMessengerTargetUser(null)}
-                onNavigateHome={() => setActiveSection('explore')}
-              />
+              currentUser ? (
+                <Messenger
+                  currentUser={currentUser}
+                  initialTargetUser={messengerTargetUser}
+                  onClearInitialTarget={() => setMessengerTargetUser(null)}
+                  onNavigateHome={() => setActiveSection('explore')}
+                />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">💬</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Clinical Telehealth Chat</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Connect directly with verified veterinarians, clinics, and specialists across Pakistan for real-time medical inquiries and case updates.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in to message veterinarians')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Sign In to Start Chat</span>
+                  </button>
+                </div>
+              )
             )}
 
             {activeSection === 'community' && (
               <CommunityFeed 
                 currentUser={currentUser} 
                 highlightPostId={highlightPostId}
+                onRequireAuth={triggerAuthWall}
               />
             )}
 
@@ -895,6 +946,7 @@ export default function App() {
                 currentUser={currentUser} 
                 onNavigate={setActiveSection} 
                 highlightProductId={highlightProductId}
+                onRequireAuth={triggerAuthWall}
               />
             )}
 
@@ -909,6 +961,7 @@ export default function App() {
                 }}
                 highlightAdId={highlightAdId}
                 initialType={initialPetType}
+                onRequireAuth={triggerAuthWall}
               />
             )}
 
@@ -917,55 +970,161 @@ export default function App() {
                 currentUser={currentUser} 
                 highlightJobId={highlightJobId}
                 highlightApplicationId={highlightApplicationId}
+                onRequireAuth={triggerAuthWall}
               />
             )}
 
             {activeSection === 'livestock' && (
-              <LivestockManagement 
-                currentUser={currentUser} 
-                highlightFarmId={highlightFarmId}
-                scannedAnimalRecordId={scannedAnimalRecordId}
-                onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
-              />
+              currentUser ? (
+                <LivestockManagement 
+                  currentUser={currentUser} 
+                  highlightFarmId={highlightFarmId}
+                  scannedAnimalRecordId={scannedAnimalRecordId}
+                  onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
+                />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">🌾</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Livestock Herd & Farm Records</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Track herd pedigree, vaccination calendars, lactation cycles, and disease alerts across your dairy & livestock operations.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in to manage your livestock herds')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Sign In to Access Herd Suite</span>
+                  </button>
+                </div>
+              )
             )}
 
             {activeSection === 'profile' && (
-              <ProfilePage
-                currentUser={currentUser}
-                onUpdateUser={handleUpdateUserProfile}
-                onDeleteSuccess={handleLogout}
-              />
+              currentUser ? (
+                <ProfilePage
+                  currentUser={currentUser}
+                  onUpdateUser={handleUpdateUserProfile}
+                  onDeleteSuccess={handleLogout}
+                />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">👤</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Member & Practitioner Profile</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Sign in to view your pet passports, practitioner badges, appointment schedule, and security settings.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in to view your profile')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Sign In / Register</span>
+                  </button>
+                </div>
+              )
             )}
 
             {activeSection === 'subscription' && (
-              <SubscriptionPortal
-                currentUser={currentUser}
-                onUpdateUser={handleUpdateUserProfile}
-                onNavigateToSection={handleNavigate}
-              />
+              currentUser ? (
+                <SubscriptionPortal
+                  currentUser={currentUser}
+                  onUpdateUser={handleUpdateUserProfile}
+                  onNavigateToSection={handleNavigate}
+                />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">⭐</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Verification & Plans</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Boost your clinic visibility, earn verified badges, unlock client online booking, and manage multi-staff practices.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in to view practitioner subscription plans')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Sign In to View Plans</span>
+                  </button>
+                </div>
+              )
             )}
 
-            {activeSection === 'admin' && currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) && (
-              <AdminPanel currentUser={currentUser} />
+            {activeSection === 'admin' && (
+              currentUser && (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin === true) ? (
+                <AdminPanel currentUser={currentUser} />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">🛡️</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Administration Console</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Access to system auditing, practitioner approvals, and database tools requires verified administrative credentials.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in with administrator credentials')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Admin Sign In</span>
+                  </button>
+                </div>
+              )
             )}
 
-            {activeSection === 'clinic_management' && currentUser && currentUser.role === 'clinic' && (
-              <ClinicManagement 
-                user={currentUser} 
-                highlightAppointmentId={highlightAppointmentId}
-                onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
-              />
+            {activeSection === 'clinic_management' && (
+              currentUser && currentUser.role === 'clinic' ? (
+                <ClinicManagement 
+                  user={currentUser} 
+                  highlightAppointmentId={highlightAppointmentId}
+                  onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
+                />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">🏥</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Clinic Portal</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Hospital scheduling, client queue management, and electronic patient check-ins are exclusively available to verified clinics.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in with your clinic account')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Clinic Sign In</span>
+                  </button>
+                </div>
+              )
             )}
 
             {activeSection === 'news' && (
-              <BlogSection currentUser={currentUser} />
+              <BlogSection 
+                currentUser={currentUser} 
+                onRequireAuth={triggerAuthWall}
+              />
             )}
 
             {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
-              <VeterinaryClinicalSuite 
-                currentUser={currentUser}
-                onNavigate={handleNavigate}
-              />
+              currentUser ? (
+                <VeterinaryClinicalSuite 
+                  currentUser={currentUser}
+                  onNavigate={handleNavigate}
+                />
+              ) : (
+                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
+                  <div className="text-4xl">🩺</div>
+                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Clinical Suite</h2>
+                  <p className="text-sm text-stone-600 leading-relaxed">
+                    Emergency anesthesia calculators, fluid therapy dosers, antibiotic formularies, and clinical diagnostics.
+                  </p>
+                  <button 
+                    onClick={() => triggerAuthWall('sign in as a veterinary practitioner to access clinical tools')} 
+                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>🔐</span>
+                    <span>Doctor Sign In</span>
+                  </button>
+                </div>
+              )
             )}
 
             {activeSection === 'about' && (
@@ -1075,8 +1234,39 @@ export default function App() {
             isOpen={isAboutUsOpen}
             onClose={() => setIsAboutUsOpen(false)}
             onNavigate={handleNavigate}
-            isLoggedIn={true}
+            isLoggedIn={!!currentUser}
+            onTriggerAuth={() => {
+              setIsAboutUsOpen(false);
+              triggerAuthWall();
+            }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* AUTH WALL MODAL OVERLAY */}
+      <AnimatePresence>
+        {isAuthModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[99999] bg-stone-900/75 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsAuthModalOpen(false);
+              }
+            }}
+          >
+            <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-3xl relative shadow-2xl">
+              <AuthScreen
+                onAuthSuccess={handleAuthSuccess}
+                authService={AuthService}
+                onOpenAboutUs={() => setIsAboutUsOpen(true)}
+                onClose={() => setIsAuthModalOpen(false)}
+                contextMessage={authModalContext}
+              />
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

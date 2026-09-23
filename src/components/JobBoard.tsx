@@ -10,12 +10,13 @@ import {
 } from 'lucide-react';
 
 interface JobBoardProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   highlightJobId?: string | null;
   highlightApplicationId?: string | null;
+  onRequireAuth?: (actionContext?: string) => void;
 }
 
-export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }: JobBoardProps) {
+export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, onRequireAuth }: JobBoardProps) {
   const [jobs, setJobs] = useState<JobPost[]>(() => {
     return PrefetchService.getCachedJobs() || [];
   });
@@ -48,10 +49,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   // Job post inputs
   const [title, setTitle] = useState<string>('');
   const [employerType, setEmployerType] = useState<JobPost['employerType']>(
-    currentUser.role === 'clinic' ? 'clinic' : currentUser.role === 'user' ? 'farm' : 'individual'
+    currentUser?.role === 'clinic' ? 'clinic' : currentUser?.role === 'user' ? 'farm' : 'individual'
   );
   const [jobType, setJobType] = useState<JobPost['jobType']>('Full-time');
-  const [location, setLocation] = useState<string>(currentUser.address || '');
+  const [location, setLocation] = useState<string>(currentUser?.address || '');
   const [salaryMin, setSalaryMin] = useState<string>('');
   const [salaryMax, setSalaryMax] = useState<string>('');
   const [experience, setExperience] = useState<string>('');
@@ -62,10 +63,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   const [minQualificationGate, setMinQualificationGate] = useState<JobPost['minQualificationGate']>('none');
 
   // Hiring Clinic Detailed Info
-  const [clinicAddress, setClinicAddress] = useState<string>(currentUser.address || '');
+  const [clinicAddress, setClinicAddress] = useState<string>(currentUser?.address || '');
   const [clinicWebsite, setClinicWebsite] = useState<string>('');
-  const [clinicContactPhone, setClinicContactPhone] = useState<string>(currentUser.phone || '');
-  const [clinicFacilities, setClinicFacilities] = useState<string>(currentUser.facilities || '');
+  const [clinicContactPhone, setClinicContactPhone] = useState<string>(currentUser?.phone || '');
+  const [clinicFacilities, setClinicFacilities] = useState<string>(currentUser?.facilities || '');
   
   // Custom screening questions & document demands
   const [screeningQuestions, setScreeningQuestions] = useState<string[]>(['']);
@@ -122,7 +123,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
     if (localHighlightJobId && jobs.length > 0) {
       const targetJob = jobs.find(j => j.id === localHighlightJobId);
       if (targetJob) {
-        const isMyOwn = currentUser.role === 'clinic' && 
+        const isMyOwn = currentUser?.role === 'clinic' && 
           (targetJob.clinicId === currentUser.uid || targetJob.clinicEmail === currentUser.email);
         
         if (isMyOwn) {
@@ -144,7 +145,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
 
   useEffect(() => {
     loadJobs();
-    if (currentUser.role === 'clinic' && !highlightJobId && !highlightApplicationId) {
+    if (currentUser?.role === 'clinic' && !highlightJobId && !highlightApplicationId) {
       setActiveTab('my_postings');
     }
   }, []);
@@ -184,6 +185,11 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   }, []);
 
   const loadAllApplications = async () => {
+    if (!currentUser) {
+      setApplications([]);
+      setLoadingAllApps(false);
+      return;
+    }
     setLoadingAllApps(true);
     try {
       let apps: JobApplication[] = [];
@@ -391,6 +397,11 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
 
   // Apply Now actions
   const initiateApply = (job: JobPost) => {
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to submit your job application or resume');
+      return;
+    }
+
     // Check if already applied
     const alreadyApplied = applications.some(app => app.jobId === job.id && app.applicantId === currentUser.uid);
     if (alreadyApplied) {
@@ -567,16 +578,17 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
   };
 
   // Filter lists & permissions
-  const isSystemAdmin = currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin;
+  const isSystemAdmin = currentUser ? (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin) : false;
 
-  const myJobPostings = jobs.filter(j => 
+  const myJobPostings = currentUser ? jobs.filter(j => 
     (j.clinicId && j.clinicId === currentUser.uid) || 
     (currentUser.email && j.clinicEmail && j.clinicEmail.toLowerCase() === currentUser.email.toLowerCase())
-  );
+  ) : [];
   
   const filteredJobs = jobs.filter(job => {
     // Tab filtering
     if (activeTab === 'my_postings') {
+      if (!currentUser) return false;
       const isMine = (job.clinicId && job.clinicId === currentUser.uid) ||
         (currentUser.email && job.clinicEmail && job.clinicEmail.toLowerCase() === currentUser.email.toLowerCase());
       if (!isMine) return false;
@@ -646,17 +658,40 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
         <motion.button
           whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => setIsPostModalOpen(true)}
+          onClick={() => {
+            if (!currentUser) {
+              if (onRequireAuth) onRequireAuth('sign in to post a veterinary vacancy or job ad');
+              return;
+            }
+            setIsPostModalOpen(true);
+          }}
           className="w-full md:w-auto relative cursor-pointer font-bold text-white bg-[#a0522d] border-b-[4px] border-[#69351d] px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 select-none shadow-[0_4px_16px_rgba(160,82,45,0.25)] hover:bg-[#8b4513] transition-all"
           id="publish_job_btn"
         >
           <Plus className="w-5 h-5" />
-          <span>{currentUser.role === 'user' ? '🌾 Post Farm Helper / Job Ad' : 'Publish Job Listing'}</span>
+          <span>{currentUser?.role === 'user' ? '🌾 Post Farm Helper / Job Ad' : 'Publish Job Listing'}</span>
         </motion.button>
       </div>
 
+      {/* GUEST CAREERS BANNER */}
+      {!currentUser && (
+        <div className="bg-[#fcf9f2] border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-sm">
+          <div>
+            <span className="bg-[#a0522d] text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Public Opportunities</span>
+            <h4 className="font-serif font-black text-stone-900 text-sm mt-1">Looking for a veterinary position or hiring for your clinic?</h4>
+            <p className="text-xs text-stone-600 mt-0.5">Explore open positions nationwide. Sign in to submit clinical applications or publish hiring alerts.</p>
+          </div>
+          <button
+            onClick={() => onRequireAuth?.('sign in to apply for or publish veterinary jobs')}
+            className="cursor-pointer btn-tactile-3d-secondary py-2.5 px-5 text-xs whitespace-nowrap bg-[#a0522d] text-white"
+          >
+            🔐 Sign In / Register
+          </button>
+        </div>
+      )}
+
       {/* TABS SELECTOR */}
-      {(myJobPostings.length > 0 || currentUser.role === 'clinic' || currentUser.role === 'user') && (
+      {(myJobPostings.length > 0 || currentUser?.role === 'clinic' || currentUser?.role === 'user') && (
         <div className="flex border-b border-[#e3dec9] gap-4" id="clinic_job_tabs">
           <button
             onClick={() => setActiveTab('browse')}
@@ -748,9 +783,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="jobs_listings_grid">
           {filteredJobs.map((job) => {
-            const isMyOwn = (job.clinicId === currentUser.uid) || 
-              (currentUser.email && job.clinicEmail && job.clinicEmail.toLowerCase() === currentUser.email.toLowerCase());
-            const appliedForJob = applications.find(app => app.jobId === job.id && app.applicantId === currentUser.uid);
+            const isMyOwn = currentUser ? ((job.clinicId === currentUser.uid) || 
+              (currentUser.email && job.clinicEmail && job.clinicEmail.toLowerCase() === currentUser.email.toLowerCase())) : false;
+            const appliedForJob = currentUser ? applications.find(app => app.jobId === job.id && app.applicantId === currentUser.uid) : undefined;
 
             const isPendingVerification = job.approvalStatus === 'pending' || (!job.approvalStatus && job.status === 'open' && job.posterRole === 'user');
             const isRejected = job.approvalStatus === 'rejected';
@@ -1000,7 +1035,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
               </button>
 
               <h2 className="text-xl font-serif font-bold text-[#3c3c3b] mb-2 flex items-center gap-2">
-                💼 {currentUser.role === 'user' ? '🌾 Post Farm Helper / Livestock Vacancy' : 'Publish New Job / Clinic Vacancy'}
+                💼 {currentUser?.role === 'user' ? '🌾 Post Farm Helper / Livestock Vacancy' : 'Publish New Job / Clinic Vacancy'}
               </h2>
               <p className="text-xs text-[#7a766f] mb-4">
                 Reach thousands of veterinarians, paravets, farm workers, and assistants across Pakistan.
@@ -1461,9 +1496,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId }
 
                 {/* Candidate pre-loaded stats review snippet */}
                 <div className="bg-[#fcf9f2] p-3 rounded-xl border border-[#e3dec9] text-[11px] font-bold text-[#5a5a40] space-y-1">
-                  <div>👤 Applicant Name: {currentUser.name}</div>
-                  <div>📧 Contact Email: {currentUser.email}</div>
-                  <div>💼 Your Role: {currentUser.role.toUpperCase()}</div>
+                  <div>👤 Applicant Name: {currentUser?.name || ''}</div>
+                  <div>📧 Contact Email: {currentUser?.email || ''}</div>
+                  <div>💼 Your Role: {currentUser?.role?.toUpperCase() || ''}</div>
                 </div>
 
                 {/* Screening questions inputs */}

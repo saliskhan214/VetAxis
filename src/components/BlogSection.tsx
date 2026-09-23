@@ -25,6 +25,7 @@ import { AdContainer } from './AdContainer';
 
 interface BlogSectionProps {
   currentUser: UserProfile | null;
+  onRequireAuth?: (actionContext?: string) => void;
 }
 
 const CATEGORIES = [
@@ -43,7 +44,7 @@ const PRESET_IMAGES = [
   { label: 'Vet Clinic Clinic', url: 'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=800&q=80' }
 ];
 
-export function BlogSection({ currentUser }: BlogSectionProps) {
+export function BlogSection({ currentUser, onRequireAuth }: BlogSectionProps) {
   const [articles, setArticles] = useState<BlogArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -446,7 +447,17 @@ export function BlogSection({ currentUser }: BlogSectionProps) {
               </div>
 
               {/* Doctor / Clinic / Admin write guide trigger */}
-              {isDoctorOrClinic ? (
+              {!currentUser ? (
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onRequireAuth?.('sign in as a veterinary practitioner to publish clinical articles')}
+                  className="flex items-center gap-2 bg-[#5a5a40] hover:bg-[#3e3e2b] text-white font-extrabold px-5 py-3 rounded-xl shadow-md border-b-[3px] border-b-[#3e3e2b] text-sm cursor-pointer w-full md:w-auto justify-center whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Doctor Sign In to Publish</span>
+                </motion.button>
+              ) : isDoctorOrClinic ? (
                 <motion.button
                   whileHover={{ scale: 1.02, y: -1 }}
                   whileTap={{ scale: 0.98 }}

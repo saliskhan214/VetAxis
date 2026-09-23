@@ -10,7 +10,7 @@ import { InteractiveClinicMap } from './InteractiveClinicMap';
 
 
 interface ExploreFeedProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   onUpdateUser: (updated: UserProfile) => void;
   activeSection?: string;
   onNavigate?: (section: string) => void;
@@ -19,6 +19,7 @@ interface ExploreFeedProps {
   initialCity?: string | null;
   initialFilter?: string | null;
   onStartChat?: (profile: UserProfile) => void;
+  onRequireAuth?: (actionContext?: string) => void;
 }
 
 const WELCOME_BANNER_SLIDE = {
@@ -59,7 +60,8 @@ export function ExploreFeed({
   highlightDoctorId,
   initialCity,
   initialFilter,
-  onStartChat
+  onStartChat,
+  onRequireAuth
 }: ExploreFeedProps) {
   const [activeTab, setActiveTab] = useState<UserRole>(() => {
     if (highlightClinicId) return 'clinic';
@@ -92,7 +94,7 @@ export function ExploreFeed({
   const [adDescription, setAdDescription] = useState<string>('');
   const [adSponsor, setAdSponsor] = useState<string>('');
   const [adCtaPreset, setAdCtaPreset] = useState<'whatsapp' | 'profile' | 'call' | 'custom'>('whatsapp');
-  const [adContactPhone, setAdContactPhone] = useState<string>(currentUser.phone || '');
+  const [adContactPhone, setAdContactPhone] = useState<string>(currentUser?.phone || '');
   const [adCustomUrl, setAdCustomUrl] = useState<string>('');
   const [adCtaText, setAdCtaText] = useState<string>('Chat on WhatsApp');
   const [adCtaUrl, setAdCtaUrl] = useState<string>('');
@@ -183,10 +185,10 @@ export function ExploreFeed({
     const cleanPhone = (adContactPhone || currentUser?.phone || '').replace(/\D/g, '');
     if (adCtaPreset === 'whatsapp') {
       const formattedPhone = cleanPhone.startsWith('92') ? cleanPhone : cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone;
-      const msg = `Hi ${adSponsor || currentUser.name}, I saw your ad on VetAxis ("${adTitle || 'Special Offer'}") and would like to inquire.`;
+      const msg = `Hi ${adSponsor || currentUser?.name || 'Doctor'}, I saw your ad on VetAxis ("${adTitle || 'Special Offer'}") and would like to inquire.`;
       return formattedPhone ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}` : '';
     } else if (adCtaPreset === 'profile') {
-      return `profile:${currentUser.uid}`;
+      return `profile:${currentUser?.uid || ''}`;
     } else if (adCtaPreset === 'call') {
       const formattedPhone = cleanPhone.startsWith('92') ? cleanPhone : cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone;
       return formattedPhone ? `tel:+${formattedPhone}` : '';
@@ -355,7 +357,7 @@ export function ExploreFeed({
       // Clean form fields
       setAdTitle('');
       setAdDescription('');
-      setAdSponsor(currentUser.name || '');
+      setAdSponsor(currentUser?.name || '');
       setAdCtaPreset('whatsapp');
       setAdCtaText('Chat on WhatsApp');
       setAdCustomUrl('');
@@ -425,8 +427,8 @@ export function ExploreFeed({
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingForm, setBookingForm] = useState({
     patientName: '',
-    ownerName: currentUser.name || '',
-    ownerPhone: currentUser.phone || '',
+    ownerName: currentUser?.name || '',
+    ownerPhone: currentUser?.phone || '',
     date: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0], // tomorrow
     time: '11:00',
     type: 'consultation' as 'consultation' | 'surgery' | 'grooming' | 'vaccination' | 'follow-up' | 'emergency',
@@ -458,7 +460,7 @@ export function ExploreFeed({
         recurrencePattern: 'None' as const,
         notes: bookingForm.notes || 'Online client booking via VetAxis homepage Clinic Card.',
         createdAt: Date.now(),
-        userId: currentUser.uid
+        userId: currentUser?.uid
       };
 
       await ClinicService.saveAppointment(records);
@@ -466,7 +468,7 @@ export function ExploreFeed({
       try {
         await NotificationService.createNotification({
           userId: selectedProfile.uid,
-          senderId: currentUser.uid,
+          senderId: currentUser?.uid || 'guest',
           senderName: bookingForm.ownerName,
           type: 'appointment_booked',
           targetId: records.id,
@@ -484,8 +486,8 @@ export function ExploreFeed({
       // Reset
       setBookingForm({
         patientName: '',
-        ownerName: currentUser.name || '',
-        ownerPhone: currentUser.phone || '',
+        ownerName: currentUser?.name || '',
+        ownerPhone: currentUser?.phone || '',
         date: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0],
         time: '11:00',
         type: 'consultation',
@@ -664,7 +666,7 @@ export function ExploreFeed({
     setCityFilterActive('');
     setHomeVisitOnly(false);
     setSortBy(SORT_TYPES.HIGHEST);
-    if (currentUser.location) {
+    if (currentUser?.location) {
       setLocLoading(true);
       try {
         const freshUser = { ...currentUser, location: null };
@@ -712,6 +714,10 @@ export function ExploreFeed({
   const handleSubmitReview = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedProfile) return;
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to submit a rating or review');
+      return;
+    }
     if (!canUserReview(currentUser.role, selectedProfile.role)) {
       setReviewError('You do not have permission to rate or review this role.');
       return;
@@ -774,9 +780,9 @@ export function ExploreFeed({
   };
 
   // Fall back to saved address/coords
-  const resolvedUserLocForSort = currentUser.location || (currentUser.address ? { 
-    lat: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lat,
-    lng: LocationService.resolveCoordinates(currentUser.address, currentUser.uid).lng,
+  const resolvedUserLocForSort = currentUser?.location || (currentUser?.address ? { 
+    lat: LocationService.resolveCoordinates(currentUser.address, currentUser?.uid || 'guest').lat,
+    lng: LocationService.resolveCoordinates(currentUser.address, currentUser?.uid || 'guest').lng,
     address: currentUser.address
   } : null);
 
@@ -897,7 +903,7 @@ export function ExploreFeed({
                   >
                     Instantly connect with highly-qualified vet doctors, dynamic clinical centers, and on-call home vaccinators near you.
                   </p>
-                  {currentUser.location && (
+                  {currentUser?.location && (
                     <motion.div 
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -1287,7 +1293,7 @@ export function ExploreFeed({
                           required
                         />
                         <p className="text-[9.5px] text-emerald-900/80 font-medium bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
-                          💡 Users clicking your billboard ad will instantly open WhatsApp with an auto-filled greeting: <em>"Hi {adSponsor || currentUser.name}, I saw your ad on VetAxis..."</em>
+                          💡 Users clicking your billboard ad will instantly open WhatsApp with an auto-filled greeting: <em>"Hi {adSponsor || currentUser?.name || 'Doctor'}, I saw your ad on VetAxis..."</em>
                         </p>
                       </div>
                     )}
@@ -1299,7 +1305,7 @@ export function ExploreFeed({
                           <span>In-App Profile Integration (Auto-Linked)</span>
                         </div>
                         <p className="text-[10px] text-blue-800/90 leading-relaxed font-semibold">
-                          Your ad connects directly to your verified VetAxis profile (<strong>{currentUser.name}</strong>). When users click the button, they will instantly view your ratings, credentials, customer reviews, offered services, and direct booking modal.
+                          Your ad connects directly to your verified VetAxis profile (<strong>{currentUser?.name || 'Your Profile'}</strong>). When users click the button, they will instantly view your ratings, credentials, customer reviews, offered services, and direct booking modal.
                         </p>
                       </div>
                     )}
@@ -1452,7 +1458,7 @@ export function ExploreFeed({
                   <label className="text-xs font-extrabold text-[#5a5a40] uppercase tracking-wider block mb-1">Select Advertising Campaign Plan</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Option 1: Privilege-based (only visible if premium subscriber and remaining credits) */}
-                    {currentUser.subscriptionTier && (
+                    {currentUser?.subscriptionTier && (
                       <button
                         type="button"
                         onClick={() => setAdPaymentChoice('free_privilege')}
@@ -1606,7 +1612,7 @@ export function ExploreFeed({
                   
                   <div className="space-y-3.5 relative z-10 text-left">
                     <span className="inline-flex px-3 py-1 bg-white/10 rounded-xl text-[9px] font-black tracking-widest font-mono border border-white/20 uppercase">
-                      📌 {adPaymentChoice === 'free_privilege' ? `${currentUser.subscriptionTier || 'Sponsor'} Promo` : 'Sponsored Billboard'} • Campaign
+                      📌 {adPaymentChoice === 'free_privilege' ? `${currentUser?.subscriptionTier || 'Sponsor'} Promo` : 'Sponsored Billboard'} • Campaign
                     </span>
 
                     <h2 className="text-xl md:text-2xl font-serif font-black tracking-tight leading-tight flex items-center gap-2">
@@ -1745,7 +1751,7 @@ export function ExploreFeed({
       </AnimatePresence>
 
       {/* ACTIVE FILTER BADGES */}
-      {(searchTerm || cityFilterActive || homeVisitOnly || currentUser.location) && (
+      {(searchTerm || cityFilterActive || homeVisitOnly || currentUser?.location) && (
         <div className="flex flex-wrap items-center gap-2 bg-[#fdfcf7] border border-[#e3dec9] p-3.5 rounded-2xl animate-fadeIn">
           <span className="text-[10px] text-[#7a766f] font-black uppercase tracking-wider mr-1">Active Filters:</span>
           
@@ -1790,11 +1796,12 @@ export function ExploreFeed({
             </span>
           )}
 
-          {currentUser.location && (
+          {currentUser?.location && (
             <span className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold px-3 py-1 rounded-xl border border-amber-200 transition-colors">
               <span>Location: {currentUser.location.address || 'Hospital Center'}</span>
               <button 
                 onClick={() => {
+                  if (!currentUser) return;
                   const freshUser = { ...currentUser, location: null };
                   onUpdateUser(freshUser);
                   secureSetItem('va_session', JSON.stringify(freshUser));
@@ -1859,8 +1866,8 @@ export function ExploreFeed({
             // Calculate distance strictly for clinic profiles using getDistance
             let distance: number | null = null;
             if (prof.role === 'clinic') {
-              const userLat = currentUser.location?.lat;
-              const userLng = currentUser.location?.lng;
+              const userLat = currentUser?.location?.lat;
+              const userLng = currentUser?.location?.lng;
 
               const lat = (prof as any).lat || (prof.location && prof.location.lat);
               const lng = (prof as any).lng || (prof.location && prof.location.lng);
@@ -1976,6 +1983,10 @@ export function ExploreFeed({
                   <button
                     type="button"
                     onClick={() => {
+                      if (!currentUser) {
+                        if (onRequireAuth) onRequireAuth('sign in to message this verified specialist');
+                        return;
+                      }
                       const target = selectedProfile;
                       setSelectedProfile(null);
                       if (onStartChat) {
@@ -2014,10 +2025,16 @@ export function ExploreFeed({
                     </a>
                   )}
 
-                  {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
+                  {selectedProfile.role === 'clinic' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && (
                     <button
                       type="button"
-                      onClick={() => setIsBookingModeOpen(!isBookingModeOpen)}
+                      onClick={() => {
+                        if (!currentUser) {
+                          if (onRequireAuth) onRequireAuth('sign in to book an online appointment with this clinic');
+                          return;
+                        }
+                        setIsBookingModeOpen(!isBookingModeOpen);
+                      }}
                       className={`btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 border border-emerald-300 font-bold transition-all cursor-pointer rounded-xl ${
                         isBookingModeOpen 
                           ? 'bg-[#5a5a40] text-white border-b-[3px] border-b-[#3c3c2b]' 
@@ -2030,7 +2047,7 @@ export function ExploreFeed({
                 </div>
 
                 {/* INLINE APPOINTMENT BOOKING PANEL */}
-                {selectedProfile.role === 'clinic' && currentUser.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
+                {selectedProfile.role === 'clinic' && currentUser?.role === 'user' && (selectedProfile.subscriptionTier === 'Silver' || selectedProfile.subscriptionTier === 'Gold' || selectedProfile.subscriptionTier === 'Platinum') && isBookingModeOpen && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -2295,7 +2312,19 @@ export function ExploreFeed({
                   </div>
 
                   {/* Write a review forms */}
-                  {currentUser.uid !== selectedProfile.uid && canUserReview(currentUser.role, selectedProfile.role) && (() => {
+                  {!currentUser ? (
+                    <div className="bg-[#fcf9f2] border border-[#e3dec9] p-5 rounded-2xl text-center space-y-2.5">
+                      <p className="text-xs text-stone-700 font-bold">Have you visited or consulted with this specialist?</p>
+                      <p className="text-[11px] text-stone-500">Sign in to leave a verified rating and clinical review for the pet parent community.</p>
+                      <button
+                        type="button"
+                        onClick={() => onRequireAuth?.('sign in to submit a clinical rating or review')}
+                        className="btn-tactile-3d-secondary py-2 px-5 text-xs inline-flex items-center gap-2 cursor-pointer font-bold mx-auto"
+                      >
+                        🔐 Sign In to Rate & Review
+                      </button>
+                    </div>
+                  ) : currentUser.uid !== selectedProfile.uid && canUserReview(currentUser.role, selectedProfile.role) && (() => {
                     const existingReview = modalReviews.find(r => r.reviewerEmail === currentUser.email);
                     return (
                       <form onSubmit={handleSubmitReview} className="bg-[#fcf9f2] border border-[#e3dec9] p-5 rounded-2xl space-y-4">

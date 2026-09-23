@@ -7,12 +7,13 @@ import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkle
 import { AdContainer } from './AdContainer';
 
 interface MarketplaceProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   onNavigate?: (section: string) => void;
   highlightProductId?: string | null;
+  onRequireAuth?: (actionContext?: string) => void;
 }
 
-export function Marketplace({ currentUser, onNavigate, highlightProductId }: MarketplaceProps) {
+export function Marketplace({ currentUser, onNavigate, highlightProductId, onRequireAuth }: MarketplaceProps) {
   const [products, setProducts] = useState<Product[]>(() => {
     return PrefetchService.getCachedProducts() || [];
   });
@@ -27,7 +28,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const [legalAgreed, setLegalAgreed] = useState<boolean>(false);
 
   // Form compose state (only allowed for doctor, clinic)
-  const isAuthorizedSeller = currentUser.role === 'doctor' || currentUser.role === 'clinic';
+  const isAuthorizedSeller = currentUser ? (currentUser.role === 'doctor' || currentUser.role === 'clinic') : false;
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [prodName, setProdName] = useState<string>('');
   const [prodPrice, setProdPrice] = useState<number>(0);
@@ -61,7 +62,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   useEffect(() => {
     loadProducts();
     // Pre-fill phone if available for convenience
-    if (currentUser.phone) {
+    if (currentUser?.phone) {
       setProdWhatsapp(currentUser.phone);
     }
 
@@ -114,6 +115,11 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to list veterinary equipment or medicines');
+      return;
+    }
 
     if (!legalAgreed) {
       setFormError('⚠️ Safe Trade Consent Required: You must check the legal affirmation box to confirm that you adhere to our anti-scam guidelines and hold the platform harmless.');
@@ -303,6 +309,23 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* GUEST LISTING CALLOUT */}
+      {!currentUser && (
+        <div className="text-left bg-[#fcf9f2] border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+          <div>
+            <span className="bg-[#5a5a40] text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Public Marketplace</span>
+            <h4 className="font-serif font-black text-stone-900 text-sm mt-1">Want to list veterinary equipment, medicines, or accessories?</h4>
+            <p className="text-xs text-stone-600 mt-0.5">Sign in to your practitioner or clinic account to catalog products to verified buyers across Pakistan.</p>
+          </div>
+          <button
+            onClick={() => onRequireAuth?.('sign in to list veterinary equipment or pharmaceuticals')}
+            className="cursor-pointer btn-tactile-3d-primary py-2.5 px-5 text-xs whitespace-nowrap"
+          >
+            🔐 Sign In to List Products
+          </button>
+        </div>
+      )}
 
       {/* COLLAPSIBLE COMPOSE FORM (Sellers only) */}
       {isAuthorizedSeller && (
@@ -502,7 +525,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId }: Mar
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((p, pIdx) => {
-            const isOwner = p.ownerEmail === currentUser.email;
+            const isOwner = currentUser?.email ? p.ownerEmail === currentUser.email : false;
             const tier = p.ownerSubscriptionTier || (p.isPremium ? 'Silver' : undefined);
 
             let cardStyle = "bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] overflow-hidden flex flex-col justify-between hover:shadow-xl hover:border-b-[4px] hover:border-[#5a5a40]";

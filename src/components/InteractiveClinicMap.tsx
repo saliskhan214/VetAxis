@@ -1,14 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+// Source: Google Maps Platform Code Assist
+import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { Search, MapPin, RefreshCw, Eye, Compass, HelpCircle } from 'lucide-react';
-
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY.trim() !== '';
+import { Search, Compass, RefreshCw } from 'lucide-react';
+import { GOOGLE_MAPS_API_KEY, DEFAULT_MAP_ID, MAPS_ATTRIBUTION_IDS, DEFAULT_CENTER } from '../lib/googleMaps';
 
 interface InteractiveClinicMapProps {
   lat?: number;
@@ -164,13 +158,13 @@ function MapController({
 
       <div className="relative border border-[#e3dec9] rounded-2xl overflow-hidden shadow-inner bg-stone-100">
         <Map
-          defaultCenter={markerPosition || { lat: 33.6844, lng: 73.0479 }}
+          defaultCenter={markerPosition || DEFAULT_CENTER}
           defaultZoom={markerPosition ? 14 : 11}
           gestureHandling={interactive ? 'greedy' : 'cooperative'}
           disableDefaultUI={!interactive}
           onClick={handleMapClick}
-          mapId="VETAXIS_MAP_ID_360"
-          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+          mapId={DEFAULT_MAP_ID}
+          internalUsageAttributionIds={[...MAPS_ATTRIBUTION_IDS]}
           style={{ width: '100%', height: interactive ? '320px' : '240px' }}
         >
           {markerPosition && (
@@ -193,7 +187,7 @@ function MapController({
 
 export function InteractiveClinicMap(props: InteractiveClinicMapProps) {
   return (
-    <APIProvider apiKey={API_KEY || ''} version="weekly">
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY} version="weekly">
       <MapController {...props} />
     </APIProvider>
   );

@@ -7,13 +7,14 @@ import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Spar
 import { AdContainer } from './AdContainer';
 
 interface PetAdsProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   onNavigate?: (section: string, highlightId?: string) => void;
   highlightAdId?: string | null;
   initialType?: string | null;
+  onRequireAuth?: (actionContext?: string) => void;
 }
 
-export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: PetAdsProps) {
+export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, onRequireAuth }: PetAdsProps) {
   const [ads, setAds] = useState<PetAd[]>(() => {
     return PrefetchService.getCachedPetAds() || [];
   });
@@ -163,7 +164,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   useEffect(() => {
     loadAds();
     loadBoostedEmergencyPosts();
-    if (currentUser.phone) {
+    if (currentUser?.phone) {
       setWhatsapp(currentUser.phone);
     }
   }, []);
@@ -207,6 +208,11 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
   const handleAdSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    if (!currentUser) {
+      if (onRequireAuth) onRequireAuth('sign in to post pet adoption or listing');
+      return;
+    }
 
     if (!legalAgreed) {
       setFormError('⚠️ Safe Trade Consent Required: You must check the legal affirmation box to confirm that you adhere to our anti-scam guidelines and hold the platform harmless.');
@@ -722,11 +728,34 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
         )}
       </AnimatePresence>
 
+      {/* GUEST LISTING CALLOUT */}
+      {!currentUser && (
+        <div className="text-left bg-[#fcf9f2] border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+          <div>
+            <span className="bg-[#5a5a40] text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Public Ad Directory</span>
+            <h4 className="font-serif font-black text-stone-900 text-sm mt-1">Want to rehome or post a pet classified?</h4>
+            <p className="text-xs text-stone-600 mt-0.5">Sign in to find loving homes, verify ad details, or connect directly with verified guardians across Pakistan.</p>
+          </div>
+          <button
+            onClick={() => onRequireAuth?.('sign in to post an adoption or pet classified ad')}
+            className="cursor-pointer btn-tactile-3d-primary py-2.5 px-5 text-xs whitespace-nowrap"
+          >
+            🔐 Sign In to Post Ad
+          </button>
+        </div>
+      )}
+
       {/* NEW POST ACTIONS */}
       <div className="text-left" data-no-scroll="true">
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => setFormOpen(!formOpen)}
+          onClick={() => {
+            if (!currentUser) {
+              if (onRequireAuth) onRequireAuth('sign in to post an adoption or pet classified ad');
+              return;
+            }
+            setFormOpen(!formOpen);
+          }}
           className="cursor-pointer btn-tactile-3d-primary py-3 px-6 text-xs inline-flex items-center gap-2"
         >
           {formOpen ? '✕ Close Composer' : '➕ Post an Ad Listing'}
@@ -1068,7 +1097,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType }: 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
           {filteredAds.map((ad, adIdx) => {
-            const isOwner = ad.ownerEmail === currentUser.email;
+            const isOwner = currentUser?.email ? ad.ownerEmail === currentUser.email : false;
             const tier = ad.ownerSubscriptionTier || (ad.isPremium ? 'Silver' : undefined);
 
             let cardStyle = "bg-white rounded-3xl border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] overflow-hidden flex flex-col justify-between hover:shadow-xl hover:border-b-[4px] hover:border-[#5a5a40]";

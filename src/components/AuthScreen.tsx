@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark } from 'lucide-react';
+import { Sparkles, CheckCircle2, ShieldCheck, HeartPulse, ShoppingBag, Landmark, X } from 'lucide-react';
 import { LegalModal } from './LegalAndAbout';
 import { LocationService } from '../lib/storage';
 
@@ -14,9 +14,11 @@ interface AuthScreenProps {
     registerGoogleUser?: (pendingInfo: any, role: string, phone: string, extra: any) => Promise<any>;
   };
   onOpenAboutUs?: () => void;
+  onClose?: () => void;
+  contextMessage?: string | null;
 }
 
-export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthScreenProps) {
+export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs, onClose, contextMessage }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [googlePendingInfo, setGooglePendingInfo] = useState<any | null>(null);
@@ -216,8 +218,26 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs }: AuthSc
           initial={{ opacity: 0, y: 30, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5, type: 'spring', stiffness: 120 }}
-          className="w-full max-w-[540px] bg-white rounded-3xl p-8 md:p-12 border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] shadow-[0_24px_50px_-15px_rgba(90,90,64,0.18)]"
+          className="w-full max-w-[540px] bg-white rounded-3xl p-8 md:p-12 border border-[#e3dec9] border-b-[6px] border-b-[#cdc6ad] shadow-[0_24px_50px_-15px_rgba(90,90,64,0.18)] relative"
         >
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-5 right-5 p-2 rounded-full bg-[#f6f3eb] hover:bg-[#ede8db] text-[#5a5a40] transition-colors cursor-pointer border border-[#e3dec9]"
+              aria-label="Close sign in"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+
+          {contextMessage && (
+            <div className="mb-6 bg-amber-50 border border-amber-200 border-b-[3px] border-b-amber-300 text-amber-900 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-xs animate-fadeIn">
+              <span className="text-base">🔐</span>
+              <span>Please {contextMessage} to proceed.</span>
+            </div>
+          )}
+
           <div className="mb-8 text-center md:text-left">
             <h1 className="font-serif text-3xl font-black text-[#373735] tracking-tight leading-none mb-2">
               {googlePendingInfo ? 'Complete Account Setup' : 'Access VetAxis'}
