@@ -20,7 +20,9 @@ import { PetAds } from './components/PetAds';
 import { ProfilePage } from './components/ProfilePage';
 import { JobBoard } from './components/JobBoard';
 import LivestockManagement from './components/LivestockManagement';
+import { LivestockPublicPortal } from './components/LivestockPublicPortal';
 import { SubscriptionPortal } from './components/SubscriptionPortal';
+import { SubscriptionPricingPublic } from './components/SubscriptionPricingPublic';
 import { GuestAnimalViewer } from './components/GuestAnimalViewer';
 import { ClinicManagement } from './components/ClinicManagement';
 import { AboutUsDirectory } from './components/AboutUsDirectory';
@@ -135,7 +137,8 @@ export default function App() {
         'livestock', 'profile', 'subscription', 'admin', 'news', 
         'blogs', 'articles', 'about', 'about_us', 'terms', 
         'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
-        'support', 'clinic_management'
+        'support', 'clinic_management', 'clinical_tools', 'clinical_suite',
+        'calculators', 'calculator', 'tools', 'messenger'
       ];
       let targetSection = tabParam.toLowerCase();
       if (targetSection === 'pets') targetSection = 'pet_ads';
@@ -144,6 +147,7 @@ export default function App() {
       if (targetSection === 'terms_of_service') targetSection = 'terms';
       if (targetSection === 'privacy_policy') targetSection = 'privacy';
       if (targetSection === 'support') targetSection = 'contact';
+      if (targetSection === 'clinical_suite' || targetSection === 'calculators' || targetSection === 'calculator' || targetSection === 'tools') targetSection = 'clinical_tools';
 
       if (validSections.includes(targetSection) || validSections.includes(tabParam.toLowerCase())) {
         setActiveSection(targetSection);
@@ -508,8 +512,9 @@ export default function App() {
     if (normalized === 'terms_of_service') normalized = 'terms';
     if (normalized === 'privacy_policy') normalized = 'privacy';
     if (normalized === 'support') normalized = 'contact';
+    if (normalized === 'clinical_suite' || normalized === 'calculators' || normalized === 'calculator' || normalized === 'tools') normalized = 'clinical_tools';
 
-    const PRIVATE_SECTIONS = ['messenger', 'livestock', 'profile', 'subscription', 'clinic_management', 'clinical_suite', 'clinical_tools', 'admin'];
+    const PRIVATE_SECTIONS = ['messenger', 'profile', 'admin', 'clinic_management'];
     if (!currentUser && PRIVATE_SECTIONS.includes(normalized)) {
       triggerAuthWall(`sign in to access ${normalized.replace('_', ' ')}`);
       return;
@@ -983,20 +988,10 @@ export default function App() {
                   onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
                 />
               ) : (
-                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
-                  <div className="text-4xl">🌾</div>
-                  <h2 className="text-2xl font-serif font-black text-stone-800">Livestock Herd & Farm Records</h2>
-                  <p className="text-sm text-stone-600 leading-relaxed">
-                    Track herd pedigree, vaccination calendars, lactation cycles, and disease alerts across your dairy & livestock operations.
-                  </p>
-                  <button 
-                    onClick={() => triggerAuthWall('sign in to manage your livestock herds')} 
-                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
-                  >
-                    <span>🔐</span>
-                    <span>Sign In to Access Herd Suite</span>
-                  </button>
-                </div>
+                <LivestockPublicPortal 
+                  onSignIn={() => triggerAuthWall('sign in to manage your livestock herds')} 
+                  onNavigate={handleNavigate}
+                />
               )
             )}
 
@@ -1033,20 +1028,10 @@ export default function App() {
                   onNavigateToSection={handleNavigate}
                 />
               ) : (
-                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
-                  <div className="text-4xl">⭐</div>
-                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Verification & Plans</h2>
-                  <p className="text-sm text-stone-600 leading-relaxed">
-                    Boost your clinic visibility, earn verified badges, unlock client online booking, and manage multi-staff practices.
-                  </p>
-                  <button 
-                    onClick={() => triggerAuthWall('sign in to view practitioner subscription plans')} 
-                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
-                  >
-                    <span>🔐</span>
-                    <span>Sign In to View Plans</span>
-                  </button>
-                </div>
+                <SubscriptionPricingPublic
+                  onSignIn={() => triggerAuthWall('sign in to select your practitioner subscription plan')}
+                  onNavigate={handleNavigate}
+                />
               )
             )}
 
@@ -1104,27 +1089,10 @@ export default function App() {
             )}
 
             {(activeSection === 'clinical_tools' || activeSection === 'clinical_suite') && (
-              currentUser ? (
-                <VeterinaryClinicalSuite 
-                  currentUser={currentUser}
-                  onNavigate={handleNavigate}
-                />
-              ) : (
-                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
-                  <div className="text-4xl">🩺</div>
-                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Clinical Suite</h2>
-                  <p className="text-sm text-stone-600 leading-relaxed">
-                    Emergency anesthesia calculators, fluid therapy dosers, antibiotic formularies, and clinical diagnostics.
-                  </p>
-                  <button 
-                    onClick={() => triggerAuthWall('sign in as a veterinary practitioner to access clinical tools')} 
-                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
-                  >
-                    <span>🔐</span>
-                    <span>Doctor Sign In</span>
-                  </button>
-                </div>
-              )
+              <VeterinaryClinicalSuite 
+                currentUser={currentUser}
+                onNavigate={handleNavigate}
+              />
             )}
 
             {activeSection === 'about' && (

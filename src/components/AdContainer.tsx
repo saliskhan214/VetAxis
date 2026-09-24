@@ -57,16 +57,20 @@ export function AdContainer({
     let timer: NodeJS.Timeout;
     try {
       if (typeof window !== 'undefined') {
-        const adsbygoogle = (window as any).adsbygoogle || [];
-        // Short debounce tick to ensure layout paint before push
         timer = setTimeout(() => {
           try {
-            adsbygoogle.push({});
-            setIsPushed(true);
+            if (adRef.current) {
+              const status = adRef.current.getAttribute('data-adsbygoogle-status');
+              if (!status) {
+                const adsbygoogle = (window as any).adsbygoogle || [];
+                adsbygoogle.push({});
+                setIsPushed(true);
+              }
+            }
           } catch (err) {
             console.debug('AdSense unit initialized or already pushed:', err);
           }
-        }, 150);
+        }, 200);
       }
     } catch (e) {
       setLoadError(true);

@@ -861,10 +861,23 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     }
   });
 
-  // Google AdSense ads.txt endpoint
-  app.get("/ads.txt", (req, res) => {
+  // Google AdSense ads.txt endpoint (Exact IAB / Google spec)
+  app.get(["/ads.txt", "/Ads.txt", "/ADS.TXT"], (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
     res.status(200).send("google.com, pub-7801443420941774, DIRECT, f08c47fec0942fa0\n");
+  });
+
+  // Robots.txt endpoint
+  app.get(["/robots.txt", "/Robots.txt"], (req, res) => {
+    const robotsPath = path.join(process.cwd(), "public", "robots.txt");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
+    if (fs.existsSync(robotsPath)) {
+      res.sendFile(robotsPath);
+    } else {
+      res.status(200).send("User-agent: *\nAllow: /\nSitemap: https://vetaxis360.com/sitemap.xml\n");
+    }
   });
 
   // Google Site Verification static handler (Supports direct GSC crawler verification)

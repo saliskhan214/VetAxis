@@ -314,7 +314,7 @@ export default function VeterinaryNewsBrief() {
       <div className="pt-2">
         <AdContainer 
           format="horizontal" 
-          adLabel="SPONSORED LINKS" 
+          adLabel="Advertisement" 
           className="shadow-xs"
         />
       </div>

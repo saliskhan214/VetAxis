@@ -32,6 +32,7 @@ import { UserProfile, UserRole } from '../types';
 import { ExploreService } from '../lib/storage';
 import { 
   GOOGLE_MAPS_API_KEY, 
+  hasGoogleMapsKey,
   DEFAULT_MAP_ID, 
   MAPS_ATTRIBUTION_IDS, 
   DEFAULT_CENTER, 
@@ -676,36 +677,162 @@ export function GoogleMapsDirectory({
           </div>
         )}
 
-        {/* Right Side / Full Width: Interactive Google Map */}
+        {/* Right Side / Full Width: Interactive Google Map or Graceful Directory Card */}
         <div className="flex-1 h-full w-full relative">
-          <APIProvider apiKey={GOOGLE_MAPS_API_KEY} version="weekly">
-            <InnerMapComponent
-              items={sortedItems}
-              selectedItem={selectedItem}
-              onSelectItem={handleMarkerSelect}
-              userLocation={userLocation}
-              centerCoord={centerCoord}
-              zoomLevel={zoomLevel}
-            />
-          </APIProvider>
+          {hasGoogleMapsKey() ? (
+            <>
+              <APIProvider apiKey={GOOGLE_MAPS_API_KEY} version="weekly">
+                <InnerMapComponent
+                  items={sortedItems}
+                  selectedItem={selectedItem}
+                  onSelectItem={handleMarkerSelect}
+                  userLocation={userLocation}
+                  centerCoord={centerCoord}
+                  zoomLevel={zoomLevel}
+                />
+              </APIProvider>
 
-          {/* Floating Map Legend */}
-          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs border border-stone-200 rounded-2xl p-2.5 shadow-md text-[10px] font-bold text-stone-700 space-y-1.5 z-10 hidden sm:block pointer-events-none">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
-              <span>Veterinary Clinic</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-              <span>Veterinary Doctor</span>
-            </div>
-            {userLocation && (
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
-                <span>Your Location</span>
+              {/* Floating Map Legend */}
+              <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs border border-stone-200 rounded-2xl p-2.5 shadow-md text-[10px] font-bold text-stone-700 space-y-1.5 z-10 hidden sm:block pointer-events-none">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                  <span>Veterinary Clinic</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                  <span>Veterinary Doctor</span>
+                </div>
+                {userLocation && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
+                    <span>Your Location</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <div className="w-full h-full bg-[#fbf9f4] p-6 flex flex-col justify-between overflow-y-auto">
+              <div className="max-w-2xl mx-auto w-full space-y-6 pt-4">
+                {selectedItem ? (
+                  <div className="bg-white border-2 border-[#5a5a40] rounded-3xl p-6 shadow-md space-y-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <span className={`inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-2 ${
+                          selectedItem.role === 'clinic' 
+                            ? 'bg-emerald-150 text-emerald-950 border border-emerald-300' 
+                            : 'bg-blue-150 text-blue-950 border border-blue-300'
+                        }`}>
+                          {selectedItem.role === 'clinic' ? '🏥 Veterinary Clinic' : '👨‍⚕️ Veterinary Doctor'}
+                        </span>
+                        <h2 className="text-2xl font-black font-serif text-stone-900">
+                          {selectedItem.name}
+                        </h2>
+                        {selectedItem.specialty && (
+                          <p className="text-sm font-semibold text-[#5a5a40] mt-0.5">
+                            {selectedItem.specialty}
+                          </p>
+                        )}
+                      </div>
+
+                      {selectedItem.rating && (
+                        <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-2xl shrink-0">
+                          <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                          <span className="font-bold text-sm text-amber-900">{selectedItem.rating.toFixed(1)}</span>
+                          <span className="text-xs text-amber-700">({selectedItem.reviewsCount || 1})</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-stone-700 bg-stone-50 p-4 rounded-2xl border border-stone-200">
+                      <div className="flex items-start gap-2.5">
+                        <MapPin className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold text-stone-900">{selectedItem.city}</p>
+                          <p className="text-stone-500 text-[11px]">{selectedItem.address || 'Address registered on file'}</p>
+                        </div>
+                      </div>
+
+                      {selectedItem.phone && (
+                        <div className="flex items-center gap-2.5">
+                          <Phone className="w-4 h-4 text-emerald-700 shrink-0" />
+                          <div>
+                            <p className="font-bold text-stone-900">Contact</p>
+                            <a href={`tel:${selectedItem.phone}`} className="text-emerald-700 hover:underline font-mono text-[11px]">
+                              {selectedItem.phone}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <a
+                        href={getDirectionsUrl(selectedItem.lat, selectedItem.lng, selectedItem.name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4a5d4e] hover:bg-[#3d4d40] text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        <span>Navigate in Google Maps ↗</span>
+                      </a>
+
+                      {selectedItem.rawProfile && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectProfile(selectedItem.rawProfile!)}
+                          className="px-5 py-2.5 bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all"
+                        >
+                          View Full Profile
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-[#e3dec9] rounded-3xl p-8 text-center space-y-4 shadow-sm">
+                    <div className="w-14 h-14 bg-stone-100 rounded-full flex items-center justify-center mx-auto text-[#5a5a40]">
+                      <MapPin className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold font-serif text-stone-900">
+                        Select a Clinic or Doctor from the Directory
+                      </h3>
+                      <p className="text-xs text-stone-500 max-w-md mx-auto mt-1">
+                        Browse verified veterinary professionals across Pakistan. Click any listing to get instant contact information and Google Maps turn-by-turn navigation.
+                      </p>
+                    </div>
+
+                    {/* Quick City Filters */}
+                    <div className="pt-2 flex flex-wrap justify-center gap-2">
+                      {MAJOR_CITIES.map((city) => (
+                        <button
+                          key={city.name}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCity(city.name);
+                            const match = sortedItems.find((i) => i.city.toLowerCase().includes(city.name.toLowerCase()));
+                            if (match) setSelectedItem(match);
+                          }}
+                          className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                            selectedCity === city.name
+                              ? 'bg-[#5a5a40] text-white border-[#5a5a40]'
+                              : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                          }`}
+                        >
+                          {city.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center pt-4">
+                <p className="text-[11px] text-stone-400">
+                  Tip: Direct navigation links work automatically. Set <code className="font-mono text-stone-600 bg-stone-100 px-1 py-0.5 rounded">VITE_GOOGLE_MAPS_API_KEY</code> in environment settings to enable live embedded satellite tiles.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

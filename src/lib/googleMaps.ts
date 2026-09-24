@@ -4,7 +4,7 @@ export const GOOGLE_MAPS_API_KEY =
   (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
   (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  'AIzaSyBU_bLKFY_15jzckXVanJdBF50jPpOxdWM';
+  '';
 
 export const MAPS_ATTRIBUTION_IDS = ['gmp_mcp_codeassist_v1_aistudio'] as const;
 
@@ -30,7 +30,12 @@ export const MAJOR_CITIES: { name: string; lat: number; lng: number; zoom: numbe
 ];
 
 export function hasGoogleMapsKey(): boolean {
-  return Boolean(GOOGLE_MAPS_API_KEY) && GOOGLE_MAPS_API_KEY.trim() !== '' && GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY';
+  return (
+    Boolean(GOOGLE_MAPS_API_KEY) &&
+    GOOGLE_MAPS_API_KEY.trim() !== '' &&
+    GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY' &&
+    GOOGLE_MAPS_API_KEY !== 'undefined'
+  );
 }
 
 /**

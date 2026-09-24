@@ -650,22 +650,20 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
                 </div>
 
               </motion.div>
-
-              {/* Policy-Compliant Google AdSense Placement inside Product Grid */}
-              {(pIdx + 1) % 6 === 0 && (
-                <div className="col-span-1 h-full flex flex-col justify-center">
-                  <AdContainer 
-                    format="rectangle" 
-                    adLabel="Advertisement" 
-                    className="h-full min-h-[320px] flex flex-col justify-between m-0"
-                  />
-                </div>
-              )}
             </React.Fragment>
             );
           })}
         </div>
       )}
+
+      {/* Policy-Compliant Google AdSense Banner Placement below Products */}
+      <div className="w-full my-8">
+        <AdContainer 
+          format="horizontal" 
+          adLabel="Advertisement" 
+          className="shadow-xs"
+        />
+      </div>
 
       {/* Premium Upgrade Modal Popup */}
       <AnimatePresence>

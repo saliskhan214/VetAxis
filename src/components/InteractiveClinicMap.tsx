@@ -2,7 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Search, Compass, RefreshCw } from 'lucide-react';
-import { GOOGLE_MAPS_API_KEY, DEFAULT_MAP_ID, MAPS_ATTRIBUTION_IDS, DEFAULT_CENTER } from '../lib/googleMaps';
+import { 
+  GOOGLE_MAPS_API_KEY, 
+  hasGoogleMapsKey, 
+  getDirectionsUrl, 
+  DEFAULT_MAP_ID, 
+  MAPS_ATTRIBUTION_IDS, 
+  DEFAULT_CENTER 
+} from '../lib/googleMaps';
 
 interface InteractiveClinicMapProps {
   lat?: number;
@@ -186,6 +193,69 @@ function MapController({
 }
 
 export function InteractiveClinicMap(props: InteractiveClinicMapProps) {
+  if (!hasGoogleMapsKey()) {
+    const currentLat = props.lat || DEFAULT_CENTER.lat;
+    const currentLng = props.lng || DEFAULT_CENTER.lng;
+    const directionsUrl = getDirectionsUrl(currentLat, currentLng, props.placeholderAddress || props.cityName);
+
+    return (
+      <div className="w-full space-y-2">
+        <div className="relative border border-[#e3dec9] rounded-2xl p-4 bg-stone-50 overflow-hidden shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="text-xs font-bold text-stone-900 font-serif">
+                  {props.placeholderAddress || props.cityName ? `${props.cityName || 'Clinic Location'}` : 'Location Map'}
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-500 font-mono">
+                Coordinates: {currentLat.toFixed(4)}° N, {currentLng.toFixed(4)}° E
+              </p>
+            </div>
+            
+            <a
+              href={directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4a5d4e] hover:bg-[#3d4d40] text-white text-xs font-bold rounded-xl transition-all shadow-xs shrink-0"
+            >
+              <span>Open in Google Maps</span>
+              <span className="text-[10px]">↗</span>
+            </a>
+          </div>
+
+          {props.interactive && props.onLocationSelect && (
+            <div className="mt-3 pt-3 border-t border-[#e3dec9]/60 flex flex-wrap items-center gap-2 text-[11px] text-stone-600">
+              <span className="font-semibold text-stone-700">Quick coordinates:</span>
+              <button
+                type="button"
+                onClick={() => props.onLocationSelect?.(33.6844, 73.0479, 'Islamabad')}
+                className="px-2 py-0.5 rounded-md bg-white border border-[#e3dec9] hover:bg-stone-150 text-[10px] font-bold"
+              >
+                Islamabad
+              </button>
+              <button
+                type="button"
+                onClick={() => props.onLocationSelect?.(31.5204, 74.3587, 'Lahore')}
+                className="px-2 py-0.5 rounded-md bg-white border border-[#e3dec9] hover:bg-stone-150 text-[10px] font-bold"
+              >
+                Lahore
+              </button>
+              <button
+                type="button"
+                onClick={() => props.onLocationSelect?.(24.8607, 67.0011, 'Karachi')}
+                className="px-2 py-0.5 rounded-md bg-white border border-[#e3dec9] hover:bg-stone-150 text-[10px] font-bold"
+              >
+                Karachi
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY} version="weekly">
       <MapController {...props} />

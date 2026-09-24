@@ -411,8 +411,8 @@ export function Navbar({
                       if (item.id === 'admin') {
                         return user?.email?.toLowerCase() === 'vetaxis360@gmail.com' || user?.email === 'saliskhan214@gmail.com' || user?.isAdmin === true;
                       }
-                      if (item.id === 'subscription') {
-                        return user ? (user.role === 'clinic' || user.role === 'doctor') : false;
+                      if (item.id === 'messenger') {
+                        return !!user;
                       }
                       if (item.id === 'clinic_management') {
                         return user?.role === 'clinic';
