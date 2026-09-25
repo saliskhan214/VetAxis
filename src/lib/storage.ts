@@ -300,17 +300,23 @@ function populateInitialSeeds() {
     const seeds: UserProfile[] = [
       {
         uid: 'seed_doc_1',
-        name: 'Dr. Sarah Alizai',
+        name: 'Dr. Sarah Alizai, DVM',
         email: 'sarah.alizai@vetaxis.pk',
         phone: '03001234567',
         role: 'doctor',
-        expertise: 'Feline Specialist, General Surgery',
+        expertise: 'Feline Specialist, Cat-Only Fear Free Certified, Soft Tissue Surgery',
         createdAt: Date.now() - 5 * 24 * 3600000,
         isVerified: true,
         offersHomeVisit: true,
         homeVisitCharges: 'Available on-call for doorstep emergency & routine vaccinations',
-        avgRating: 4.8,
-        totalReviews: 12,
+        address: 'Islamabad Capital Territory',
+        location: {
+          lat: 33.6844,
+          lng: 73.0479,
+          address: 'F-7 / F-8 Markaz, Islamabad'
+        },
+        avgRating: 4.9,
+        totalReviews: 24,
         reviews: [
           {
             id: 'rev_1',
@@ -318,128 +324,363 @@ function populateInitialSeeds() {
             reviewerName: 'Ali Khan',
             reviewerRole: 'user',
             rating: 5,
-            comment: 'Dr. Sarah saved my cat! She is extremely thorough and caring.',
+            comment: 'Dr. Sarah saved my Persian cat during late-night emergency triage. Fear-free gentle handling and pristine diagnosis.',
             date: Date.now() - 2 * 24 * 3600000
           }
         ]
       },
       {
         uid: 'seed_doc_2',
-        name: 'Dr. Faisal Shah',
+        name: 'Dr. Faisal Shah, DVM, MSc (Surgery)',
         email: 'faisal.shah@vetaxis.pk',
         phone: '03217654321',
         role: 'doctor',
-        expertise: 'Avian Medicine, Surgery & Orthopedics',
+        expertise: 'Avian Medicine, Exotic Pets (Rabbits, Reptiles, Birds), Orthopedics & GDV Bloat Surgery',
         createdAt: Date.now() - 15 * 24 * 3600000,
         isVerified: true,
-        avgRating: 4.5,
-        totalReviews: 6,
+        address: 'Gulberg III, Lahore',
+        location: {
+          lat: 31.5204,
+          lng: 74.3587,
+          address: 'Main Boulevard, Gulberg III, Lahore'
+        },
+        avgRating: 4.9,
+        totalReviews: 18,
         reviews: []
       },
       {
         uid: 'seed_clinic_1',
-        name: 'Peshawar Animal Hospital',
-        email: 'peshawar.vet@clinic.pk',
-        phone: '0915222222',
+        name: '24/7 Companion Animal Hospital & Emergency Trauma Center',
+        email: 'emergency.lahore@clinic.pk',
+        phone: '04235889900',
         role: 'clinic',
-        facilities: 'Digital X-Ray, ICU, Laboratory, 24/7 Emergency',
-        address: 'Khyber Road, Peshawar Cantonment',
+        facilities: 'Digital X-Ray, In-House Blood Lab, Ultrasound, 24/7 Emergency Open Now, Walk-in (No Appt Required), CareCredit / Payment Plans Accepted, Oxygen ICU, Isolation Ward',
+        address: 'DHA Phase 5 / Gulberg, Lahore',
         createdAt: Date.now() - 30 * 24 * 3600000,
         isVerified: true,
         offersHomeVisit: true,
-        homeVisitCharges: 'Mobile vet van & on-site farm calls across Peshawar district',
+        homeVisitCharges: 'Mobile vet van & 24hr after-hours home emergency visit unit',
+        location: {
+          lat: 31.4697,
+          lng: 74.4101,
+          address: 'Sector CCA, Phase 5 DHA, Lahore'
+        },
+        avgRating: 4.9,
+        totalReviews: 42,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_2',
+        name: 'Metro Pet Dental, Dermatology & Spay-Neuter Surgical Clinic',
+        email: 'metropet.isb@clinic.pk',
+        phone: '0512877665',
+        role: 'clinic',
+        facilities: 'Puppy Vaccinations and Deworming, Low Cost Cat Spay Neuter Clinic, Ultrasonic Pet Dental Scaling, Skin Allergy Testing, Microchipping (ISO 11784), Digital X-Ray Sensor',
+        address: 'Blue Area / G-9 Markaz, Islamabad',
+        createdAt: Date.now() - 25 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Doorstep puppy vaccine boosters & routine microchipping',
+        location: {
+          lat: 33.7087,
+          lng: 73.0560,
+          address: 'Jinnah Avenue, Blue Area, Islamabad'
+        },
+        avgRating: 4.8,
+        totalReviews: 31,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_3',
+        name: 'Equine, Livestock & Companion Veterinary Surgical Center',
+        email: 'equine.peshawar@clinic.pk',
+        phone: '0915222222',
+        role: 'clinic',
+        facilities: 'Equine Horse Care, Colic Management, Digital Radiography, High-Frequency Ultrasound, Mobile Farm Ambulatory Unit, Livestock Herd Health',
+        address: 'Khyber Road, Peshawar Cantonment',
+        createdAt: Date.now() - 20 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Mobile vet van with portable ultrasound for horse and farm calls',
         location: {
           lat: 34.0151,
           lng: 71.5249,
           address: 'Khyber Road, Peshawar Cantonment'
         },
         avgRating: 4.9,
-        totalReviews: 15,
+        totalReviews: 19,
         reviews: []
       },
       {
         uid: 'seed_assistant_1',
-        name: 'Haris Qureshi',
+        name: 'Haris Qureshi, Licensed Vet Tech',
         email: 'haris.q@vetaxis.pk',
         phone: '03339090901',
         role: 'assistant',
-        expertise: 'Wound dressing, vaccination schedules, post-op care',
+        expertise: 'Wound dressing, AAHA puppy vaccination schedules, catheterization, post-op ICU monitoring',
         createdAt: Date.now() - 2 * 24 * 3600000,
-        isVerified: false,
-        avgRating: 4.0,
-        totalReviews: 2,
+        isVerified: true,
+        avgRating: 4.8,
+        totalReviews: 8,
         reviews: []
       }
     ];
     saveLocalUsers(seeds);
   }
 
-  // Seed default marketplace items
+  // Seed default marketplace items (Matching Categories 4 & 6)
   if (!localStorage.getItem(LOCAL_ACC_KEY)) {
     const marketSeeds: Product[] = [
       {
         id: 'p_seed_1',
-        name: 'Organic Anti-Flea Shampoo',
-        price: 1250,
-        quantity: 25,
-        description: 'Clinically proven herbal anti-flea formula for kittens and dogs. Free from harsh chemicals.',
+        name: 'Amoxicillin-Clavulanate Veterinary Oral Drops (Cats & Small Dogs)',
+        price: 950,
+        quantity: 40,
+        description: 'Broad spectrum veterinary antibiotic suspension. Clinically dosed for feline upper respiratory infections, soft tissue wounds, and urinary tract infections.',
         whatsapp: '923001234567',
         ownerEmail: 'sarah.alizai@vetaxis.pk',
-        ownerName: 'Dr. Sarah Alizai',
+        ownerName: 'Dr. Sarah Alizai, DVM',
         ownerRole: 'doctor',
         createdAt: Date.now() - 1 * 24 * 3600000
       },
       {
         id: 'p_seed_2',
-        name: 'Premium Calcium Tablets for Canines',
-        price: 850,
-        quantity: 50,
-        description: 'Supports absolute bone density and joint strength. Specially formulated for retrievers and large breeds.',
+        name: 'Broad Spectrum Flea, Tick & Heartworm Prevention Chewables',
+        price: 2450,
+        quantity: 60,
+        description: 'Monthly chewable treatment for dogs. Complete defense against fleas, ticks, mites, and heartworm microfilariae.',
         whatsapp: '923217654321',
         ownerEmail: 'faisal.shah@vetaxis.pk',
         ownerName: 'Dr. Faisal Shah',
         ownerRole: 'doctor',
+        createdAt: Date.now() - 2 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_3',
+        name: 'Canine Joint Supplements Collagen & Glucosamine Chondroitin Chews',
+        price: 1850,
+        quantity: 35,
+        description: 'Veterinarian formulated joint support soft chews for hip dysplasia, senior canine arthritis, and cartilege regeneration.',
+        whatsapp: '923001234567',
+        ownerEmail: 'sarah.alizai@vetaxis.pk',
+        ownerName: 'Dr. Sarah Alizai, DVM',
+        ownerRole: 'doctor',
         createdAt: Date.now() - 3 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_4',
+        name: 'Chlorhexidine Gluconate 4% Antiseptic Veterinary Shampoo (500ml)',
+        price: 1350,
+        quantity: 50,
+        description: 'Medical antibacterial & antifungal skin shampoo for canine pyoderma, yeast dermatitis, and hot-spot relief.',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Dr. Faisal Shah',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 4 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_5',
+        name: 'Veterinary Renal Support Diet Wet Food (Canine Kidney Care)',
+        price: 680,
+        quantity: 80,
+        description: 'Low phosphorus, controlled protein veterinary wet renal formula for cats and dogs diagnosed with Chronic Kidney Disease (CKD).',
+        whatsapp: '923001234567',
+        ownerEmail: 'sarah.alizai@vetaxis.pk',
+        ownerName: 'Dr. Sarah Alizai, DVM',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 5 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_6',
+        name: 'Enzymatic Pet Dental Tartar Toothpaste (Poultry Flavour)',
+        price: 750,
+        quantity: 65,
+        description: 'Safe to swallow enzymatic oral gel for plaque removal, calculus prevention, and fresh pet breath.',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Dr. Faisal Shah',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 6 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_7',
+        name: 'Veterinary Surgical Instruments Set (24-Piece German Stainless Steel)',
+        price: 18500,
+        quantity: 12,
+        description: 'Autoclavable clinical operating set: Metzenbaum scissors, scalpel handles, Mayo-Hegar needle holders, tissue forceps, and hemostatic clamps.',
+        whatsapp: '923001234567',
+        ownerEmail: 'sarah.alizai@vetaxis.pk',
+        ownerName: 'Dr. Sarah Alizai, DVM',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 7 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_8',
+        name: 'Used Veterinary Ultrasound Machine (Certified Refurbished Doppler)',
+        price: 245000,
+        quantity: 3,
+        description: 'Full Doppler color ultrasound with microconvex probe (abdominal) and linear rectal probe. Tested, calibrated with 1-year clinical warranty.',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Dr. Faisal Shah',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 8 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_9',
+        name: 'Veterinary Digital X-Ray Flat Panel Sensor (Wireless DR System)',
+        price: 320000,
+        quantity: 2,
+        description: 'High DQE Cesium Iodide flat panel detector for small animal radiography with instant DICOM image processing workstation.',
+        whatsapp: '923001234567',
+        ownerEmail: 'sarah.alizai@vetaxis.pk',
+        ownerName: 'Dr. Sarah Alizai, DVM',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 9 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_10',
+        name: 'Rapid Parvo Test Kit (CPV-Ag Direct Diagnostic Cassettes - Box of 10)',
+        price: 3400,
+        quantity: 25,
+        description: 'Clinical grade 10-minute antigen detection test for canine parvovirus. Highly sensitive colloidal gold immunochromatography.',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Dr. Faisal Shah',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 10 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_11',
+        name: 'Modular Stainless Steel Veterinary Recovery Cages (Bank of 3)',
+        price: 88000,
+        quantity: 5,
+        description: '304 stainless steel hospital recovery cages with secure slam latch, removable waste pans, and fluid drain port.',
+        whatsapp: '923001234567',
+        ownerEmail: 'sarah.alizai@vetaxis.pk',
+        ownerName: 'Dr. Sarah Alizai, DVM',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 11 * 24 * 3600000
+      },
+      {
+        id: 'p_seed_12',
+        name: 'Piezoelectric Veterinary Dental Scaler & Polisher Unit',
+        price: 29500,
+        quantity: 8,
+        description: 'Ultrasonic calculus scaler with LED illumination, self-contained irrigation bottle, and 5 dental tips for canine/feline scaling.',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Dr. Faisal Shah',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 12 * 24 * 3600000
       }
     ];
     localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(marketSeeds));
   }
 
-  // Seed default pet ads
+  // Seed default pet ads (Matching Category 7)
   if (!localStorage.getItem(LOCAL_PETS_KEY)) {
     const petSeeds: PetAd[] = [
       {
         id: 'ad_seed_1',
         adType: 'adoption',
-        petType: 'Cat',
-        breed: 'Persian Crossbreed',
-        age: 3,
+        petType: 'Dog',
+        breed: 'Rescue Puppy Mix (Labrador Cross)',
+        age: 0.3,
         price: 0,
-        description: 'Extremely playful kitten vaccinated and trained. Looking for a warm home.',
-        location: 'Gulshan Iqbal, Karachi',
+        description: 'Shelter rescue puppy, fully vaccinated with AAHA core DHPP shot, microchipped (ISO 11784), and dewormed. Looking for a loving home with a secure garden.',
+        location: 'F-8 / Blue Area, Islamabad',
         whatsapp: '923001234567',
         ownerEmail: 'user1@test.com',
-        ownerName: 'Ali Khan',
+        ownerName: 'VetAxis Rescue Shelter Partner',
+        ownerRole: 'user',
+        createdAt: Date.now() - 1 * 24 * 3600000
+      },
+      {
+        id: 'ad_seed_2',
+        adType: 'adoption',
+        petType: 'Cat',
+        breed: 'Persian Crossbreed Kitten',
+        age: 0.4,
+        price: 0,
+        description: 'Rescued kitten, litter-box trained, veterinary health tested negative for FeLV/FIV, and vaccinated. Free adoption weekend program.',
+        location: 'Gulshan-e-Iqbal, Karachi',
+        whatsapp: '923001234567',
+        ownerEmail: 'user1@test.com',
+        ownerName: 'Karachi Rescue Cat Adoption Center',
         ownerRole: 'user',
         createdAt: Date.now() - 2 * 24 * 3600000
+      },
+      {
+        id: 'ad_seed_3',
+        adType: 'adoption',
+        petType: 'Dog',
+        breed: 'Senior Golden Retriever Cross',
+        age: 7,
+        price: 0,
+        description: 'Foster-to-adopt program: Gentle senior retriever seeking calm indoor home. Very calm with children and other pets, full veterinary health passport included.',
+        location: 'DHA Phase 5, Lahore',
+        whatsapp: '923217654321',
+        ownerEmail: 'user1@test.com',
+        ownerName: 'Adopt Senior Dog Foster Initiative',
+        ownerRole: 'user',
+        createdAt: Date.now() - 3 * 24 * 3600000
+      },
+      {
+        id: 'ad_seed_4',
+        adType: 'sale',
+        petType: 'Cat',
+        breed: 'British Shorthair (Verified Pedigree GCCF / TICA)',
+        age: 0.5,
+        price: 35000,
+        description: 'Ethical health-tested pedigree kitten with full vaccination ledger, 5-generation pedigree certificate, microchip, and parental genetic screening.',
+        location: 'Gulberg, Lahore',
+        whatsapp: '923217654321',
+        ownerEmail: 'faisal.shah@vetaxis.pk',
+        ownerName: 'Verified Pedigree Feline Cattery',
+        ownerRole: 'doctor',
+        createdAt: Date.now() - 4 * 24 * 3600000
       }
     ];
     localStorage.setItem(LOCAL_PETS_KEY, JSON.stringify(petSeeds));
   }
 
-  // Seed community posts
+  // Seed community posts (Matching Category 3)
   if (!localStorage.getItem(LOCAL_POSTS_KEY)) {
     const postSeeds: CommunityPost[] = [
       {
         id: 'post_seed_1',
-        authorEmail: 'sarah.alizai@vetaxis.pk',
-        authorName: 'Dr. Sarah Alizai',
+        authorEmail: 'faisal.shah@vetaxis.pk',
+        authorName: 'Dr. Faisal Shah, DVM',
         role: 'doctor',
         profilePic: 'default',
-        text: 'Hello everyone! I noticed a sudden spike in ticks in Peshawar cantonment area due to early summer. Please check your dogs paws, ears, and belly after walks. Use standard fipronil protective drops if needed!',
+        text: '🔬 Clinical Case Study & Radiograph Discussion: 4-year-old German Shepherd presented with sudden acute non-productive retching, restlessness, and severe abdominal tympany. Right lateral radiograph confirmed classic Double-Bubble (Popeye’s Arm) sign of Gastric Dilatation-Volvulus (GDV Bloat). Performed emergency trochar decompression, fluid resuscitation with shock dose crystalloids, followed by surgical detorsion and incisional gastropexy. Patient is doing excellently on Day 3 post-op!',
         category: 'help',
-        ts: Date.now() - 4 * 3600000,
+        ts: Date.now() - 2 * 3600000,
+        reactions: { '❤️': ['sarah.alizai@vetaxis.pk', 'user1@test.com'], '👍': ['haris.q@vetaxis.pk'], '❗': [] }
+      },
+      {
+        id: 'post_seed_2',
+        authorEmail: 'sarah.alizai@vetaxis.pk',
+        authorName: 'Dr. Sarah Alizai, DVM',
+        role: 'doctor',
+        profilePic: 'default',
+        text: '🐾 Ask-A-Vet Community Notice: Parvovirus season is at peak. Reminder for all pet owners: puppies need 3-4 consecutive boosters every 3-4 weeks until 16-20 weeks of age. Never expose unvaccinated pups to public dog parks. If you observe lethargy, vomiting, or bloody diarrhea, seek 24/7 emergency veterinary hospitalization within the first 24 hours!',
+        category: 'help',
+        ts: Date.now() - 8 * 3600000,
         reactions: { '❤️': ['user1@test.com'], '👍': ['faisal.shah@vetaxis.pk'], '❗': [] }
+      },
+      {
+        id: 'post_seed_3',
+        authorEmail: 'haris.q@vetaxis.pk',
+        authorName: 'Haris Qureshi (Vet Tech)',
+        role: 'assistant',
+        profilePic: 'default',
+        text: '🎓 Vet Tech & Student Discussion: Sharing our clinical checklist for pre-anesthetic surgical evaluation: checking PCV/TP, blood glucose, and baseline ECG. How do other clinics manage low systolic blood pressure (<90 mmHg) in geriatric feline patients under isoflurane anesthesia?',
+        category: 'general',
+        ts: Date.now() - 14 * 3600000,
+        reactions: { '❤️': ['sarah.alizai@vetaxis.pk'], '👍': ['faisal.shah@vetaxis.pk'], '❗': [] }
       }
     ];
     localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(postSeeds));

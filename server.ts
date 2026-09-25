@@ -655,14 +655,31 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
 
     // 7. BUILD SPECIALTY & CATEGORY FILTER HUBS
     const specialtyHubs = [
-      { path: "?tab=explore&amp;filter=emergency", name: "24/7 Emergency Animal Hospitals", freq: "daily", priority: "0.95" },
-      { path: "?tab=explore&amp;filter=vaccination", name: "Home Pet Vaccination Services", freq: "daily", priority: "0.85" },
-      { path: "?tab=explore&amp;filter=surgery", name: "Specialist Veterinary Surgeries", freq: "weekly", priority: "0.85" },
-      { path: "?tab=jobs&amp;type=Full-time", name: "Full-Time DVM Positions", freq: "daily", priority: "0.80" },
+      { path: "?tab=explore&amp;filter=emergency", name: "24/7 Emergency Animal Hospitals & Vets Open Now", freq: "daily", priority: "0.95" },
+      { path: "?tab=explore&amp;filter=walkin", name: "Affordable Walk-in Pet Clinics Without Appointment", freq: "daily", priority: "0.90" },
+      { path: "?tab=explore&amp;filter=mobile", name: "Mobile Vet Home Visit Animal Doctors", freq: "daily", priority: "0.90" },
+      { path: "?tab=explore&amp;filter=exotic", name: "Exotic Pet, Avian Bird & Reptile Specialist Vets", freq: "weekly", priority: "0.85" },
+      { path: "?tab=explore&amp;filter=cat_only", name: "Cat Only Fear-Free Certified Veterinary Clinics", freq: "weekly", priority: "0.85" },
+      { path: "?tab=explore&amp;filter=equine", name: "Equine & Horse Care Veterinarians", freq: "weekly", priority: "0.85" },
+      { path: "?tab=explore&amp;filter=vaccination", name: "Puppy Vaccination & Deworming Services", freq: "daily", priority: "0.90" },
+      { path: "?tab=explore&amp;filter=diagnostics", name: "Vet Clinics with Ultrasound & Digital X-Ray", freq: "daily", priority: "0.90" },
+      { path: "?tab=explore&amp;filter=dental", name: "Pet Dental Clinics Teeth Cleaning & Scaling", freq: "weekly", priority: "0.85" },
+      { path: "?tab=clinical_tools&amp;sub=pet_ds", name: "Pet DS: Parvo, CKD Stages & Bloat Emergency Signs", freq: "daily", priority: "0.90" },
+      { path: "?tab=clinical_tools&amp;sub=blood_chart", name: "Canine Blood Test Normal Ranges Reference Chart", freq: "weekly", priority: "0.90" },
+      { path: "?tab=clinical_tools&amp;sub=travel_guidelines", name: "International Pet Travel USDA IATA CDC Guidelines", freq: "weekly", priority: "0.85" },
+      { path: "?tab=jobs&amp;type=Full-time", name: "Full-Time DVM Positions & Veterinary Jobs", freq: "daily", priority: "0.80" },
       { path: "?tab=jobs&amp;type=Part-time", name: "Locum & Part-Time Vet Jobs", freq: "daily", priority: "0.80" },
       { path: "?tab=jobs&amp;type=Internship", name: "Veterinary House Job Internships", freq: "weekly", priority: "0.80" },
-      { path: "?tab=pets&amp;type=lost_sos", name: "Emergency Missing Pet SOS Network", freq: "always", priority: "0.90" },
-      { path: "?tab=pets&amp;type=adoption", name: "Pet Rescue & Adoption Classifieds", freq: "daily", priority: "0.85" }
+      { path: "?tab=pets&amp;type=lost_sos", name: "Emergency Missing Pet SOS Network", freq: "always", priority: "0.95" },
+      { path: "?tab=pets&amp;type=adoption", name: "Dog & Cat Rescue Adoption Shelters", freq: "daily", priority: "0.85" },
+      { path: "?tab=pets&amp;type=safe_buying", name: "Ethical Pet Rehoming & Puppy Scam Prevention Guidelines", freq: "weekly", priority: "0.85" },
+      { path: "?tab=marketplace&amp;category=prescription_medicine", name: "Veterinary Prescription Medicine, Flea/Tick & Heartworm", freq: "daily", priority: "0.85" },
+      { path: "?tab=marketplace&amp;category=clinical_equipment", name: "Veterinary Surgical Instruments & Refurbished Ultrasound", freq: "weekly", priority: "0.85" },
+      { path: "?tab=marketplace&amp;category=hardware_cages", name: "Modular Stainless Steel Recovery Cages & Autoclaves", freq: "weekly", priority: "0.80" },
+      { path: "?tab=community&amp;hub=vin_case_studies", name: "Veterinary Community VIN Forum & Clinical Radiograph Cases", freq: "daily", priority: "0.85" },
+      { path: "?tab=community&amp;hub=ce_webinars", name: "Veterinary Continuing Education CE & Student Study Discord", freq: "weekly", priority: "0.80" },
+      { path: "?tab=news&amp;topic=aaha_vaccine_guidelines", name: "AAHA Canine Core vs Noncore Vaccination Schedules", freq: "weekly", priority: "0.85" },
+      { path: "?tab=news&amp;topic=fda_pet_food_recalls", name: "FDA Pet Food Recall List Updates & Animal Safety", freq: "daily", priority: "0.85" }
     ];
 
     const specialtyHubUrls = specialtyHubs.map(hub => `
@@ -710,6 +727,12 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     <lastmod>${lastModExplore}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>${BASE_URL}/?tab=clinical_tools</loc>
+    <lastmod>${todayStr}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.92</priority>
   </url>
   <url>
     <loc>${BASE_URL}/?tab=jobs</loc>

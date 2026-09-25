@@ -42,7 +42,7 @@ import { UserProfile } from '../types';
 interface VeterinaryClinicalSuiteProps {
   currentUser?: UserProfile | null;
   onNavigate?: (section: string) => void;
-  initialTab?: 'wave1' | 'wave2' | 'wave3';
+  initialTab?: 'wave1' | 'wave2' | 'wave3' | 'wave4';
 }
 
 const LOCAL_STORAGE_CUSTOM_DRUGS_KEY = 'vetaxis_custom_drugs_v1';
@@ -53,12 +53,48 @@ export function VeterinaryClinicalSuite({
   initialTab = 'wave1'
 }: VeterinaryClinicalSuiteProps) {
   // Main Wave Selector
-  const [activeWave, setActiveWave] = useState<'wave1' | 'wave2' | 'wave3'>(initialTab);
+  const [activeWave, setActiveWave] = useState<'wave1' | 'wave2' | 'wave3' | 'wave4'>(initialTab);
 
   // Sub-tab selectors for each wave
   const [wave1SubTab, setWave1SubTab] = useState<'drug_dosing' | 'fluid_therapy' | 'vitals_matrix'>('drug_dosing');
   const [wave2SubTab, setWave2SubTab] = useState<'calorie_calc' | 'toxicity_checker' | 'vaccine_schedule' | 'age_calc'>('calorie_calc');
   const [wave3SubTab, setWave3SubTab] = useState<'gestation_timeline' | 'dairy_economics' | 'mastitis_cmt'>('gestation_timeline');
+  const [wave4SubTab, setWave4SubTab] = useState<'pet_ds' | 'blood_ranges' | 'travel_iata' | 'safe_adoption'>('pet_ds');
+
+  // Wave 4 state: Blood normal ranges search & filter
+  const [bloodSearchQuery, setBloodSearchQuery] = useState('');
+  const [bloodSpeciesFilter, setBloodSpeciesFilter] = useState<'all' | 'canine' | 'feline'>('all');
+
+  // Wave 4 state: IATA pet crate calculator
+  const [petLengthA, setPetLengthA] = useState<number>(65); // nose to root of tail in cm
+  const [petElbowB, setPetElbowB] = useState<number>(25); // elbow to ground in cm
+  const [petWidthC, setPetWidthC] = useState<number>(24); // across shoulders in cm
+  const [petHeightD, setPetHeightD] = useState<number>(55); // ground to tip of ears in cm
+
+  // Automatically check URL parameters (?sub= or ?guide=)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const sub = params.get('sub') || params.get('guide');
+      if (sub) {
+        if (sub === 'pet_ds' || sub === 'parvo' || sub === 'ckd' || sub === 'bloat') {
+          setActiveWave('wave4');
+          setWave4SubTab('pet_ds');
+        } else if (sub === 'blood_chart' || sub === 'blood_ranges') {
+          setActiveWave('wave4');
+          setWave4SubTab('blood_ranges');
+        } else if (sub === 'travel_guidelines' || sub === 'iata' || sub === 'travel') {
+          setActiveWave('wave4');
+          setWave4SubTab('travel_iata');
+        } else if (sub === 'safe_buying' || sub === 'safe_adoption' || sub === 'scams') {
+          setActiveWave('wave4');
+          setWave4SubTab('safe_adoption');
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Copy feedback state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -394,12 +430,18 @@ export function VeterinaryClinicalSuite({
             >
               ⚠️ Toxic Alert
             </button>
+            <button
+              onClick={() => { setActiveWave('wave4'); setWave4SubTab('pet_ds'); }}
+              className="text-xs font-bold bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+            >
+              🔬 Pet DS & Lab
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Category Tabs Selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <button
           onClick={() => setActiveWave('wave1')}
           className={`p-4 rounded-2xl border transition-all text-left cursor-pointer flex items-center gap-3.5 shadow-sm ${
@@ -451,6 +493,24 @@ export function VeterinaryClinicalSuite({
             <span className="text-[10px] font-black uppercase tracking-wider block opacity-80">Farm & Livestock</span>
             <h2 className="text-sm font-black m-0 leading-tight">Livestock & Dairy Calculators</h2>
             <p className="text-[11px] opacity-75 mt-0.5">Gestation timelines, feed economics, and CMT matrix</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveWave('wave4')}
+          className={`p-4 rounded-2xl border transition-all text-left cursor-pointer flex items-center gap-3.5 shadow-sm ${
+            activeWave === 'wave4'
+              ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[5px] border-b-[#3e3e2b]'
+              : 'bg-white text-[#5a5a40] border-[#e3dec9] border-b-[3px] border-b-[#cdc6ad] hover:bg-[#fcf9f2]'
+          }`}
+        >
+          <div className={`p-2.5 rounded-xl text-xl ${activeWave === 'wave4' ? 'bg-white/20' : 'bg-[#f4efe4]'}`}>
+            🔬
+          </div>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider block opacity-80">Diagnostics & DS</span>
+            <h2 className="text-sm font-black m-0 leading-tight">Pet DS & Diagnostics Hub</h2>
+            <p className="text-[11px] opacity-75 mt-0.5">Parvo, CKD stages, blood lab ranges, travel & IATA</p>
           </div>
         </button>
       </div>
@@ -2167,6 +2227,662 @@ export function VeterinaryClinicalSuite({
                     <p className="text-[10px] pt-1 border-t border-black/10 font-bold">Action: {item.action}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* WAVE 4: PET DS (DISEASES, DIAGNOSTICS & CLINICAL GUIDELINES)             */}
+      {/* ========================================================================= */}
+      {activeWave === 'wave4' && (
+        <div className="space-y-6">
+          {/* Wave 4 Sub-Tabs Navigation */}
+          <div className="flex flex-wrap gap-2 p-1.5 bg-[#eae4d3] rounded-2xl border border-[#cdc6ad]">
+            <button
+              onClick={() => setWave4SubTab('pet_ds')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                wave4SubTab === 'pet_ds'
+                  ? 'bg-[#5a5a40] text-white shadow-xs'
+                  : 'text-[#5a5a40] hover:bg-white/50'
+              }`}
+            >
+              <span>🔬</span> Pet DS: Disease Protocols &amp; Emergencies
+            </button>
+            <button
+              onClick={() => setWave4SubTab('blood_ranges')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                wave4SubTab === 'blood_ranges'
+                  ? 'bg-[#5a5a40] text-white shadow-xs'
+                  : 'text-[#5a5a40] hover:bg-white/50'
+              }`}
+            >
+              <span>🩸</span> Canine &amp; Feline Blood Test Normal Ranges
+            </button>
+            <button
+              onClick={() => setWave4SubTab('travel_iata')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                wave4SubTab === 'travel_iata'
+                  ? 'bg-[#5a5a40] text-white shadow-xs'
+                  : 'text-[#5a5a40] hover:bg-white/50'
+              }`}
+            >
+              <span>✈️</span> Pet Travel (USDA / CDC) &amp; IATA Crate Calculator
+            </button>
+            <button
+              onClick={() => setWave4SubTab('safe_adoption')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                wave4SubTab === 'safe_adoption'
+                  ? 'bg-[#5a5a40] text-white shadow-xs'
+                  : 'text-[#5a5a40] hover:bg-white/50'
+              }`}
+            >
+              <span>🛡️</span> Safe Pet Adoption &amp; Anti-Scam Guide
+            </button>
+          </div>
+
+          {/* 4.1 PET DS: DISEASE PROTOCOLS & EMERGENCIES */}
+          {wave4SubTab === 'pet_ds' && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40] bg-[#f4efe4] px-2.5 py-1 rounded-full">
+                      Clinical Reference Guide
+                    </span>
+                    <h3 className="font-serif font-black text-xl text-[#3c3c3b] mt-1">
+                      Pet DS — Critical Disease Triage, Timelines &amp; Emergency Signs
+                    </h3>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Evidence-based clinical disease markers: Canine Parvovirus, Feline CKD Staging, GDV Bloat, and FIP therapeutic protocols.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopy(
+                        "CANINE PARVOVIRUS PROTOCOL: Day 1-2 Fever, anorexia; Day 3-4 Projectile vomiting, hematochezia, severe leukopenia; Day 5+ Sepsis risk. Triage: IV crystalloids (LRS/Plasmalyte), Maropitant (1 mg/kg), Ampicillin/Enrofloxacin, Buprenorphine, micro-enteral nutrition.\n\nFELINE CKD IRIS STAGES: Stage 1 (<1.6 mg/dL, >3 yrs); Stage 2 (1.6-2.8 mg/dL, 2-3 yrs); Stage 3 (2.9-5.0 mg/dL, 1-2 yrs); Stage 4 (>5.0 mg/dL, 1-3 mos).\n\nDOG BLOAT (GDV): Non-productive retching, tympanic abdominal distension, restlessness. Emergency: Decompress stomach immediately, IV shock fluids, surgical gastropexy.",
+                        "pet_ds_summary"
+                      )}
+                      className="px-3 py-1.5 bg-[#fcf9f2] border border-[#e3dec9] hover:bg-[#eae4d3] text-[#5a5a40] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      {copiedKey === 'pet_ds_summary' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === 'pet_ds_summary' ? 'Copied' : 'Copy Emergency Protocols'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Canine Parvovirus Day-by-Day Progression */}
+              <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-rose-100 text-rose-800 text-lg">🦠</span>
+                  <div>
+                    <h4 className="font-serif font-black text-base text-stone-900 m-0">
+                      Canine Parvovirus (CPV-2) Symptoms in Puppies — Day-by-Day Timeline
+                    </h4>
+                    <p className="text-xs text-stone-500">
+                      Incubation: 3 to 7 days post-exposure. Immediate hospitalization within 48 hours boosts survival from 10% to &gt;85%.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-md">
+                      Days 1 – 2: Prodromal
+                    </span>
+                    <h5 className="font-bold text-sm text-amber-950 m-0">Early Malaise &amp; Fever</h5>
+                    <ul className="text-[11px] text-amber-900 space-y-1 list-disc pl-4">
+                      <li>High fever (103°F - 105°F)</li>
+                      <li>Depression, reluctance to play</li>
+                      <li>Refusal of food and water</li>
+                      <li>Early subclinical leukopenia</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 bg-rose-200/60 px-2 py-0.5 rounded-md">
+                      Days 3 – 4: Acute GI Crisis
+                    </span>
+                    <h5 className="font-bold text-sm text-rose-950 m-0">Vomiting &amp; Hematochezia</h5>
+                    <ul className="text-[11px] text-rose-900 space-y-1 list-disc pl-4">
+                      <li>Intractable projectile vomiting</li>
+                      <li>Foul, mustard-colored or bloody diarrhea</li>
+                      <li>Profound dehydration (&gt;8-10%)</li>
+                      <li>Hypoglycemia &amp; hypokalemia</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 bg-purple-200/60 px-2 py-0.5 rounded-md">
+                      Days 5 – 7: Critical Window
+                    </span>
+                    <h5 className="font-bold text-sm text-purple-950 m-0">Endotoxemia &amp; Sepsis</h5>
+                    <ul className="text-[11px] text-purple-900 space-y-1 list-disc pl-4">
+                      <li>Intestinal mucosal barrier collapse</li>
+                      <li>Bacterial translocation (Gram-negative sepsis)</li>
+                      <li>Severe neutropenia (WBC &lt; 2,000/mcL)</li>
+                      <li>Hypothermia &amp; septic shock risk</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-md">
+                      Day 8+: Recovery
+                    </span>
+                    <h5 className="font-bold text-sm text-emerald-950 m-0">Mucosal Regeneration</h5>
+                    <ul className="text-[11px] text-emerald-900 space-y-1 list-disc pl-4">
+                      <li>Vomiting cessation, appetite returns</li>
+                      <li>Stool begins firming up</li>
+                      <li>Rebound leukocytosis</li>
+                      <li>Lifelong immunity established</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-[#fcf9f2] p-4 rounded-2xl border border-[#e3dec9] text-xs text-stone-700 space-y-1.5">
+                  <h6 className="font-bold text-stone-900 text-xs">Standard Parvovirus Inpatient Triage Protocol:</h6>
+                  <p className="text-[11px] leading-relaxed">
+                    1. <strong>Aggressive Crystalloid Resuscitation:</strong> Plasmalyte or LRS at 60-90 mL/kg/day + dehydration deficit + ongoing losses, supplemented with 20-30 mEq/L KCl and 2.5-5% dextrose.<br />
+                    2. <strong>Antiemetic Control:</strong> Maropitant (Cerenia) 1 mg/kg SC q24h + Ondansetron 0.5 mg/kg IV q8h.<br />
+                    3. <strong>Broad-Spectrum Antimicrobials:</strong> Ampicillin-Sulbactam 30 mg/kg IV q8h OR Cefazolin + Enrofloxacin/Amikacin once hydrated.<br />
+                    4. <strong>Early Enteral Nutrition:</strong> Micro-enteral trickle feeding via nasogastric tube accelerates enterocyte healing.
+                  </p>
+                </div>
+              </div>
+
+              {/* 2. Feline Chronic Kidney Disease (CKD) IRIS Staging & Survival Rates */}
+              <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-blue-100 text-blue-800 text-lg">🐱</span>
+                  <div>
+                    <h4 className="font-serif font-black text-base text-stone-900 m-0">
+                      Cat Chronic Kidney Disease (CKD) — IRIS Staging, Lab Markers &amp; Survival Rates
+                    </h4>
+                    <p className="text-xs text-stone-500">
+                      International Renal Interest Society (IRIS) classification based on fasting blood creatinine and symmetric dimethylarginine (SDMA).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border border-stone-200 rounded-xl overflow-hidden">
+                    <thead className="bg-[#f4efe4] text-[#5a5a40] font-black uppercase text-[10px]">
+                      <tr>
+                        <th className="p-3">IRIS Stage</th>
+                        <th className="p-3">Serum Creatinine</th>
+                        <th className="p-3">Blood SDMA</th>
+                        <th className="p-3">Remaining Nephrons</th>
+                        <th className="p-3">Median Survival Time</th>
+                        <th className="p-3">Primary Clinical Interventions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 text-[11px] text-stone-700">
+                      <tr className="hover:bg-stone-50">
+                        <td className="p-3 font-bold text-emerald-700">Stage 1 (Non-Azotemic)</td>
+                        <td className="p-3 font-mono">&lt; 1.6 mg/dL</td>
+                        <td className="p-3 font-mono">&lt; 18 mcg/dL</td>
+                        <td className="p-3">33% – 100%</td>
+                        <td className="p-3 font-bold text-stone-900">&gt; 3 Years (1,150+ days)</td>
+                        <td className="p-3">Treat underlying cause, discontinue nephrotoxic drugs, monitor blood pressure &amp; proteinuria.</td>
+                      </tr>
+                      <tr className="hover:bg-stone-50">
+                        <td className="p-3 font-bold text-blue-700">Stage 2 (Mild Azotemia)</td>
+                        <td className="p-3 font-mono">1.6 – 2.8 mg/dL</td>
+                        <td className="p-3 font-mono">18 – 25 mcg/dL</td>
+                        <td className="p-3">25% – 33%</td>
+                        <td className="p-3 font-bold text-stone-900">2 to 3 Years (800+ days)</td>
+                        <td className="p-3">Transition to veterinary renal diet (low phosphorus, high-quality restricted protein), hydration support.</td>
+                      </tr>
+                      <tr className="hover:bg-stone-50">
+                        <td className="p-3 font-bold text-amber-700">Stage 3 (Moderate Azotemia)</td>
+                        <td className="p-3 font-mono">2.9 – 5.0 mg/dL</td>
+                        <td className="p-3 font-mono">26 – 38 mcg/dL</td>
+                        <td className="p-3">10% – 25%</td>
+                        <td className="p-3 font-bold text-stone-900">1 to 2 Years (~400 days)</td>
+                        <td className="p-3">Strict renal prescription diet, intestinal phosphate binders (calcium carbonate/sevelamer), potassium supplementation, SQ fluids.</td>
+                      </tr>
+                      <tr className="hover:bg-stone-50">
+                        <td className="p-3 font-bold text-rose-700">Stage 4 (Severe End-Stage)</td>
+                        <td className="p-3 font-mono">&gt; 5.0 mg/dL</td>
+                        <td className="p-3 font-mono">&gt; 38 mcg/dL</td>
+                        <td className="p-3">&lt; 10%</td>
+                        <td className="p-3 font-bold text-stone-900">1 to 3 Months (~35 – 100 days)</td>
+                        <td className="p-3">Daily SQ fluids (LRS), appetite stimulants (mirtazapine), anti-nausea therapy, EPO for non-regenerative anemia.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. Dog Bloat GDV & Emergency Triad */}
+              <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-red-100 text-red-800 text-lg">⚠️</span>
+                  <div>
+                    <h4 className="font-serif font-black text-base text-stone-900 m-0">
+                      Dog Bloat (Gastric Dilatation-Volvulus / GDV) — Emergency Signs &amp; Immediate Action
+                    </h4>
+                    <p className="text-xs text-stone-500">
+                      Deep-chested breeds (Great Danes, German Shepherds, Standard Poodles, Boxers). 100% fatal without emergency surgery.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 space-y-1.5">
+                    <span className="text-[10px] font-black uppercase text-red-700">Classic Symptom 1</span>
+                    <h5 className="font-bold text-red-950 text-sm m-0">Unproductive Retching</h5>
+                    <p className="text-[11px] text-red-900">
+                      The dog frantically attempts to vomit every few minutes, coughing up small amounts of white saliva or thick foam without bringing up stomach contents.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 space-y-1.5">
+                    <span className="text-[10px] font-black uppercase text-red-700">Classic Symptom 2</span>
+                    <h5 className="font-bold text-red-950 text-sm m-0">Distended, Hard Abdomen</h5>
+                    <p className="text-[11px] text-red-900">
+                      The cranial abdomen balloons outwards, feeling tight and drum-like when gently tapped (tympanitic sound).
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 space-y-1.5">
+                    <span className="text-[10px] font-black uppercase text-red-700">Classic Symptom 3</span>
+                    <h5 className="font-bold text-red-950 text-sm m-0">Extreme Restlessness &amp; Pain</h5>
+                    <p className="text-[11px] text-red-900">
+                      Inability to lie down comfortably, pacing, looking at the flank, rapid shallow panting, pale or grayish gums, and sudden collapse from caudal vena cava shock.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-stone-900 text-white p-4 rounded-2xl text-xs space-y-1">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold block">🚨 Immediate Action Required:</span>
+                  <p className="text-[11px] text-stone-300">
+                    Transport immediately to the nearest 24/7 veterinary emergency hospital. Do NOT give water, food, or home remedies. Vets must decompress the stomach with an 14G needle trochar or orogastric tube, administer shock IV fluids via large-bore front-leg catheters, and perform emergency surgical derotation with incisional gastropexy.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4. FIP & Canine Distemper Differential */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-5 rounded-3xl border border-[#e3dec9] space-y-2">
+                  <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-100 px-2 py-0.5 rounded">Feline Clinical Protocol</span>
+                  <h5 className="font-bold text-sm text-stone-900 m-0">Feline Infectious Peritonitis (FIP) — GS-441524 Protocol</h5>
+                  <p className="text-[11px] text-stone-600 leading-relaxed">
+                    Once deemed 100% fatal, FIP is now curable with nucleoside analog GS-441524 (oral or SC) administered daily for 84 consecutive days.<br />
+                    • <strong>Wet / Effusive FIP:</strong> 5 – 6 mg/kg q24h<br />
+                    • <strong>Dry / Non-effusive FIP:</strong> 6 – 8 mg/kg q24h<br />
+                    • <strong>Ocular FIP:</strong> 8 – 10 mg/kg q24h<br />
+                    • <strong>Neurological FIP:</strong> 10 – 15 mg/kg q24h<br />
+                    Monitor body weight weekly to adjust dose as kitten grows. Evaluate complete blood count and A:G ratio at weeks 4, 8, and 12.
+                  </p>
+                </div>
+
+                <div className="bg-white p-5 rounded-3xl border border-[#e3dec9] space-y-2">
+                  <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Differential Diagnosis</span>
+                  <h5 className="font-bold text-sm text-stone-900 m-0">Canine Distemper Early Symptoms vs. Kennel Cough</h5>
+                  <p className="text-[11px] text-stone-600 leading-relaxed">
+                    • <strong>Kennel Cough (CIRD Complex):</strong> Sharp, dry, hacking "honking" cough often triggered by tracheal palpation. Dogs remain energetic and maintain normal appetite. Self-limiting in 10–14 days.<br />
+                    • <strong>Canine Distemper Virus (CDV):</strong> Biphasic fever spike, thick mucopurulent oculonasal discharge, severe lethargy, coughing, vomiting, diarrhea, followed weeks later by hyperkeratosis ("hard pad disease" of nose and paw pads), enamel hypoplasia, and neurological involuntary muscle twitching (myoclonus) or seizures.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4.2 CANINE & FELINE BLOOD TEST NORMAL REFERENCE RANGES */}
+          {wave4SubTab === 'blood_ranges' && (
+            <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40] bg-[#f4efe4] px-2.5 py-1 rounded-full">
+                    Laboratory Diagnostics Reference Chart
+                  </span>
+                  <h3 className="font-serif font-black text-xl text-[#3c3c3b] mt-1">
+                    Canine &amp; Feline Blood Test Normal Ranges — Reference Matrix
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Comprehensive normal reference ranges for Complete Blood Count (CBC) and Serum Chemistry Profiles with clinical indications.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopy(
+                      "CANINE BLOOD NORMAL RANGES:\nRBC: 5.5 - 8.5 x10^6/mcL | HGB: 12.0 - 18.0 g/dL | HCT: 37 - 55%\nWBC: 6.0 - 17.0 x10^3/mcL | Platelets: 175 - 500 x10^3/mcL\nBUN: 7 - 27 mg/dL | Creatinine: 0.5 - 1.4 mg/dL | SDMA: 0 - 14 mcg/dL\nALT: 10 - 100 U/L | ALKP: 20 - 150 U/L | Total Protein: 5.4 - 7.5 g/dL\nAlbumin: 2.6 - 4.0 g/dL | Glucose: 70 - 130 mg/dL\nSodium: 140 - 154 mEq/L | Potassium: 3.8 - 5.6 mEq/L | Chloride: 105 - 120 mEq/L\n\nFELINE BLOOD NORMAL RANGES:\nRBC: 5.0 - 10.0 x10^6/mcL | HGB: 9.0 - 15.0 g/dL | HCT: 29 - 45%\nWBC: 5.5 - 19.5 x10^3/mcL | Platelets: 200 - 600 x10^3/mcL\nBUN: 14 - 36 mg/dL | Creatinine: 0.8 - 2.4 mg/dL | SDMA: 0 - 14 mcg/dL\nALT: 10 - 80 U/L | ALKP: 10 - 90 U/L | Total Protein: 6.0 - 8.0 g/dL\nAlbumin: 2.3 - 3.9 g/dL | Glucose: 70 - 150 mg/dL",
+                      "blood_chart_copy"
+                    )}
+                    className="px-3 py-1.5 bg-[#fcf9f2] border border-[#e3dec9] hover:bg-[#eae4d3] text-[#5a5a40] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                  >
+                    {copiedKey === 'blood_chart_copy' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedKey === 'blood_chart_copy' ? 'Copied Chart' : 'Copy All Lab Ranges'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Search & Species Filter */}
+              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-stone-50 p-3 rounded-2xl border border-stone-200">
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    value={bloodSearchQuery}
+                    onChange={(e) => setBloodSearchQuery(e.target.value)}
+                    placeholder="Search biomarker (e.g. Creatinine, RBC, ALT)..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-[#cdc6ad] bg-white text-xs text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-[#5a5a40]"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="font-semibold text-stone-600 mr-1 text-[11px]">Species:</span>
+                  {(['all', 'canine', 'feline'] as const).map((sp) => (
+                    <button
+                      key={sp}
+                      onClick={() => setBloodSpeciesFilter(sp)}
+                      className={`px-3 py-1 rounded-xl font-bold capitalize transition-all cursor-pointer ${
+                        bloodSpeciesFilter === sp
+                          ? 'bg-[#5a5a40] text-white'
+                          : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      {sp === 'all' ? 'All Biomarkers' : sp === 'canine' ? '🐕 Dogs Only' : '🐈 Cats Only'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lab Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-stone-200 rounded-xl overflow-hidden">
+                  <thead className="bg-[#f4efe4] text-[#5a5a40] font-black uppercase text-[10px]">
+                    <tr>
+                      <th className="p-3">Biomarker</th>
+                      <th className="p-3">Category</th>
+                      <th className="p-3">Canine Range (Dog)</th>
+                      <th className="p-3">Feline Range (Cat)</th>
+                      <th className="p-3">Units</th>
+                      <th className="p-3">Clinical Indication (High / Low)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 text-[11px] text-stone-700">
+                    {[
+                      { name: 'RBC (Red Blood Cells)', cat: 'CBC', dog: '5.5 – 8.5', catRange: '5.0 – 10.0', unit: 'x10^6 / mcL', indication: 'Low: Non-regenerative or hemolytic anemia, blood loss. High: Dehydration (hemoconcentration), polycythemia.' },
+                      { name: 'Hemoglobin (HGB)', cat: 'CBC', dog: '12.0 – 18.0', catRange: '9.0 – 15.0', unit: 'g/dL', indication: 'Oxygen transport protein. Low: Anemia, hemorrhage, iron deficiency. High: Dehydration.' },
+                      { name: 'Hematocrit (HCT / PCV)', cat: 'CBC', dog: '37.0 – 55.0', catRange: '29.0 – 45.0', unit: '%', indication: 'Volume of RBCs. PCV <20% indicates severe anemia requiring blood transfusion consideration.' },
+                      { name: 'WBC (Total Leukocytes)', cat: 'CBC', dog: '6.0 – 17.0', catRange: '5.5 – 19.5', unit: 'x10^3 / mcL', indication: 'Low: Viral infections (Parvo, Panleukopenia), bone marrow toxicity. High: Bacterial infection, inflammation, stress leukogram.' },
+                      { name: 'Platelets (PLT)', cat: 'CBC', dog: '175 – 500', catRange: '200 – 600', unit: 'x10^3 / mcL', indication: 'Clotting cells. Low: Tick-borne diseases (Ehrlichia, Babesia), immune thrombocytopenia (ITP), DIC bleeding.' },
+                      { name: 'BUN (Blood Urea Nitrogen)', cat: 'Chemistry', dog: '7.0 – 27.0', catRange: '14.0 – 36.0', unit: 'mg/dL', indication: 'Low: Hepatic insufficiency, portosystemic shunt. High: Renal failure, dehydration (prerenal azotemia), GI bleed.' },
+                      { name: 'Creatinine (CREA)', cat: 'Chemistry', dog: '0.5 – 1.4', catRange: '0.8 – 2.4', unit: 'mg/dL', indication: 'Key renal filtration index. Elevations indicate loss of >67-75% functional nephrons.' },
+                      { name: 'SDMA (Symmetric Dimethylarginine)', cat: 'Chemistry', dog: '0 – 14.0', catRange: '0 – 14.0', unit: 'mcg/dL', indication: 'Early biomarker of kidney disease, detects loss of 25-40% kidney function well before creatinine rises.' },
+                      { name: 'ALT (Alanine Aminotransferase)', cat: 'Chemistry', dog: '10 – 100', catRange: '10 – 80', unit: 'U/L', indication: 'Specific liver parenchymal leakage enzyme. High: Acute hepatic injury, trauma, toxicities (acetaminophen, NSAIDs).' },
+                      { name: 'ALKP / ALP (Alkaline Phosphatase)', cat: 'Chemistry', dog: '20 – 150', catRange: '10 – 90', unit: 'U/L', indication: 'Cholestasis & bone turnover. High: Biliary obstruction, Cushing\'s disease (hyperadrenocorticism), steroid administration.' },
+                      { name: 'Total Protein (TP)', cat: 'Chemistry', dog: '5.4 – 7.5', catRange: '6.0 – 8.0', unit: 'g/dL', indication: 'Low: Protein-losing nephropathy/enteropathy, liver failure. High: Dehydration, multiple myeloma, chronic infection (FIP).' },
+                      { name: 'Albumin (ALB)', cat: 'Chemistry', dog: '2.6 – 4.0', catRange: '2.3 – 3.9', unit: 'g/dL', indication: 'Oncotic pressure maintainer. Low: Severe GI loss (PLE), kidney loss (PLN), third-space fluid effusion.' },
+                      { name: 'Glucose (GLU)', cat: 'Chemistry', dog: '70 – 130', catRange: '70 – 150', unit: 'mg/dL', indication: 'Low: Sepsis, neonatal starvation, insulinoma. High: Diabetes mellitus, feline stress-induced hyperglycemia.' },
+                      { name: 'Sodium (Na+)', cat: 'Electrolytes', dog: '140 – 154', catRange: '145 – 158', unit: 'mEq/L', indication: 'Extracellular fluid osmolality. Low: Addison\'s disease (hypoadrenocorticism), severe diarrhea. High: Dehydration, water deprivation.' },
+                      { name: 'Potassium (K+)', cat: 'Electrolytes', dog: '3.8 – 5.6', catRange: '3.7 – 5.3', unit: 'mEq/L', indication: 'Cardiac conduction critical ion. High: Urethral obstruction (blocked tomcat), Addison\'s, acute renal failure. Low: Anorexia, CKD losses.' },
+                      { name: 'Phosphorus (PHOS)', cat: 'Chemistry', dog: '2.5 – 6.0', catRange: '2.5 – 6.5', unit: 'mg/dL', indication: 'Mineral metabolism. Elevated in renal failure due to impaired excretion; accelerates kidney damage progression.' }
+                    ].filter((item) => {
+                      const matchQuery = bloodSearchQuery.trim() === '' || 
+                        item.name.toLowerCase().includes(bloodSearchQuery.toLowerCase()) || 
+                        item.cat.toLowerCase().includes(bloodSearchQuery.toLowerCase()) ||
+                        item.indication.toLowerCase().includes(bloodSearchQuery.toLowerCase());
+                      return matchQuery;
+                    }).map((row, idx) => (
+                      <tr key={idx} className="hover:bg-stone-50">
+                        <td className="p-3 font-bold text-stone-900">{row.name}</td>
+                        <td className="p-3">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stone-100 text-stone-700">
+                            {row.cat}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono font-semibold text-emerald-800">{row.dog}</td>
+                        <td className="p-3 font-mono font-semibold text-blue-800">{row.catRange}</td>
+                        <td className="p-3 text-stone-500 font-mono text-[10px]">{row.unit}</td>
+                        <td className="p-3 text-[10px] text-stone-600 leading-tight max-w-xs">{row.indication}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 4.3 INTERNATIONAL PET TRAVEL (USDA / CDC / IATA CRATE CALCULATOR) */}
+          {wave4SubTab === 'travel_iata' && (
+            <div className="space-y-6">
+              {/* Guidelines Card */}
+              <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40] bg-[#f4efe4] px-2.5 py-1 rounded-full">
+                    International Pet Travel Regulations
+                  </span>
+                  <h3 className="font-serif font-black text-xl text-[#3c3c3b] mt-1">
+                    International Pet Travel Guidelines — USDA APHIS, CDC &amp; IATA Flight Standards
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Mandatory protocols for flying dogs and cats across the United States, European Union, United Kingdom, and Middle East.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1.5">
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase">Step 1</span>
+                    <h5 className="font-bold text-stone-900 text-sm m-0">ISO 11784/11785 Microchip</h5>
+                    <p className="text-[11px] text-stone-600">
+                      Must be a 15-digit non-encrypted microchip operating at 134.2 kHz. <strong>Crucial rule:</strong> The microchip must be implanted BEFORE or on the same day as the primary rabies vaccination.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1.5">
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase">Step 2</span>
+                    <h5 className="font-bold text-stone-900 text-sm m-0">Rabies &amp; Titer Test (FAVN)</h5>
+                    <p className="text-[11px] text-stone-600">
+                      Rabies vaccine administered at age &gt;12 weeks. High-risk rabies countries require an OIE/CDC certified Fluorescent Antibody Virus Neutralization (FAVN) test with titer level &gt;= 0.5 IU/mL, drawn at least 30 days post-vaccination.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1.5">
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase">Step 3</span>
+                    <h5 className="font-bold text-stone-900 text-sm m-0">Animal Health Certificate (AHC)</h5>
+                    <p className="text-[11px] text-stone-600">
+                      USDA APHIS 7001 or destination country endorsed certificate signed by an accredited veterinarian within 10 days of departure. Internal and external parasite (Tapeworm / Echinococcus) treatment 24-120h prior to entry into UK/EU.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1.5">
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase">Step 4</span>
+                    <h5 className="font-bold text-stone-900 text-sm m-0">Updated CDC Dog Import Rules</h5>
+                    <p className="text-[11px] text-stone-600">
+                      Dogs entering the US must be at least 6 months old, have an ISO microchip, look healthy, and have the online CDC Dog Import Form receipt submitted prior to boarding the flight.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive IATA Crate Dimensions Calculator */}
+              <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-5">
+                <div>
+                  <h4 className="font-serif font-black text-base text-stone-900 m-0">
+                    📐 Interactive IATA Approved Airline Pet Carrier Crate Sizing Calculator
+                  </h4>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Airlines strictly enforce IATA Live Animal Regulations (LAR). Crates where the animal cannot stand fully erect, turn around 360°, and lie down comfortably will be rejected at cargo check-in.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Inputs */}
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold text-stone-700 uppercase tracking-wider">Pet Measurements (in Centimeters):</h5>
+                    
+                    <div>
+                      <label className="text-xs font-semibold text-stone-800 flex justify-between">
+                        <span>A: Animal Length (Nose tip to base of tail)</span>
+                        <span className="font-mono text-[#5a5a40] font-bold">{petLengthA} cm</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="20"
+                        max="130"
+                        value={petLengthA}
+                        onChange={(e) => setPetLengthA(Number(e.target.value))}
+                        className="w-full accent-[#5a5a40]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-stone-800 flex justify-between">
+                        <span>B: Front Leg Height (Elbow joint to ground)</span>
+                        <span className="font-mono text-[#5a5a40] font-bold">{petElbowB} cm</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="5"
+                        max="60"
+                        value={petElbowB}
+                        onChange={(e) => setPetElbowB(Number(e.target.value))}
+                        className="w-full accent-[#5a5a40]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-stone-800 flex justify-between">
+                        <span>C: Animal Width (Widest point across shoulders)</span>
+                        <span className="font-mono text-[#5a5a40] font-bold">{petWidthC} cm</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="10"
+                        max="50"
+                        value={petWidthC}
+                        onChange={(e) => setPetWidthC(Number(e.target.value))}
+                        className="w-full accent-[#5a5a40]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-stone-800 flex justify-between">
+                        <span>D: Standing Height (Ground to top of head / ear tips)</span>
+                        <span className="font-mono text-[#5a5a40] font-bold">{petHeightD} cm</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="15"
+                        max="110"
+                        value={petHeightD}
+                        onChange={(e) => setPetHeightD(Number(e.target.value))}
+                        className="w-full accent-[#5a5a40]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Calculated Results */}
+                  {(() => {
+                    const minLength = Math.round(petLengthA + (petElbowB / 2));
+                    const minWidth = Math.round(petWidthC * 2);
+                    const minHeight = Math.round(petHeightD + 5); // +5cm airline safety clearance
+
+                    let recommendedSize = "IATA #100 (Small: 53 x 40 x 38 cm)";
+                    if (minLength > 100 || minHeight > 80) recommendedSize = "IATA #700 (Giant: 122 x 81 x 89 cm)";
+                    else if (minLength > 85 || minHeight > 68) recommendedSize = "IATA #500 (X-Large: 102 x 69 x 76 cm)";
+                    else if (minLength > 75 || minHeight > 60) recommendedSize = "IATA #400 (Large: 91 x 64 x 69 cm)";
+                    else if (minLength > 65 || minHeight > 50) recommendedSize = "IATA #300 (Intermediate: 81 x 57 x 61 cm)";
+                    else if (minLength > 50 || minHeight > 40) recommendedSize = "IATA #200 (Medium: 71 x 52 x 54 cm)";
+
+                    return (
+                      <div className="bg-[#fcf9f2] p-5 rounded-2xl border border-[#e3dec9] flex flex-col justify-between space-y-4">
+                        <div className="space-y-3">
+                          <span className="text-[10px] font-black uppercase text-[#5a5a40] bg-[#eae4d3] px-2.5 py-1 rounded-md">
+                            Minimum IATA Cargo Dimensions
+                          </span>
+                          
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="bg-white p-3 rounded-xl border border-stone-200">
+                              <span className="text-[10px] text-stone-500 uppercase block font-bold">Min Length</span>
+                              <strong className="text-base text-stone-900 font-mono">{minLength} cm</strong>
+                              <span className="text-[9px] text-stone-400 block mt-0.5">(A + ½B)</span>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-stone-200">
+                              <span className="text-[10px] text-stone-500 uppercase block font-bold">Min Width</span>
+                              <strong className="text-base text-stone-900 font-mono">{minWidth} cm</strong>
+                              <span className="text-[9px] text-stone-400 block mt-0.5">(C x 2)</span>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-stone-200">
+                              <span className="text-[10px] text-stone-500 uppercase block font-bold">Min Height</span>
+                              <strong className="text-base text-stone-900 font-mono">{minHeight} cm</strong>
+                              <span className="text-[9px] text-stone-400 block mt-0.5">(D + 5cm)</span>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1">
+                            <span className="font-bold text-emerald-900">Recommended Standard Crate:</span>
+                            <p className="font-mono text-emerald-800 font-black text-sm">{recommendedSize}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-[10px] text-stone-500 leading-tight">
+                          * Note: Airline cargo staff require metal bolts (plastic clips prohibited on international flights), non-spillable clip-on water dish, and live animal labels attached to all 4 sides.
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4.4 ETHICAL PET ADOPTION & ANTI-SCAM GUIDE */}
+          {wave4SubTab === 'safe_adoption' && (
+            <div className="bg-white p-6 rounded-3xl border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] shadow-sm space-y-6">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#5a5a40] bg-[#f4efe4] px-2.5 py-1 rounded-full">
+                  Pet Parent Protection &amp; Welfare
+                </span>
+                <h3 className="font-serif font-black text-xl text-[#3c3c3b] mt-1">
+                  Ethical Pet Adoption &amp; Puppy Scam Prevention Guidelines
+                </h3>
+                <p className="text-xs text-stone-500">
+                  How to safely adopt rescue pets, verify certified pedigree breeders, and identify online pet deposit scams.
+                </p>
+              </div>
+
+              {/* Red Flags vs Safe Practices */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-rose-700 font-bold text-lg">🚩</span>
+                    <h4 className="font-bold text-rose-950 text-sm m-0">Puppy &amp; Pet Scam Red Flags</h4>
+                  </div>
+                  <ul className="text-xs text-rose-900 space-y-2 list-disc pl-4 leading-relaxed">
+                    <li><strong>Upfront Untraceable Payments:</strong> Seller demands non-refundable advance deposits via wire transfer, gift cards, or crypto before you see the animal.</li>
+                    <li><strong>Unusually Low Prices:</strong> Purebred puppies (French Bulldogs, Golden Retrievers, Persian Kittens) offered for &quot;free adoption if you pay shipping fees.&quot;</li>
+                    <li><strong>Refusal of Video Verification:</strong> Seller refuses to make a live WhatsApp video call showing the pet interacting with the mother.</li>
+                    <li><strong>Phony Courier Fees:</strong> Seller claims the pet is stuck at airport cargo and demands sudden payments for &quot;temperature-controlled insurance crates.&quot;</li>
+                  </ul>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-700 font-bold text-lg">✅</span>
+                    <h4 className="font-bold text-emerald-950 text-sm m-0">Safe Adoption &amp; Verified Breeder Checklist</h4>
+                  </div>
+                  <ul className="text-xs text-emerald-900 space-y-2 list-disc pl-4 leading-relaxed">
+                    <li><strong>In-Person or Live Video Meeting:</strong> Always see the puppy/kitten in its living environment with its mother prior to committing funds.</li>
+                    <li><strong>Veterinarian Health Record:</strong> Demand a veterinary vaccination card signed by a licensed DVM with genuine manufacturer vaccine stickers.</li>
+                    <li><strong>Genetic Health Clearances:</strong> Reputable breeders provide OFA/PennHIP hip scores, elbow clearance, and breed-specific DNA disease screens.</li>
+                    <li><strong>Adopt Don&apos;t Shop:</strong> Check verified animal shelters and rescue organizations on VetAxis 360 offering ethical home checks and microchipping.</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Exotic Animals & License Alert */}
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1">
+                <span className="font-bold block">⚖️ Legal Regulations on Exotic Pets (Birds, Reptiles, Small Animals):</span>
+                <p className="text-[11px] text-amber-900">
+                  Certain parrots, birds of prey, reptiles, and wild cats fall under CITES (Convention on International Trade in Endangered Species) and provincial wildlife protection departments. Always verify possession licenses and import certificates before acquiring exotic animals.
+                </p>
               </div>
             </div>
           )}

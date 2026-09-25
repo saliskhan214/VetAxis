@@ -77,6 +77,14 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             <ul className="space-y-2">
               <li>
                 <button
+                  onClick={(e) => handleNavClick('directory', e)}
+                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-amber-900 ${activeSection === 'directory' ? 'underline font-black' : ''}`}
+                >
+                  🔍 Search &amp; SEO Portal
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={(e) => handleNavClick('clinical_tools', e)}
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-emerald-800 ${activeSection === 'clinical_tools' ? 'underline' : ''}`}
                 >
@@ -208,6 +216,57 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
             </ul>
           </div>
 
+        </div>
+
+        {/* Top SEO Search Categories Strip (Google Ranked Clinical Clusters) */}
+        <div className="mt-10 pt-6 border-t border-[#ece7d8] space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-[11px] font-black uppercase text-[#5a5a40] tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Trending Veterinary Search Topics</span>
+            </span>
+            <button
+              onClick={(e) => handleNavClick('directory', e)}
+              className="text-[11px] font-bold text-[#5a5a40] hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>Explore All 8 Query Categories (75+ topics)</span>
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            {[
+              { label: '🚨 24/7 Emergency Vet Near Me', target: 'explore' },
+              { label: '🚶 Walk-In Animal Clinics (No Appt)', target: 'explore' },
+              { label: '🏠 Mobile Vet Home Visits', target: 'explore' },
+              { label: '🐈 Cat-Only Fear Free Certified', target: 'explore' },
+              { label: '🦜 Exotic & Avian Bird Specialists', target: 'explore' },
+              { label: '🐎 Equine & Horse Care', target: 'explore' },
+              { label: '💉 Puppy Vaccinations & Deworming', target: 'clinical_tools' },
+              { label: '🔬 Ultrasound & Digital X-Ray Hospitals', target: 'explore' },
+              { label: '🩸 Canine Blood Test Normal Reference Chart', target: 'clinical_tools' },
+              { label: '🐾 Parvovirus Symptoms Day-by-Day', target: 'clinical_tools' },
+              { label: '🐱 Cat Chronic Kidney Disease (CKD) Stages', target: 'clinical_tools' },
+              { label: '⚠️ Dog Bloat (GDV) Emergency Signs', target: 'clinical_tools' },
+              { label: '✈️ IATA Flight Pet Crate Dimensions', target: 'clinical_tools' },
+              { label: '💊 Veterinary Prescription Antibiotics Direct', target: 'marketplace' },
+              { label: '🛡️ Best Flea & Tick Prevention Chewables', target: 'marketplace' },
+              { label: '🐶 Verified Dog Shelter Puppies Adoption', target: 'pet_ads' },
+              { label: '🐱 Rescue Cat Adoption Free Weekend', target: 'pet_ads' },
+              { label: '💬 DVM Community & Radiograph Case Studies', target: 'community' },
+              { label: '🎓 Accredited CE Webinars & VIN Forums', target: 'community' },
+              { label: '📜 AAHA Canine Vaccine Schedule Guidelines', target: 'news' },
+              { label: '📢 FDA Monthly Pet Food Recall Alerts', target: 'news' }
+            ].map((topic, i) => (
+              <button
+                key={i}
+                onClick={(e) => handleNavClick(topic.target, e)}
+                className="px-2.5 py-1 rounded-lg bg-white border border-[#e3dec9] hover:border-[#5a5a40] text-stone-700 hover:text-black transition-colors cursor-pointer"
+              >
+                {topic.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Bottom Disclaimers & Copyright */}

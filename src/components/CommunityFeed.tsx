@@ -539,10 +539,38 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
     }, 1500);
   };
 
+  // URL Filter support
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const f = params.get('filter');
+      if (f) {
+        setActiveFilter(f);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Filters
   const filteredPosts = posts.filter((p) => {
     // 1. Category filter
-    const matchesCategory = activeFilter === 'all' || p.category === activeFilter;
+    let matchesCategory = activeFilter === 'all';
+    if (!matchesCategory) {
+      if (p.category === activeFilter) {
+        matchesCategory = true;
+      } else if (activeFilter === 'case_studies' && (p.text.toLowerCase().includes('case study') || p.text.toLowerCase().includes('radiograph') || p.text.toLowerCase().includes('ultrasound'))) {
+        matchesCategory = true;
+      } else if (activeFilter === 'surgery' && (p.text.toLowerCase().includes('surgery') || p.text.toLowerCase().includes('protocol') || p.text.toLowerCase().includes('gastropexy'))) {
+        matchesCategory = true;
+      } else if (activeFilter === 'ce_webinars' && (p.text.toLowerCase().includes('webinar') || p.text.toLowerCase().includes('student') || p.text.toLowerCase().includes('discord') || p.text.toLowerCase().includes('vin'))) {
+        matchesCategory = true;
+      } else if (activeFilter === 'peer_support' && (p.text.toLowerCase().includes('support') || p.text.toLowerCase().includes('mental') || p.text.toLowerCase().includes('tech'))) {
+        matchesCategory = true;
+      } else if (activeFilter === 'vin' && (p.text.toLowerCase().includes('vin') || p.text.toLowerCase().includes('network'))) {
+        matchesCategory = true;
+      }
+    }
     if (!matchesCategory) return false;
 
     // 2. City Filter
@@ -996,6 +1024,10 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
                 { id: 'all', label: '🌐 All Topics', activeClass: 'bg-[#5a5a40] border-[#5a5a40] border-b-[3px] border-b-[#3e3e2b] text-white font-extrabold' },
                 { id: 'emergency', label: '🚨 Emergency Alerts', activeClass: 'bg-red-600 border-red-700 border-b-[3px] border-b-red-800 text-white font-extrabold' },
                 { id: 'ask_vet', label: '💬 Ask-A-Vet Q&A Hub', activeClass: 'bg-amber-600 border-amber-700 border-b-[3px] border-b-amber-800 text-white font-extrabold' },
+                { id: 'case_studies', label: '🔬 Case Studies & Radiographs', activeClass: 'bg-purple-700 border-purple-800 border-b-[3px] border-b-purple-900 text-white font-extrabold' },
+                { id: 'surgery', label: '⚕️ Surgery Protocols & Tips', activeClass: 'bg-indigo-700 border-indigo-800 border-b-[3px] border-b-indigo-900 text-white font-extrabold' },
+                { id: 'ce_webinars', label: '🎓 Student Discord & CE Webinars', activeClass: 'bg-teal-700 border-teal-800 border-b-[3px] border-b-teal-900 text-white font-extrabold' },
+                { id: 'peer_support', label: '🤝 Peer Support & Mental Health', activeClass: 'bg-stone-700 border-stone-800 border-b-[3px] border-b-stone-900 text-white font-extrabold' },
                 { id: 'lost', label: '🔴 Missing Pets', activeClass: 'bg-[#df4747] border-[#c23838] border-b-[3px] border-b-[#9e2a2a] text-white font-extrabold' },
                 { id: 'adoption', label: '🟢 Adoption Circles', activeClass: 'bg-emerald-600 border-emerald-700 border-b-[3px] border-b-emerald-800 text-white font-extrabold' },
                 { id: 'help', label: '🔵 Assistance Queries', activeClass: 'bg-blue-600 border-blue-700 border-b-[3px] border-b-blue-800 text-white font-extrabold' }

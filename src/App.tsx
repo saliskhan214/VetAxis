@@ -32,6 +32,7 @@ import { TermsOfServicePage, PrivacyPolicyPage, AboutUsPage, ContactSupportPage 
 import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
 import { Messenger } from './components/Messenger';
 import { Footer } from './components/Footer';
+import { SearchDiscoveryHub } from './components/SearchDiscoveryHub';
 import PageNotFound from './components/PageNotFound';
 import { PrefetchService } from './lib/prefetchService';
 
@@ -131,6 +132,59 @@ export default function App() {
       setInitialPetType(petTypeParam);
     }
 
+    const queryParam = params.get('q') || params.get('search') || params.get('query');
+    if (queryParam) {
+      const qLower = queryParam.toLowerCase().trim();
+      if (
+        qLower.includes('emergency') || qLower.includes('vet near me') || qLower.includes('clinic near me') || 
+        qLower.includes('walk in') || qLower.includes('cheap vet') || qLower.includes('mobile vet') || 
+        qLower.includes('cat only') || qLower.includes('exotic') || qLower.includes('avian') || 
+        qLower.includes('equine') || qLower.includes('reptile') || qLower.includes('ultrasound') || 
+        qLower.includes('x ray') || qLower.includes('vaccin') || qLower.includes('spay') || 
+        qLower.includes('dental') || qLower.includes('low cost') || qLower.includes('carecredit') ||
+        qLower.includes('doctor') || qLower.includes('clinic')
+      ) {
+        setActiveSection('explore');
+        setInitialFilter(queryParam);
+      } else if (
+        qLower.includes('parvo') || qLower.includes('blood test') || qLower.includes('normal range') || 
+        qLower.includes('kidney') || qLower.includes('ckd') || qLower.includes('bloat') || 
+        qLower.includes('gdv') || qLower.includes('distemper') || qLower.includes('fip') || 
+        qLower.includes('dna') || qLower.includes('calculator') || qLower.includes('dosage')
+      ) {
+        setActiveSection('clinical_tools');
+      } else if (
+        qLower.includes('community') || qLower.includes('forum') || qLower.includes('vin') || 
+        qLower.includes('vet tech') || qLower.includes('peer support') || qLower.includes('case stud') || 
+        qLower.includes('radiograph') || qLower.includes('surgery protocol') || qLower.includes('ce webinar') || 
+        qLower.includes('ask a vet')
+      ) {
+        setActiveSection('community');
+      } else if (
+        qLower.includes('prescription') || qLower.includes('medicine') || qLower.includes('flea') || 
+        qLower.includes('heartworm') || qLower.includes('amoxicillin') || qLower.includes('glucosamine') || 
+        qLower.includes('shampoo') || qLower.includes('renal diet') || qLower.includes('ultrasound machine') || 
+        qLower.includes('anesthesia') || qLower.includes('autoclave') || qLower.includes('cage') || 
+        qLower.includes('scaler') || qLower.includes('surgical instrument')
+      ) {
+        setActiveSection('marketplace');
+      } else if (
+        qLower.includes('adoption') || qLower.includes('adopt') || qLower.includes('shelter') || 
+        qLower.includes('rescue') || qLower.includes('foster') || qLower.includes('breeder') || 
+        qLower.includes('puppy scam')
+      ) {
+        setActiveSection('pet_ads');
+      } else if (
+        qLower.includes('travel') || qLower.includes('usda') || qLower.includes('iata') || 
+        qLower.includes('cdc') || qLower.includes('microchip') || qLower.includes('recall') || 
+        qLower.includes('aaha') || qLower.includes('avian influenza') || qLower.includes('bird flu')
+      ) {
+        setActiveSection('news');
+      } else {
+        setActiveSection('directory');
+      }
+    }
+
     if (tabParam) {
       const validSections = [
         'explore', 'community', 'marketplace', 'pet_ads', 'jobs', 
@@ -138,7 +192,8 @@ export default function App() {
         'blogs', 'articles', 'about', 'about_us', 'terms', 
         'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
         'support', 'clinic_management', 'clinical_tools', 'clinical_suite',
-        'calculators', 'calculator', 'tools', 'messenger'
+        'calculators', 'calculator', 'tools', 'messenger',
+        'directory', 'search_hub', 'seo', 'search_portal'
       ];
       let targetSection = tabParam.toLowerCase();
       if (targetSection === 'pets') targetSection = 'pet_ads';
@@ -148,6 +203,7 @@ export default function App() {
       if (targetSection === 'privacy_policy') targetSection = 'privacy';
       if (targetSection === 'support') targetSection = 'contact';
       if (targetSection === 'clinical_suite' || targetSection === 'calculators' || targetSection === 'calculator' || targetSection === 'tools') targetSection = 'clinical_tools';
+      if (targetSection === 'search_hub' || targetSection === 'seo' || targetSection === 'search_portal') targetSection = 'directory';
 
       if (validSections.includes(targetSection) || validSections.includes(tabParam.toLowerCase())) {
         setActiveSection(targetSection);
@@ -173,32 +229,36 @@ export default function App() {
   // Dynamic SEO meta tags and Title management per active section
   useEffect(() => {
     const titles: Record<string, string> = {
-      explore: "Find Verified Veterinary Clinics, DVM Doctors & Emergency Animal Hospitals | VetAxis 360",
+      explore: "Vet Near Me (24/7 Emergency & Walk-in), Clinics & Animal Doctors | VetAxis 360",
+      clinical_tools: "Pet DS, Disease Diagnostics, Blood Test Ranges & Clinical Suite | VetAxis 360",
       jobs: "DVM Veterinary Careers, Hospital Jobs & Staff Recruitment | VetAxis 360",
-      pet_ads: "Lost & Found Pets SOS Network, Pet Adoption & Classifieds | VetAxis 360",
+      pet_ads: "Dog & Cat Adoption Shelters, Rescues & Lost Pet SOS | VetAxis 360",
       livestock: "Livestock Herd Management, Farm Health Ledgers & Dairy Care | VetAxis 360",
-      marketplace: "Veterinary Medicine, Surgical Supplies & Pharmacy Marketplace | VetAxis 360",
-      community: "Veterinary Clinical Discussions, Case Studies & DVM Insights | VetAxis 360",
-      news: "Veterinary Clinical Guides & Animal Health Articles | VetAxis 360",
+      marketplace: "Veterinary Prescription Medicine, Surgical Equipment & Supplies | VetAxis 360",
+      community: "Veterinary Community Forum, Case Studies, VIN Discussions & CE | VetAxis 360",
+      news: "Animal Health Guidelines, Pet Travel (USDA / IATA / CDC) & AAHA | VetAxis 360",
       subscription: "Practitioner Billing, Verified Badges & Premium Tiers | VetAxis 360",
       profile: "My Clinical Profile & Pet Medical Passports | VetAxis 360",
       about: "About VetAxis 360 | Pakistan & Global Veterinary Platform",
+      directory: "Veterinary Intelligence & Search Directory — 8 Top Query Categories | VetAxis 360",
       terms: "Terms of Service | VetAxis 360",
       privacy: "Privacy Policy & Medical Data Security | VetAxis 360",
       contact: "Contact & Support | VetAxis 360"
     };
 
     const descriptions: Record<string, string> = {
-      explore: "Find verified veterinary clinics, 24/7 emergency pet hospitals, DVM doctors, vaccination centers, and animal specialists across Islamabad, Lahore, Karachi, and Pakistan.",
+      explore: "Find verified 24/7 emergency vets near me open now, affordable walk-in pet clinics, mobile home visits, and species specialists across Islamabad, Lahore, Karachi, and Pakistan.",
+      clinical_tools: "Clinical veterinary intelligence suite: Canine blood test normal reference ranges, Parvovirus day-by-day triage, Feline CKD IRIS staging, GDV bloat protocols, and drug calculators.",
       jobs: "Browse open veterinary jobs, hospital vacancies, and farm assistant positions across Pakistan, or recruit verified DVM professionals on VetAxis 360.",
-      pet_ads: "Post lost pet SOS alerts, find missing dogs & cats, or adopt verified companion pets across Pakistan on VetAxis 360.",
+      pet_ads: "Adopt rescue dogs and cats from verified shelters, find missing pets via instant SOS broadcasts, and review safe pet adoption guidelines.",
       livestock: "Dairy and livestock health management: maintain animal records, track vaccinations, lactation logs, and herd disease alerts.",
-      marketplace: "Buy and sell livestock, farm animals, veterinary supplies, and animal pharmaceuticals with verified sellers nationwide.",
-      community: "Connect with veterinarians, farmers, and pet parents across Pakistan. Share clinical cases, advice, and pet health tips.",
-      news: "Read evidence-based veterinary articles, animal care advice, clinical disease prevention, and pet health guides authored by licensed DVMs.",
+      marketplace: "Order veterinary prescription medicine online: antibiotics, flea & tick chewables, heartworm pills, canine joint supplements, ultrasound machines, and surgical instrument sets.",
+      community: "Connect with veterinarians, veterinary technicians, and DVM students. Share clinical radiology cases, surgery tips, and access continuing education webinars.",
+      news: "Official veterinary guidelines: International pet travel (USDA APHIS, IATA crate sizes, CDC rabies rules), AAHA puppy vaccine schedules, and FDA pet food recalls.",
       subscription: "Veterinary practitioner subscriptions: verify clinical credentials, publish billboard listings, and enable direct appointment booking.",
       profile: "Manage your veterinary practitioner credentials, client bookings, and pet medical health passports.",
       about: "Learn about VetAxis 360, Pakistan's premier veterinary care and clinical intelligence ecosystem.",
+      directory: "Search Pakistan and global veterinary queries: 24/7 emergency clinics, walk-ins, DVM forums, Parvovirus day-by-day guides, blood normal ranges, and pet travel guidelines.",
       terms: "Terms of Service and clinical usage policies for the VetAxis 360 platform.",
       privacy: "Privacy policy and veterinary medical data protection standards on VetAxis 360.",
       contact: "Get in touch with the VetAxis 360 customer support and clinical emergency response triage team."
@@ -1111,7 +1171,18 @@ export default function App() {
               <ContactSupportPage onNavigate={handleNavigate} />
             )}
 
-            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact'].includes(activeSection) && (
+            {(activeSection === 'directory' || activeSection === 'search_hub' || activeSection === 'seo' || activeSection === 'search_portal') && (
+              <SearchDiscoveryHub 
+                onNavigate={(section, param) => {
+                  if (param) {
+                    if (section === 'explore') setInitialFilter(param);
+                  }
+                  handleNavigate(section);
+                }}
+              />
+            )}
+
+            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'directory', 'search_hub', 'seo', 'search_portal'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>

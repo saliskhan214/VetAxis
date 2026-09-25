@@ -77,6 +77,23 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
   }, []);
 
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get('search') || params.get('q') || params.get('item');
+      const cat = params.get('category');
+      if (s) {
+        setSearchTerm(s);
+      } else if (cat) {
+        if (cat === 'prescription_medicine') setSearchTerm('antibiotic');
+        else if (cat === 'clinical_equipment') setSearchTerm('ultrasound');
+        else setSearchTerm(cat);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     if (highlightProductId && products.length > 0) {
       setTimeout(() => {
         const el = document.getElementById(`product-${highlightProductId}`);
@@ -479,33 +496,88 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
       )}
 
       {/* FILTER & OPTION CONTROLS BAR */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-4.5 rounded-2xl shadow-sm">
-        <span className="text-xs text-[#7a766f] font-black uppercase tracking-wider">
-          📦 Catalog: <strong className="text-black font-mono font-black">{filteredProducts.length}</strong> authenticated entries available
-        </span>
+      <div className="flex flex-col gap-3 bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-4.5 rounded-2xl shadow-sm">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <span className="text-xs text-[#7a766f] font-black uppercase tracking-wider">
+            📦 Catalog: <strong className="text-black font-mono font-black">{filteredProducts.length}</strong> authenticated entries available
+          </span>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="text-xs bg-white border border-[#e3dec9] p-2.5 px-3 rounded-xl cursor-pointer font-bold text-[#373735] focus:outline-none"
-          >
-            <option value="newest">🕒 Recency: Newest</option>
-            <option value="oldest">🕒 Recency: Oldest</option>
-            <option value="price-asc">PKR Price: Low → High</option>
-            <option value="price-desc">PKR Price: High → Low</option>
-          </select>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="text-xs bg-white border border-[#e3dec9] p-2.5 px-3 rounded-xl cursor-pointer font-bold text-[#373735] focus:outline-none"
+            >
+              <option value="newest">🕒 Recency: Newest</option>
+              <option value="oldest">🕒 Recency: Oldest</option>
+              <option value="price-asc">PKR Price: Low → High</option>
+              <option value="price-desc">PKR Price: High → Low</option>
+            </select>
 
-          <div className="relative w-full max-w-[220px]">
-            <input
-              type="text"
-              placeholder="Search pharmacy products…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-control rounded-xl pl-9 py-2.5 text-xs w-full font-semibold"
-            />
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a49f92] w-4 h-4" />
+            <div className="relative w-full max-w-[220px]">
+              <input
+                type="text"
+                placeholder="Search products or equipment…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-control rounded-xl pl-9 py-2.5 text-xs w-full font-semibold"
+              />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a49f92] w-4 h-4" />
+            </div>
           </div>
+        </div>
+
+        {/* Quick SEO Keyword Chips matching Search Queries */}
+        <div className="pt-2 border-t border-[#f4f1e9] flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-black uppercase text-[#8c8c69] pr-1 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-[#5a5a40]" />
+            <span>Popular Categories:</span>
+          </span>
+          {[
+            { label: '💊 Amoxicillin & Antibiotics', key: 'amoxicillin' },
+            { label: '🛡️ Flea, Tick & Heartworm', key: 'flea' },
+            { label: '🦴 Joint Glucosamine Chews', key: 'glucosamine' },
+            { label: '🧼 Chlorhexidine 4% Shampoo', key: 'shampoo' },
+            { label: '🍲 Renal & Urinary Food', key: 'renal' },
+            { label: '🪥 Enzymatic Toothpaste', key: 'toothpaste' },
+            { label: '🔬 Ultrasound Machines', key: 'ultrasound' },
+            { label: '🩻 Digital X-Ray Sensors', key: 'x-ray' },
+            { label: '✂️ Surgical Instrument Sets', key: 'surgical' },
+            { label: '🏥 Stainless Recovery Cages', key: 'cage' },
+            { label: '🦷 Dental Scalers', key: 'scaler' },
+            { label: '🧪 Rapid Parvo Test Kits', key: 'parvo' }
+          ].map((chip) => {
+            const isSelected = searchTerm.toLowerCase().includes(chip.key.toLowerCase());
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => {
+                  if (isSelected) {
+                    setSearchTerm('');
+                  } else {
+                    setSearchTerm(chip.key);
+                  }
+                }}
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all border cursor-pointer ${
+                  isSelected 
+                    ? 'bg-[#5a5a40] text-white border-[#5a5a40] shadow-xs' 
+                    : 'bg-[#faf8f2] text-stone-700 border-[#e3dec9] hover:border-[#5a5a40] hover:bg-white'
+                }`}
+              >
+                {chip.label} {isSelected ? '✕' : ''}
+              </button>
+            );
+          })}
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="text-[10px] text-red-600 font-bold hover:underline ml-1"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 

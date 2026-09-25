@@ -640,12 +640,35 @@ export function ExploreFeed({
       handleCitySearchSubmit(initialCity);
     }
     if (initialFilter) {
-      if (initialFilter.toLowerCase().includes('emergency')) {
+      const f = initialFilter.toLowerCase();
+      if (f.includes('emergency') || f.includes('open_now') || f.includes('24hr')) {
         setSearchTerm('emergency');
-      } else if (initialFilter.toLowerCase().includes('vaccin')) {
+      } else if (f.includes('walkin') || f.includes('walk-in')) {
+        setSearchTerm('walk-in');
+      } else if (f.includes('mobile') || f.includes('home_visit')) {
+        setHomeVisitOnly(true);
+      } else if (f.includes('cat') || f.includes('feline')) {
+        setSearchTerm('cat');
+      } else if (f.includes('exotic') || f.includes('bird') || f.includes('avian') || f.includes('reptile')) {
+        setSearchTerm('exotic');
+      } else if (f.includes('equine') || f.includes('horse')) {
+        setSearchTerm('equine');
+      } else if (f.includes('vaccin') || f.includes('deworm')) {
         setSearchTerm('vaccin');
-      } else if (initialFilter.toLowerCase().includes('surg')) {
-        setSearchTerm('surgery');
+      } else if (f.includes('dental')) {
+        setSearchTerm('dental');
+      } else if (f.includes('diagnostics') || f.includes('ultrasound') || f.includes('xray') || f.includes('x-ray')) {
+        setSearchTerm('ultrasound');
+      } else if (f.includes('spay') || f.includes('neuter')) {
+        setSearchTerm('spay');
+      } else if (f.includes('dermatology') || f.includes('allergy')) {
+        setSearchTerm('allergy');
+      } else if (f.includes('low_cost') || f.includes('cheap')) {
+        setSearchTerm('low cost');
+      } else if (f.includes('payment_plans') || f.includes('carecredit')) {
+        setSearchTerm('payment plans');
+      } else {
+        setSearchTerm(initialFilter);
       }
     }
   }, [initialCity, initialFilter]);
@@ -794,22 +817,42 @@ export function ExploreFeed({
         return false;
       }
 
-      const search = searchTerm.toLowerCase();
-      const matchesSearch = (
-        p.name.toLowerCase().includes(search) ||
-        (p.expertise || '').toLowerCase().includes(search) ||
-        (p.facilities || '').toLowerCase().includes(search) ||
-        (p.address || '').toLowerCase().includes(search) ||
-        (p.homeVisitCharges || '').toLowerCase().includes(search) ||
-        (p.offersHomeVisit && (
-          'home visit'.includes(search) ||
-          'visit'.includes(search) ||
-          'doorstep'.includes(search) ||
-          'farm visit'.includes(search) ||
-          'on-site'.includes(search)
-        ))
-      );
-      if (!matchesSearch) return false;
+      const search = searchTerm.toLowerCase().trim();
+      if (!search) return true;
+
+      // Smart semantic intent matching for search queries from Google
+      const facilityText = (p.facilities || '').toLowerCase();
+      const expertiseText = (p.expertise || '').toLowerCase();
+      const nameText = p.name.toLowerCase();
+      const addrText = (p.address || '').toLowerCase();
+      const combinedText = `${nameText} ${expertiseText} ${facilityText} ${addrText} ${p.homeVisitCharges || ''}`.toLowerCase();
+
+      // Check direct substring
+      if (combinedText.includes(search)) return true;
+
+      // Multi-word token matching (all non-stop words must match)
+      const stopWords = new Set(['near', 'me', 'for', 'and', 'the', 'in', 'at', 'with', 'without', 'to', 'of', 'a', 'an']);
+      const tokens = search.split(/\s+/).filter(w => w.length > 1 && !stopWords.has(w));
+      if (tokens.length > 0) {
+        const allTokensMatch = tokens.every(tok => combinedText.includes(tok));
+        if (allTokensMatch) return true;
+      }
+
+      // Check specific semantic keywords from user's search queries
+      if ((search.includes('emergency') || search.includes('24 hour') || search.includes('open now')) && (facilityText.includes('emergency') || facilityText.includes('24/7') || facilityText.includes('icu'))) return true;
+      if ((search.includes('walk in') || search.includes('walk-in') || search.includes('appointment')) && facilityText.includes('walk-in')) return true;
+      if ((search.includes('cat') || search.includes('feline')) && (expertiseText.includes('cat') || expertiseText.includes('feline') || facilityText.includes('cat'))) return true;
+      if ((search.includes('exotic') || search.includes('bird') || search.includes('avian') || search.includes('reptile') || search.includes('rabbit') || search.includes('snake')) && (expertiseText.includes('exotic') || expertiseText.includes('avian') || expertiseText.includes('reptile') || expertiseText.includes('bird'))) return true;
+      if ((search.includes('horse') || search.includes('equine')) && (expertiseText.includes('equine') || facilityText.includes('equine') || facilityText.includes('horse'))) return true;
+      if ((search.includes('ultrasound') || search.includes('x ray') || search.includes('x-ray') || search.includes('radiograph')) && (facilityText.includes('ultrasound') || facilityText.includes('x-ray') || facilityText.includes('digital x-ray'))) return true;
+      if ((search.includes('vaccin') || search.includes('deworm')) && (facilityText.includes('vaccin') || expertiseText.includes('vaccin') || (p.offersHomeVisit && facilityText.includes('vaccin')))) return true;
+      if ((search.includes('dental') || search.includes('teeth')) && facilityText.includes('dental')) return true;
+      if ((search.includes('spay') || search.includes('neuter')) && facilityText.includes('spay')) return true;
+      if ((search.includes('blood') || search.includes('lab')) && (facilityText.includes('lab') || facilityText.includes('blood'))) return true;
+      if ((search.includes('carecredit') || search.includes('payment plan') || search.includes('low cost')) && (facilityText.includes('payment plan') || facilityText.includes('carecredit') || facilityText.includes('low cost'))) return true;
+      if (search.includes('home visit') && p.offersHomeVisit) return true;
+
+      return false;
 
       // Filter by city if selected
       if (cityFilterActive) {
