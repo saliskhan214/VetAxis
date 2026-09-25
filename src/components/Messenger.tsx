@@ -44,12 +44,23 @@ export const Messenger: React.FC<MessengerProps> = ({
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [showMobileList, setShowMobileList] = useState(true);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Scroll to bottom smoothly
-  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
+  // Scroll internal messages container ONLY — NEVER scroll the window or entire page
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth', force = false) => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // Check if user is near bottom or if explicitly forced (e.g. user sent a message)
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+
+    if (force || isNearBottom) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior
+      });
+    }
   };
 
   // 1. Subscribe to all user's conversations
@@ -98,6 +109,8 @@ export const Messenger: React.FC<MessengerProps> = ({
       return;
     }
 
+    let isInitialConvLoad = true;
+
     // Subscribe live and mark messages as delivered / seen
     const unsubscribe = MessengerService.subscribeToMessages(
       activeConvId,
@@ -105,7 +118,14 @@ export const Messenger: React.FC<MessengerProps> = ({
       true, // Active viewing conversation
       (msgs) => {
         setMessages(msgs);
-        setTimeout(() => scrollToBottom('auto'), 80);
+        if (isInitialConvLoad) {
+          isInitialConvLoad = false;
+          // Initial conversation switch: position internal chat container at bottom
+          setTimeout(() => scrollToBottom('auto', true), 40);
+        } else {
+          // Incoming message: scroll internal container only if user was already near bottom
+          scrollToBottom('smooth', false);
+        }
       }
     );
 
@@ -114,11 +134,6 @@ export const Messenger: React.FC<MessengerProps> = ({
 
     return () => unsubscribe();
   }, [activeConvId, currentUser.uid]);
-
-  // Scroll when new messages arrive
-  useEffect(() => {
-    scrollToBottom('smooth');
-  }, [messages.length]);
 
   // Active conversation object & other participant details
   const activeConversation = conversations.find((c) => c.id === activeConvId);
@@ -150,6 +165,8 @@ export const Messenger: React.FC<MessengerProps> = ({
 
     try {
       await MessengerService.sendMessage(activeConvId, currentUser, otherParticipant, textToSend);
+      // Smoothly scroll only the internal chat container, never the browser window
+      setTimeout(() => scrollToBottom('smooth', true), 30);
     } catch (err) {
       console.error('Error sending message:', err);
       // Restore input text on error
@@ -157,7 +174,7 @@ export const Messenger: React.FC<MessengerProps> = ({
     } finally {
       setIsSending(false);
       if (inputRef.current) {
-        inputRef.current.focus();
+        inputRef.current.focus({ preventScroll: true });
       }
     }
   };
@@ -222,7 +239,7 @@ export const Messenger: React.FC<MessengerProps> = ({
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 md:py-6 text-left select-none">
+    <div data-no-scroll="true" className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 md:py-6 text-left select-none">
       {/* 15-Day Auto-Expiration & Privacy Header Notice */}
       <div className="mb-4 bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-xs">
         <div className="flex items-center gap-2.5">
@@ -475,7 +492,7 @@ export const Messenger: React.FC<MessengerProps> = ({
               </div>
 
               {/* Messages Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
                 {/* Notice banner in chat */}
                 <div className="text-center my-2">
                   <span className="inline-flex items-center gap-1.5 bg-[#f4f1e9] border border-[#e3dec9] text-stone-600 text-[10px] font-semibold px-3 py-1 rounded-full shadow-2xs">
@@ -560,7 +577,6 @@ export const Messenger: React.FC<MessengerProps> = ({
                     );
                   })
                 )}
-                <div ref={messagesEndRef} />
               </div>
 
               {/* Chat Input Bar */}
