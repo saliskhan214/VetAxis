@@ -229,57 +229,57 @@ export default function App() {
   // Dynamic SEO meta tags and Title management per active section
   useEffect(() => {
     const titles: Record<string, string> = {
-      explore: "Vet Near Me (24/7 Emergency & Walk-in), Clinics & Animal Doctors | VetAxis 360",
-      clinical_tools: "Pet DS, Disease Diagnostics, Blood Test Ranges & Clinical Suite | VetAxis 360",
-      jobs: "DVM Veterinary Careers, Hospital Jobs & Staff Recruitment | VetAxis 360",
-      pet_ads: "Dog & Cat Adoption Shelters, Rescues & Lost Pet SOS | VetAxis 360",
-      livestock: "Livestock Herd Management, Farm Health Ledgers & Dairy Care | VetAxis 360",
-      marketplace: "Veterinary Prescription Medicine, Surgical Equipment & Supplies | VetAxis 360",
-      community: "Veterinary Community Forum, Case Studies, VIN Discussions & CE | VetAxis 360",
-      news: "Animal Health Guidelines, Pet Travel (USDA / IATA / CDC) & AAHA | VetAxis 360",
-      subscription: "Practitioner Billing, Verified Badges & Premium Tiers | VetAxis 360",
-      profile: "My Clinical Profile & Pet Medical Passports | VetAxis 360",
-      about: "About VetAxis 360 | Pakistan & Global Veterinary Platform",
-      directory: "Veterinary Intelligence & Search Directory — 8 Top Query Categories | VetAxis 360",
+      explore: "VetAxis 360 – Pakistan's Veterinary & Clinical Care Network",
+      clinical_tools: "Veterinary Clinical Intelligence & Diagnostic Suite | VetAxis 360",
+      jobs: "Veterinary Doctor Careers & Hospital Recruitment | VetAxis 360",
+      pet_ads: "Ethical Pet Adoption, Rescues & Missing Pet Alerts | VetAxis 360",
+      livestock: "Livestock & Dairy Herd Health Management | VetAxis 360",
+      marketplace: "Veterinary Medicine, Clinical Equipment & Supplies | VetAxis 360",
+      community: "DVM Community Forum, Case Studies & Clinical CE | VetAxis 360",
+      news: "Veterinary News, Health Alerts & Travel Guidelines | VetAxis 360",
+      subscription: "Practitioner Credentials & Verification Portal | VetAxis 360",
+      profile: "Veterinary Profile & Pet Medical Passports | VetAxis 360",
+      about: "About VetAxis 360 | Premier Veterinary Care Ecosystem",
+      directory: "Veterinary Directory & Clinical Search | VetAxis 360",
       terms: "Terms of Service | VetAxis 360",
       privacy: "Privacy Policy & Medical Data Security | VetAxis 360",
-      contact: "Contact & Support | VetAxis 360"
+      contact: "Contact & Clinical Support | VetAxis 360"
     };
 
     const descriptions: Record<string, string> = {
-      explore: "Find verified 24/7 emergency vets near me open now, affordable walk-in pet clinics, mobile home visits, and species specialists across Islamabad, Lahore, Karachi, and Pakistan.",
-      clinical_tools: "Clinical veterinary intelligence suite: Canine blood test normal reference ranges, Parvovirus day-by-day triage, Feline CKD IRIS staging, GDV bloat protocols, and drug calculators.",
-      jobs: "Browse open veterinary jobs, hospital vacancies, and farm assistant positions across Pakistan, or recruit verified DVM professionals on VetAxis 360.",
-      pet_ads: "Adopt rescue dogs and cats from verified shelters, find missing pets via instant SOS broadcasts, and review safe pet adoption guidelines.",
-      livestock: "Dairy and livestock health management: maintain animal records, track vaccinations, lactation logs, and herd disease alerts.",
-      marketplace: "Order veterinary prescription medicine online: antibiotics, flea & tick chewables, heartworm pills, canine joint supplements, ultrasound machines, and surgical instrument sets.",
-      community: "Connect with veterinarians, veterinary technicians, and DVM students. Share clinical radiology cases, surgery tips, and access continuing education webinars.",
-      news: "Official veterinary guidelines: International pet travel (USDA APHIS, IATA crate sizes, CDC rabies rules), AAHA puppy vaccine schedules, and FDA pet food recalls.",
-      subscription: "Veterinary practitioner subscriptions: verify clinical credentials, publish billboard listings, and enable direct appointment booking.",
-      profile: "Manage your veterinary practitioner credentials, client bookings, and pet medical health passports.",
+      explore: "Pakistan's premier veterinary clinical community platform. Connect with qualified doctors, general hospitals, nurse assistant directories, veterinary calculators, and certified marketplace products.",
+      clinical_tools: "Clinical veterinary intelligence suite: Canine blood test reference ranges, Parvovirus day-by-day triage, Feline CKD staging, and drug dosage calculators on VetAxis 360.",
+      jobs: "Browse open veterinary doctor jobs, hospital vacancies, and clinical assistant positions across Pakistan on VetAxis 360.",
+      pet_ads: "Adopt rescue pets from verified shelters, browse loving companion animal listings, and review safe pet adoption guidelines on VetAxis 360.",
+      livestock: "Dairy and livestock health management: maintain animal records, track vaccinations, lactation logs, and herd health on VetAxis 360.",
+      marketplace: "Certified veterinary medical supplies: prescription medicines, diagnostic kits, ultrasound equipment, and surgical instruments on VetAxis 360.",
+      community: "Connect with veterinarians and DVM students. Share clinical cases, surgical protocols, and accredited continuing education webinars on VetAxis 360.",
+      news: "Official veterinary health guidelines: pet international travel requirements (USDA/IATA), vaccine schedules, and animal health alerts.",
+      subscription: "Veterinary practitioner subscriptions: verify clinical credentials, publish billboard listings, and enable client bookings on VetAxis 360.",
+      profile: "Manage your veterinary practitioner credentials, client consultations, and digital pet medical passports.",
       about: "Learn about VetAxis 360, Pakistan's premier veterinary care and clinical intelligence ecosystem.",
-      directory: "Search Pakistan and global veterinary queries: 24/7 emergency clinics, walk-ins, DVM forums, Parvovirus day-by-day guides, blood normal ranges, and pet travel guidelines.",
+      directory: "Search Pakistan veterinary services: verified clinics, animal doctors, emergency care, and diagnostic tools.",
       terms: "Terms of Service and clinical usage policies for the VetAxis 360 platform.",
       privacy: "Privacy policy and veterinary medical data protection standards on VetAxis 360.",
-      contact: "Get in touch with the VetAxis 360 customer support and clinical emergency response triage team."
+      contact: "Get in touch with the VetAxis 360 support and clinical emergency response triage team."
     };
 
     const socialTitles: Record<string, string> = {
-      explore: "VetAxis 360 | Premier Veterinary Care & 24/7 Emergency Animal Clinics",
-      clinical_tools: "VetAxis 360 | Veterinary Clinical Intelligence & Diagnostic Suite",
-      jobs: "VetAxis 360 | Veterinary Doctor Careers & Animal Hospital Vacancies",
-      pet_ads: "VetAxis 360 | Ethical Pet Adoption, Rescues & Animal Care",
-      livestock: "VetAxis 360 | Livestock & Dairy Herd Health Management",
-      marketplace: "VetAxis 360 | Certified Veterinary Medicine, Supplies & Equipment",
-      community: "VetAxis 360 | DVM Community Forum, Radiograph Cases & Clinical CE",
-      news: "VetAxis 360 | Veterinary News, Pet Travel Guidelines & Health Alerts",
-      subscription: "VetAxis 360 | Veterinary Practitioner Credentials & Verification",
-      profile: "VetAxis 360 | Veterinary Profile & Pet Health Passports",
-      about: "VetAxis 360 | Pakistan & Global Veterinary Clinical Network",
-      directory: "VetAxis 360 | Veterinary Search Directory & Emergency Care Hub",
-      terms: "VetAxis 360 | Clinical Terms of Service",
-      privacy: "VetAxis 360 | Medical Data Privacy & Protection",
-      contact: "VetAxis 360 | Emergency Clinical Triage & Support"
+      explore: "VetAxis 360 – Pakistan's Veterinary & Clinical Care Network",
+      clinical_tools: "VetAxis 360 – Veterinary Clinical Suite & Calculators",
+      jobs: "VetAxis 360 – Veterinary Doctor Careers & Hospital Recruitment",
+      pet_ads: "VetAxis 360 – Ethical Pet Adoption & Animal Rescues",
+      livestock: "VetAxis 360 – Livestock & Dairy Herd Health Management",
+      marketplace: "VetAxis 360 – Certified Veterinary Medicine & Supplies",
+      community: "VetAxis 360 – DVM Peer Community & Case Discussions",
+      news: "VetAxis 360 – Veterinary Guidelines & Health Alerts",
+      subscription: "VetAxis 360 – Professional Verification & Tiers",
+      profile: "VetAxis 360 – Veterinary Profile & Pet Passports",
+      about: "VetAxis 360 – Premier Veterinary Care Platform",
+      directory: "VetAxis 360 – Veterinary Directory & Search",
+      terms: "VetAxis 360 – Clinical Terms of Service",
+      privacy: "VetAxis 360 – Data Privacy & Medical Security",
+      contact: "VetAxis 360 – Clinical Support & Triage"
     };
 
     if (titles[activeSection]) {

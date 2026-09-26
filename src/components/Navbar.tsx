@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, VetNotification } from '../types';
-import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2 } from 'lucide-react';
+import { Menu, X, LogOut, User, Compass, MessageSquare, ShoppingBag, Grid, Bell, Trash2, Check, AlertCircle, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessengerService } from '../lib/messengerService';
 import { PrefetchService } from '../lib/prefetchService';
@@ -37,6 +37,9 @@ export function Navbar({
   const [timerId, setTimerId] = useState<any>(null);
   const [unreadMessages, setUnreadMessages] = useState<number>(0);
   const [browserPerm, setBrowserPerm] = useState<string>('default');
+  const [isAlertBannerDismissed, setIsAlertBannerDismissed] = useState<boolean>(() => BrowserNotificationService.isDismissed());
+  const [isRequestingAlertPerm, setIsRequestingAlertPerm] = useState<boolean>(false);
+  const [alertFeedback, setAlertFeedback] = useState<{ type: 'info' | 'error' | 'success'; message: string } | null>(null);
 
   useEffect(() => {
     if (BrowserNotificationService.isSupported()) {
@@ -183,28 +186,134 @@ export function Navbar({
                     </div>
 
                     {/* Browser Notifications Permission Banner */}
-                    {BrowserNotificationService.isSupported() && browserPerm !== 'granted' && (
-                      <div className="mb-2.5 p-2 rounded-xl bg-amber-50/90 border border-amber-200 flex items-center justify-between gap-2 shadow-2xs">
-                        <div className="flex items-center gap-1.5 text-[10px] text-amber-900 font-bold">
-                          <Bell className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>Enable browser alerts</span>
+                    {BrowserNotificationService.isSupported() && !isAlertBannerDismissed && (
+                      <div className="mb-2.5 p-2.5 rounded-xl bg-gradient-to-r from-amber-50/95 to-amber-100/60 border border-amber-200/90 shadow-2xs transition-all">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-lg bg-amber-200/70 text-amber-800 flex items-center justify-center shrink-0">
+                              <Bell className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-black text-amber-950 leading-tight">
+                                Desktop Alerts
+                              </p>
+                              <p className="text-[9px] text-amber-800/80 leading-tight truncate">
+                                Get instant browser popups for clinic updates
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {browserPerm === 'granted' ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  BrowserNotificationService.sendTestNotification();
+                                }}
+                                className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                title="Send a test notification to your desktop"
+                              >
+                                <Check className="w-3 h-3" /> Test
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isRequestingAlertPerm}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setIsRequestingAlertPerm(true);
+                                  setAlertFeedback(null);
+
+                                  if (BrowserNotificationService.isInIframe()) {
+                                    setIsRequestingAlertPerm(false);
+                                    setAlertFeedback({
+                                      type: 'info',
+                                      message: 'Preview frames restrict OS prompts. Open VetAxis in a full browser tab to enable, or dismiss.'
+                                    });
+                                    return;
+                                  }
+
+                                  try {
+                                    const res = await BrowserNotificationService.requestPermission();
+                                    setBrowserPerm(res);
+                                    if (res === 'granted') {
+                                      setAlertFeedback({
+                                        type: 'success',
+                                        message: 'Alerts active! Sent test notification.'
+                                      });
+                                      BrowserNotificationService.sendTestNotification();
+                                    } else if (res === 'denied') {
+                                      setAlertFeedback({
+                                        type: 'error',
+                                        message: 'Notifications blocked in browser settings. Click 🔒 in address bar to allow, or dismiss.'
+                                      });
+                                    } else {
+                                      setAlertFeedback({
+                                        type: 'info',
+                                        message: 'Permission was not granted by browser.'
+                                      });
+                                    }
+                                  } catch {
+                                    setAlertFeedback({
+                                      type: 'error',
+                                      message: 'Could not enable alerts. You can dismiss this banner.'
+                                    });
+                                  } finally {
+                                    setIsRequestingAlertPerm(false);
+                                  }
+                                }}
+                                className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                              >
+                                {isRequestingAlertPerm ? 'Enabling...' : 'Turn On'}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                BrowserNotificationService.setDismissed(true);
+                                setIsAlertBannerDismissed(true);
+                              }}
+                              className="p-1 text-amber-700 hover:text-amber-950 hover:bg-amber-200/50 rounded-md transition-colors cursor-pointer"
+                              title="Dismiss and hide this notice"
+                              aria-label="Dismiss alert notice"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const res = await BrowserNotificationService.requestPermission();
-                            setBrowserPerm(res);
-                            if (res === 'granted') {
-                              BrowserNotificationService.showNotification('VetAxis Alerts Active', {
-                                body: 'Browser notifications are now enabled on this device!'
-                              });
-                            }
-                          }}
-                          className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors cursor-pointer shrink-0"
-                        >
-                          Turn On
-                        </button>
+
+                        {/* Interactive Feedback Message */}
+                        {alertFeedback && (
+                          <div className={`mt-2 p-1.5 rounded-lg text-[10px] leading-tight flex items-start gap-1.5 ${
+                            alertFeedback.type === 'success' 
+                              ? 'bg-emerald-100/90 text-emerald-900 border border-emerald-300' 
+                              : alertFeedback.type === 'error'
+                              ? 'bg-rose-100/90 text-rose-900 border border-rose-300'
+                              : 'bg-amber-100/90 text-amber-900 border border-amber-300'
+                          }`}>
+                            {alertFeedback.type === 'success' ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                            )}
+                            <div className="flex-1">
+                              <span>{alertFeedback.message}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAlertFeedback(null);
+                              }}
+                              className="text-[9px] underline font-bold cursor-pointer shrink-0"
+                            >
+                              hide
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 

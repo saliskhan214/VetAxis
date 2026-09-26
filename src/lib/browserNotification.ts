@@ -45,6 +45,44 @@ class BrowserNotificationManager {
   }
 
   /**
+   * Check if running inside an iframe (like AI Studio preview or embed)
+   */
+  public isInIframe(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.self !== window.top;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /**
+   * Check if the user previously dismissed the browser alert prompt banner
+   */
+  public isDismissed(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('vetaxis_browser_alerts_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Save dismiss preference
+   */
+  public setDismissed(dismissed: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      if (dismissed) {
+        localStorage.setItem('vetaxis_browser_alerts_dismissed', 'true');
+      } else {
+        localStorage.removeItem('vetaxis_browser_alerts_dismissed');
+      }
+    } catch {}
+  }
+
+  /**
    * Check if browser Notification API is supported
    */
   public isSupported(): boolean {
@@ -60,17 +98,47 @@ class BrowserNotificationManager {
   }
 
   /**
-   * Request permission from user
+   * Request permission from user with safe timeout and iframe handling
    */
   public async requestPermission(): Promise<PermissionStatus> {
     if (!this.isSupported()) return 'unsupported';
-    try {
-      const result = await Notification.requestPermission();
-      return result as PermissionStatus;
-    } catch (err) {
-      console.warn('Notification.requestPermission error:', err);
-      return Notification.permission as PermissionStatus;
+
+    if (this.isInIframe()) {
+      // In modern browsers, Notification.requestPermission() is blocked inside cross-origin iframes
+      console.warn('Notification permission request: Running inside an iframe.');
+      try {
+        const res = await Notification.requestPermission();
+        return res as PermissionStatus;
+      } catch {
+        return (Notification.permission || 'default') as PermissionStatus;
+      }
     }
+
+    try {
+      // Wrap in a promise with timeout in case browser hangs on prompt
+      const result = await Promise.race([
+        Notification.requestPermission(),
+        new Promise<PermissionStatus>((_, reject) => 
+          setTimeout(() => reject(new Error('Permission request timed out')), 8000)
+        )
+      ]);
+      return result as PermissionStatus;
+    } catch (err: any) {
+      console.warn('Notification.requestPermission error:', err);
+      return (Notification.permission || 'default') as PermissionStatus;
+    }
+  }
+
+  /**
+   * Fire a quick test notification
+   */
+  public sendTestNotification(): boolean {
+    if (this.getPermission() !== 'granted') return false;
+    const notif = this.showNotification('🐾 VetAxis 360 Alerts Active', {
+      body: 'Desktop notifications are working! You will be notified of important pet care updates and broadcasts.',
+      requireInteraction: false
+    });
+    return !!notif;
   }
 
   /**

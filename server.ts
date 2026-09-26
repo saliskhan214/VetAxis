@@ -903,6 +903,29 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     }
   });
 
+  // High-performance Social OpenGraph Image endpoint (Guaranteed 200 OK with correct MIME for WhatsApp, Facebook, Twitter, LinkedIn)
+  app.get(["/og-image.png", "/og-image", "/OG-IMAGE.PNG"], (req, res) => {
+    const ogPngPath = path.join(process.cwd(), "public", "og-image.png");
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
+    if (fs.existsSync(ogPngPath)) {
+      res.sendFile(ogPngPath);
+    } else {
+      res.redirect("https://vetaxis360.com/logo.png");
+    }
+  });
+
+  app.get(["/og-image.jpg", "/og-image.jpeg"], (req, res) => {
+    const ogJpgPath = path.join(process.cwd(), "public", "og-image.jpg");
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
+    if (fs.existsSync(ogJpgPath)) {
+      res.sendFile(ogJpgPath);
+    } else {
+      res.redirect("https://vetaxis360.com/og-image.png");
+    }
+  });
+
   // Google Site Verification static handler (Supports direct GSC crawler verification)
   app.get("/google707ec5232c268176.html", (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
