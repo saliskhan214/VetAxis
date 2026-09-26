@@ -1077,55 +1077,6 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
           </div>
         </div>
 
-        {/* Quick Top Search Queries Bar */}
-        <div className="pt-3 border-t border-[#f4f1e9] flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-black uppercase text-[#8c8c69] pr-1 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-[#5a5a40]" />
-            <span>Top Searches:</span>
-          </span>
-          {[
-            { label: '🐶 Shelter Puppies Adoption', term: 'puppy', type: 'adoption' },
-            { label: '🐱 Rescue Cat (Free Adoption)', term: 'kitten', type: 'adoption' },
-            { label: '🐕 Senior Dog Foster', term: 'senior', type: 'adoption' },
-            { label: '🐰 Small Animals & Rabbits', term: 'rabbit', type: 'all' },
-            { label: '📜 Pedigree Kittens (GCCF/TICA)', term: 'pedigree', type: 'sale' },
-            { label: '🦜 Hand-Tamed Birds', term: 'parrot', type: 'sale' },
-          ].map((chip, idx) => {
-            const isSelected = searchTerm.toLowerCase().includes(chip.term.toLowerCase());
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  if (isSelected) {
-                    setSearchTerm('');
-                    setTypeFilter('all');
-                  } else {
-                    setSearchTerm(chip.term);
-                    setTypeFilter(chip.type);
-                  }
-                }}
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all border cursor-pointer ${
-                  isSelected 
-                    ? 'bg-[#5a5a40] text-white border-[#5a5a40] shadow-xs' 
-                    : 'bg-[#faf8f2] text-stone-700 border-[#e3dec9] hover:border-[#5a5a40] hover:bg-white'
-                }`}
-              >
-                {chip.label} {isSelected ? '✕' : ''}
-              </button>
-            );
-          })}
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => { setSearchTerm(''); setTypeFilter('all'); }}
-              className="text-[10px] text-red-600 font-bold hover:underline ml-1"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
       </div>
 
       {/* ACTIVE EMERGENCIES - MOVED TO TOP */}

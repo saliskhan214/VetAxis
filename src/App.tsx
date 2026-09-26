@@ -264,6 +264,24 @@ export default function App() {
       contact: "Get in touch with the VetAxis 360 customer support and clinical emergency response triage team."
     };
 
+    const socialTitles: Record<string, string> = {
+      explore: "VetAxis 360 | Premier Veterinary Care & 24/7 Emergency Animal Clinics",
+      clinical_tools: "VetAxis 360 | Veterinary Clinical Intelligence & Diagnostic Suite",
+      jobs: "VetAxis 360 | Veterinary Doctor Careers & Animal Hospital Vacancies",
+      pet_ads: "VetAxis 360 | Ethical Pet Adoption, Rescues & Animal Care",
+      livestock: "VetAxis 360 | Livestock & Dairy Herd Health Management",
+      marketplace: "VetAxis 360 | Certified Veterinary Medicine, Supplies & Equipment",
+      community: "VetAxis 360 | DVM Community Forum, Radiograph Cases & Clinical CE",
+      news: "VetAxis 360 | Veterinary News, Pet Travel Guidelines & Health Alerts",
+      subscription: "VetAxis 360 | Veterinary Practitioner Credentials & Verification",
+      profile: "VetAxis 360 | Veterinary Profile & Pet Health Passports",
+      about: "VetAxis 360 | Pakistan & Global Veterinary Clinical Network",
+      directory: "VetAxis 360 | Veterinary Search Directory & Emergency Care Hub",
+      terms: "VetAxis 360 | Clinical Terms of Service",
+      privacy: "VetAxis 360 | Medical Data Privacy & Protection",
+      contact: "VetAxis 360 | Emergency Clinical Triage & Support"
+    };
+
     if (titles[activeSection]) {
       document.title = titles[activeSection];
 
@@ -273,11 +291,12 @@ export default function App() {
         metaDesc.setAttribute('content', descriptions[activeSection]);
       }
 
-      // Update og:title & twitter:title
+      // Update og:title & twitter:title with clean, branded titles
+      const sTitle = socialTitles[activeSection] || "VetAxis 360 | Premier Veterinary Care & 24/7 Emergency Animal Clinics";
       const ogTitle = document.querySelector('meta[property="og:title"]');
-      if (ogTitle) ogTitle.setAttribute('content', titles[activeSection]);
+      if (ogTitle) ogTitle.setAttribute('content', sTitle);
       const twTitle = document.querySelector('meta[name="twitter:title"]');
-      if (twTitle) twTitle.setAttribute('content', titles[activeSection]);
+      if (twTitle) twTitle.setAttribute('content', sTitle);
 
       // Update og:description & twitter:description
       if (descriptions[activeSection]) {
@@ -285,6 +304,19 @@ export default function App() {
         if (ogDesc) ogDesc.setAttribute('content', descriptions[activeSection]);
         const twDesc = document.querySelector('meta[name="twitter:description"]');
         if (twDesc) twDesc.setAttribute('content', descriptions[activeSection]);
+      }
+
+      // Update og:image and twitter:image to guaranteed branded asset
+      try {
+        const previewImageUrl = `${window.location.origin}/og-image.png`;
+        const ogImg = document.querySelector('meta[property="og:image"]');
+        if (ogImg) ogImg.setAttribute('content', previewImageUrl);
+        const ogSecureImg = document.querySelector('meta[property="og:image:secure_url"]');
+        if (ogSecureImg) ogSecureImg.setAttribute('content', previewImageUrl);
+        const twImg = document.querySelector('meta[name="twitter:image"]');
+        if (twImg) twImg.setAttribute('content', previewImageUrl);
+      } catch (e) {
+        // Ignored
       }
 
       // Update canonical URL & og:url

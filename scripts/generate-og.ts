@@ -1,0 +1,302 @@
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
+
+async function generateOgImage() {
+  const width = 1200;
+  const height = 630;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0e1713"/>
+      <stop offset="50%" stop-color="#14231b"/>
+      <stop offset="100%" stop-color="#0a100d"/>
+    </linearGradient>
+
+    <!-- Radial Glow for Accent -->
+    <radialGradient id="glowTopLeft" cx="20%" cy="20%" r="50%">
+      <stop offset="0%" stop-color="#3d6b4f" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#3d6b4f" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glowRight" cx="80%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="#b88350" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#b88350" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Card Background -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#192a21" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#101c15" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <!-- Mascot Fur Gradient -->
+    <linearGradient id="furGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ddaa75"/>
+      <stop offset="100%" stop-color="#c4935e"/>
+    </linearGradient>
+
+    <!-- Ear Inner Gradient -->
+    <linearGradient id="earInner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c48a52"/>
+      <stop offset="100%" stop-color="#ab743f"/>
+    </linearGradient>
+
+    <!-- Snout Gradient -->
+    <linearGradient id="snoutGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#faedd9"/>
+    </linearGradient>
+
+    <!-- Medallion Gradient -->
+    <linearGradient id="medallionGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b06c47"/>
+      <stop offset="100%" stop-color="#8a4f30"/>
+    </linearGradient>
+
+    <!-- Gold Accent Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f6d365"/>
+      <stop offset="100%" stop-color="#fda085"/>
+    </linearGradient>
+
+    <!-- Badge Background -->
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#21352b"/>
+      <stop offset="100%" stop-color="#18271f"/>
+    </linearGradient>
+
+    <!-- Card Shadow -->
+    <filter id="shadowFilter" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Base Background -->
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
+  <rect width="1200" height="630" fill="url(#glowTopLeft)"/>
+  <rect width="1200" height="630" fill="url(#glowRight)"/>
+
+  <!-- Subtle Modern Technical Grid Pattern -->
+  <g stroke="#ffffff" stroke-opacity="0.03" stroke-width="1">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="150" y1="0" x2="150" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="450" y1="0" x2="450" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="750" y1="0" x2="750" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="1050" y1="0" x2="1050" y2="630"/>
+  </g>
+
+  <!-- Outer Border Frame -->
+  <rect x="24" y="24" width="1152" height="582" rx="32" fill="none" stroke="#2a4234" stroke-width="2"/>
+  <rect x="26" y="26" width="1148" height="578" rx="30" fill="none" stroke="#f6d365" stroke-opacity="0.15" stroke-width="1"/>
+
+  <!-- Left Main Content Column -->
+  <g transform="translate(80, 85)">
+    <!-- Top Category Pill -->
+    <g transform="translate(0, 0)">
+      <rect width="360" height="38" rx="19" fill="#1b2e23" stroke="#3b5d47" stroke-width="1.5"/>
+      <!-- Green pulse dot -->
+      <circle cx="22" cy="19" r="5" fill="#4ade80"/>
+      <circle cx="22" cy="19" r="9" fill="#4ade80" fill-opacity="0.25"/>
+      <text x="40" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#a7f3d0" letter-spacing="1.5">VETERINARY CLINICAL PLATFORM</text>
+    </g>
+
+    <!-- Main Title -->
+    <g transform="translate(0, 85)">
+      <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="64" font-weight="900" fill="#ffffff" letter-spacing="-1">
+        VetAxis <tspan fill="url(#goldGrad)">360</tspan>
+      </text>
+    </g>
+
+    <!-- Tagline / Headline -->
+    <text x="0" y="132" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#e2e8f0" letter-spacing="-0.3">
+      Pakistan's Premier Veterinary Care &amp; Clinical Network
+    </text>
+
+    <!-- Subtitle Description -->
+    <text x="0" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#94a3b8" letter-spacing="-0.1">
+      Connect with verified doctors, registered animal hospitals, emergency clinics,
+    </text>
+    <text x="0" y="196" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#94a3b8" letter-spacing="-0.1">
+      clinical calculators, DVM peer consultations &amp; certified marketplace products.
+    </text>
+
+    <!-- Feature Pillars Badges Grid -->
+    <g transform="translate(0, 245)">
+      <!-- Badge 1: Verified Vets -->
+      <g transform="translate(0, 0)">
+        <rect width="180" height="42" rx="12" fill="url(#badgeGrad)" stroke="#2d493a" stroke-width="1.2"/>
+        <text x="14" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#d1fae5">🩺 Verified Doctors</text>
+      </g>
+
+      <!-- Badge 2: Emergency & Walk-in -->
+      <g transform="translate(192, 0)">
+        <rect width="185" height="42" rx="12" fill="url(#badgeGrad)" stroke="#2d493a" stroke-width="1.2"/>
+        <text x="14" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#fed7aa">🚨 24/7 Emergency</text>
+      </g>
+
+      <!-- Badge 3: Clinical Suite -->
+      <g transform="translate(389, 0)">
+        <rect width="195" height="42" rx="12" fill="url(#badgeGrad)" stroke="#2d493a" stroke-width="1.2"/>
+        <text x="14" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#e0e7ff">🧮 Vet Calculators</text>
+      </g>
+
+      <!-- Badge 4: DVM Community -->
+      <g transform="translate(0, 52)">
+        <rect width="180" height="42" rx="12" fill="url(#badgeGrad)" stroke="#2d493a" stroke-width="1.2"/>
+        <text x="14" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#fbcfe8">💬 DVM Discussions</text>
+      </g>
+
+      <!-- Badge 5: Pet Marketplace -->
+      <g transform="translate(192, 52)">
+        <rect width="185" height="42" rx="12" fill="url(#badgeGrad)" stroke="#2d493a" stroke-width="1.2"/>
+        <text x="14" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#fef08a">🛒 Medical Supply</text>
+      </g>
+
+      <!-- Badge 6: Pet Adoption -->
+      <g transform="translate(389, 52)">
+        <rect width="195" height="42" rx="12" fill="url(#badgeGrad)" stroke="#2d493a" stroke-width="1.2"/>
+        <text x="14" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#cbd5e1">🐾 Ethical Adoption</text>
+      </g>
+    </g>
+
+    <!-- Bottom URL Bar & Trust Indicator -->
+    <g transform="translate(0, 395)">
+      <rect width="270" height="40" rx="10" fill="#132019" stroke="#33523f" stroke-width="1.5"/>
+      <!-- Globe icon SVG -->
+      <g transform="translate(16, 12)">
+        <circle cx="8" cy="8" r="7" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+        <line x1="1" y1="8" x2="15" y2="8" stroke="#4ade80" stroke-width="1.2"/>
+        <ellipse cx="8" cy="8" rx="3.5" ry="7" fill="none" stroke="#4ade80" stroke-width="1.2"/>
+      </g>
+      <text x="42" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="#ffffff" letter-spacing="0.5">vetaxis360.com</text>
+      <!-- Verified Badge -->
+      <circle cx="240" cy="20" r="9" fill="#3b82f6"/>
+      <path d="M236 20 L239 23 L245 17" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <!-- Right Visual Mascot & Brand Crest Card -->
+  <g transform="translate(770, 95)" filter="url(#shadowFilter)">
+    <!-- Glassmorphic Card Container -->
+    <rect width="350" height="440" rx="28" fill="url(#cardGrad)" stroke="#385444" stroke-width="2"/>
+    <rect x="2" y="2" width="346" height="436" rx="26" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+
+    <!-- Inner Mascot Stage Circular Plate -->
+    <circle cx="175" cy="180" r="130" fill="#1f3428" stroke="#3d5e4b" stroke-width="3"/>
+    <circle cx="175" cy="180" r="115" fill="#fdfbf7" stroke="#e8dfce" stroke-width="4"/>
+
+    <!-- Mini Paw Badge top-right of plate -->
+    <g transform="translate(265, 80)">
+      <circle cx="0" cy="0" r="22" fill="#ffffff" stroke="#e8dfce" stroke-width="2" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.1))"/>
+      <ellipse cx="-5" cy="-5" rx="2.5" ry="3.8" fill="#6d5d6e" transform="rotate(-15 -5 -5)"/>
+      <ellipse cx="5" cy="-5" rx="2.5" ry="3.8" fill="#6d5d6e" transform="rotate(15 5 -5)"/>
+      <ellipse cx="-9" cy="2" rx="2.2" ry="3.2" fill="#6d5d6e" transform="rotate(-35 -9 2)"/>
+      <ellipse cx="9" cy="2" rx="2.2" ry="3.2" fill="#6d5d6e" transform="rotate(35 9 2)"/>
+      <path d="M-6,4 C-6,1 -3,0 0,1.5 C3,0 6,1 6,4 C6,8 3,9 0,9 C-3,9 -6,8 -6,4 Z" fill="#6d5d6e"/>
+    </g>
+
+    <!-- Embedded Mascot Graphic (Scaled & Centered) -->
+    <g transform="translate(175, 185) scale(0.95) translate(-256, -265)">
+      <!-- Left Ear -->
+      <g transform="rotate(-12 185 190)">
+        <ellipse cx="185" cy="180" rx="36" ry="48" fill="url(#furGrad)"/>
+        <ellipse cx="185" cy="184" rx="22" ry="32" fill="url(#earInner)"/>
+      </g>
+
+      <!-- Right Ear -->
+      <g transform="rotate(12 327 190)">
+        <ellipse cx="327" cy="180" rx="36" ry="48" fill="url(#furGrad)"/>
+        <ellipse cx="327" cy="184" rx="22" ry="32" fill="url(#earInner)"/>
+      </g>
+
+      <!-- Bear Head -->
+      <path d="M 180 230 
+               C 170 200, 200 175, 256 175 
+               C 312 175, 342 200, 332 230 
+               C 345 265, 345 305, 315 330 
+               C 290 350, 222 350, 197 330 
+               C 167 305, 167 265, 180 230 Z" 
+            fill="url(#furGrad)" 
+            stroke="#b88350" 
+            stroke-width="2"/>
+
+      <!-- Snout / Muzzle Light Patch -->
+      <ellipse cx="256" cy="285" rx="46" ry="38" fill="url(#snoutGrad)" stroke="#eedbc4" stroke-width="1.5"/>
+
+      <!-- Left Eye -->
+      <circle cx="218" cy="245" r="13" fill="#2d2621"/>
+      <circle cx="214" cy="241" r="4.5" fill="#ffffff"/>
+      <circle cx="222" cy="249" r="2" fill="#ffffff"/>
+
+      <!-- Right Eye -->
+      <circle cx="294" cy="245" r="13" fill="#2d2621"/>
+      <circle cx="290" cy="241" r="4.5" fill="#ffffff"/>
+      <circle cx="298" cy="249" r="2" fill="#ffffff"/>
+
+      <!-- Cute Nose -->
+      <path d="M 246 265 C 246 260, 252 258, 256 258 C 260 258, 266 260, 266 265 C 266 272, 256 277, 256 277 C 256 277, 246 272, 246 265 Z" fill="#2d2621"/>
+      <ellipse cx="254" cy="262" rx="3" ry="1.5" fill="#ffffff" opacity="0.6"/>
+
+      <!-- Mouth Line & Tongue -->
+      <path d="M 256 276 L 256 288" stroke="#2d2621" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 251 287 C 251 298, 261 298, 261 287 Z" fill="#ff8597" stroke="#e06275" stroke-width="1.5"/>
+
+      <!-- Cheek Dots -->
+      <circle cx="196" cy="282" r="2.5" fill="#ab743f" opacity="0.6"/>
+      <circle cx="188" cy="288" r="2.5" fill="#ab743f" opacity="0.6"/>
+      <circle cx="316" cy="282" r="2.5" fill="#ab743f" opacity="0.6"/>
+      <circle cx="324" cy="288" r="2.5" fill="#ab743f" opacity="0.6"/>
+
+      <!-- Veterinary Cross Medallion -->
+      <g transform="translate(256, 350)">
+        <circle cx="0" cy="0" r="19" fill="url(#medallionGrad)" stroke="#f7efe1" stroke-width="2.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))"/>
+        <rect x="-3.5" y="-10" width="7" height="20" rx="2" fill="#ffffff"/>
+        <rect x="-10" y="-3.5" width="20" height="7" rx="2" fill="#ffffff"/>
+      </g>
+    </g>
+
+    <!-- Card Footer Branding -->
+    <g transform="translate(25, 345)">
+      <rect width="300" height="65" rx="16" fill="#132018" stroke="#2d4838" stroke-width="1.5"/>
+      <text x="150" y="28" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#f6d365" letter-spacing="1">
+        ⭐ CERTIFIED VETERINARY HUB
+      </text>
+      <text x="150" y="48" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">
+        Doctors &#8226; Clinics &#8226; Emergency Triage
+      </text>
+    </g>
+  </g>
+</svg>`;
+
+  const publicDir = path.join(process.cwd(), 'public');
+  const pngPath = path.join(publicDir, 'og-image.png');
+  const jpgPath = path.join(publicDir, 'og-image.jpg');
+  const svgPath = path.join(publicDir, 'og-image.svg');
+
+  // Save the SVG source
+  fs.writeFileSync(svgPath, svg, 'utf-8');
+
+  // Render to PNG
+  await sharp(Buffer.from(svg))
+    .png({ quality: 100, compressionLevel: 9 })
+    .toFile(pngPath);
+  console.log('✅ Generated public/og-image.png (1200x630)');
+
+  // Render to JPEG
+  await sharp(Buffer.from(svg))
+    .jpeg({ quality: 95 })
+    .toFile(jpgPath);
+  console.log('✅ Generated public/og-image.jpg (1200x630)');
+}
+
+generateOgImage().catch(console.error);

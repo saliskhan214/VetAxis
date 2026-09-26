@@ -526,59 +526,6 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
             </div>
           </div>
         </div>
-
-        {/* Quick SEO Keyword Chips matching Search Queries */}
-        <div className="pt-2 border-t border-[#f4f1e9] flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-black uppercase text-[#8c8c69] pr-1 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-[#5a5a40]" />
-            <span>Popular Categories:</span>
-          </span>
-          {[
-            { label: '💊 Amoxicillin & Antibiotics', key: 'amoxicillin' },
-            { label: '🛡️ Flea, Tick & Heartworm', key: 'flea' },
-            { label: '🦴 Joint Glucosamine Chews', key: 'glucosamine' },
-            { label: '🧼 Chlorhexidine 4% Shampoo', key: 'shampoo' },
-            { label: '🍲 Renal & Urinary Food', key: 'renal' },
-            { label: '🪥 Enzymatic Toothpaste', key: 'toothpaste' },
-            { label: '🔬 Ultrasound Machines', key: 'ultrasound' },
-            { label: '🩻 Digital X-Ray Sensors', key: 'x-ray' },
-            { label: '✂️ Surgical Instrument Sets', key: 'surgical' },
-            { label: '🏥 Stainless Recovery Cages', key: 'cage' },
-            { label: '🦷 Dental Scalers', key: 'scaler' },
-            { label: '🧪 Rapid Parvo Test Kits', key: 'parvo' }
-          ].map((chip) => {
-            const isSelected = searchTerm.toLowerCase().includes(chip.key.toLowerCase());
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => {
-                  if (isSelected) {
-                    setSearchTerm('');
-                  } else {
-                    setSearchTerm(chip.key);
-                  }
-                }}
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all border cursor-pointer ${
-                  isSelected 
-                    ? 'bg-[#5a5a40] text-white border-[#5a5a40] shadow-xs' 
-                    : 'bg-[#faf8f2] text-stone-700 border-[#e3dec9] hover:border-[#5a5a40] hover:bg-white'
-                }`}
-              >
-                {chip.label} {isSelected ? '✕' : ''}
-              </button>
-            );
-          })}
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm('')}
-              className="text-[10px] text-red-600 font-bold hover:underline ml-1"
-            >
-              Clear
-            </button>
-          )}
-        </div>
       </div>
 
       {/* PRODUCT LAYOUT GRID */}

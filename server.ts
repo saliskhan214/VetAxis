@@ -961,6 +961,23 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
     });
   });
 
+  // Explicit social preview image handler for WhatsApp, Twitter, Facebook, LinkedIn crawlers
+  app.get(["/og-image.png", "/og-image.jpg", "/og-image.svg"], (req, res) => {
+    const filename = req.path.replace(/^\//, '');
+    const publicPath = path.join(process.cwd(), "public", filename);
+    const distPath = path.join(process.cwd(), "dist", filename);
+    const targetFile = fs.existsSync(publicPath) ? publicPath : (fs.existsSync(distPath) ? distPath : null);
+
+    if (targetFile) {
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
+      if (filename.endsWith(".png")) res.setHeader("Content-Type", "image/png");
+      if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) res.setHeader("Content-Type", "image/jpeg");
+      if (filename.endsWith(".svg")) res.setHeader("Content-Type", "image/svg+xml");
+      return res.sendFile(targetFile);
+    }
+    res.status(404).send("Preview asset not found");
+  });
+
   // ─────────────────────────────────────────────────────────────────
   // VITE DEVELOPMENT MIDDLEWARE OR STATIC PRODUCTION ASSETS
   // ─────────────────────────────────────────────────────────────────

@@ -82,7 +82,6 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
-    { id: 'directory', label: 'Search Portal', icon: '🔍' },
     { id: 'messenger', label: 'Messenger', icon: '💬' },
     { id: 'clinical_tools', label: 'Vet & Pet Calculators', icon: '🧮' },
     { id: 'clinic_management', label: 'Clinic Management', icon: '🏥' },
