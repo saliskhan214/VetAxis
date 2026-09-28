@@ -133,7 +133,7 @@ export function OfflineModeIndicator({
                     🛰️ Connection error or slow network
                   </h4>
                   <p className="text-gray-700 text-xs leading-relaxed">
-                    Your livestock feed is fully secure and retrieves and saves records locally on your device storage via active service workers.
+                    Your session is secure and retrieves and saves records locally on your device storage via active service workers.
                   </p>
                 </div>
               </div>

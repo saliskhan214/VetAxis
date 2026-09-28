@@ -19,12 +19,8 @@ import { Marketplace } from './components/Marketplace';
 import { PetAds } from './components/PetAds';
 import { ProfilePage } from './components/ProfilePage';
 import { JobBoard } from './components/JobBoard';
-import LivestockManagement from './components/LivestockManagement';
-import { LivestockPublicPortal } from './components/LivestockPublicPortal';
 import { SubscriptionPortal } from './components/SubscriptionPortal';
 import { SubscriptionPricingPublic } from './components/SubscriptionPricingPublic';
-import { GuestAnimalViewer } from './components/GuestAnimalViewer';
-import { ClinicManagement } from './components/ClinicManagement';
 import { AboutUsDirectory } from './components/AboutUsDirectory';
 import { ThreeDAnimalLoader } from './components/ThreeDAnimalLoader';
 import { BlogSection } from './components/BlogSection';
@@ -64,8 +60,6 @@ export default function App() {
   const [highlightPostId, setHighlightPostId] = useState<string | null>(null);
   const [highlightJobId, setHighlightJobId] = useState<string | null>(null);
   const [highlightApplicationId, setHighlightApplicationId] = useState<string | null>(null);
-  const [highlightFarmId, setHighlightFarmId] = useState<string | null>(null);
-  const [highlightAppointmentId, setHighlightAppointmentId] = useState<string | null>(null);
   const [highlightClinicId, setHighlightClinicId] = useState<string | null>(null);
   const [highlightDoctorId, setHighlightDoctorId] = useState<string | null>(null);
   const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
@@ -73,8 +67,6 @@ export default function App() {
   const [initialCity, setInitialCity] = useState<string | null>(null);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
   const [initialPetType, setInitialPetType] = useState<string | null>(null);
-  const [scannedAnimalRecordId, setScannedAnimalRecordId] = useState<string | null>(null);
-  const [temporaryBypassGuestForAuth, setTemporaryBypassGuestForAuth] = useState<boolean>(false);
   const [messengerTargetUser, setMessengerTargetUser] = useState<UserProfile | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalContext, setAuthModalContext] = useState<string | null>(null);
@@ -188,10 +180,10 @@ export default function App() {
     if (tabParam) {
       const validSections = [
         'explore', 'community', 'marketplace', 'pet_ads', 'jobs', 
-        'livestock', 'profile', 'subscription', 'admin', 'news', 
+        'profile', 'subscription', 'admin', 'news', 
         'blogs', 'articles', 'about', 'about_us', 'terms', 
         'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
-        'support', 'clinic_management', 'clinical_tools', 'clinical_suite',
+        'support', 'clinical_tools', 'clinical_suite',
         'calculators', 'calculator', 'tools', 'messenger',
         'directory', 'search_hub', 'seo', 'search_portal'
       ];
@@ -205,23 +197,10 @@ export default function App() {
       if (targetSection === 'clinical_suite' || targetSection === 'calculators' || targetSection === 'calculator' || targetSection === 'tools') targetSection = 'clinical_tools';
       if (targetSection === 'search_hub' || targetSection === 'seo' || targetSection === 'search_portal') targetSection = 'directory';
 
-      if (validSections.includes(targetSection) || validSections.includes(tabParam.toLowerCase())) {
+      if (validSections.includes(targetSection)) {
         setActiveSection(targetSection);
       } else {
         setActiveSection('not_found');
-      }
-    }
-
-    if (animalId) {
-      setScannedAnimalRecordId(animalId);
-      if (currentUser?.uid) {
-        setActiveSection('livestock');
-      }
-      try {
-        const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-      } catch (err) {
-        console.warn('Could not clean address bar parameters:', err);
       }
     }
   }, [currentUser?.uid]);
@@ -233,7 +212,6 @@ export default function App() {
       clinical_tools: "Veterinary Clinical Intelligence & Diagnostic Suite | VetAxis 360",
       jobs: "Veterinary Doctor Careers & Hospital Recruitment | VetAxis 360",
       pet_ads: "Ethical Pet Adoption, Rescues & Missing Pet Alerts | VetAxis 360",
-      livestock: "Livestock & Dairy Herd Health Management | VetAxis 360",
       marketplace: "Veterinary Medicine, Clinical Equipment & Supplies | VetAxis 360",
       community: "DVM Community Forum, Case Studies & Clinical CE | VetAxis 360",
       news: "Veterinary News, Health Alerts & Travel Guidelines | VetAxis 360",
@@ -251,7 +229,6 @@ export default function App() {
       clinical_tools: "Clinical veterinary intelligence suite: Canine blood test reference ranges, Parvovirus day-by-day triage, Feline CKD staging, and drug dosage calculators on VetAxis 360.",
       jobs: "Browse open veterinary doctor jobs, hospital vacancies, and clinical assistant positions across Pakistan on VetAxis 360.",
       pet_ads: "Adopt rescue pets from verified shelters, browse loving companion animal listings, and review safe pet adoption guidelines on VetAxis 360.",
-      livestock: "Dairy and livestock health management: maintain animal records, track vaccinations, lactation logs, and herd health on VetAxis 360.",
       marketplace: "Certified veterinary medical supplies: prescription medicines, diagnostic kits, ultrasound equipment, and surgical instruments on VetAxis 360.",
       community: "Connect with veterinarians and DVM students. Share clinical cases, surgical protocols, and accredited continuing education webinars on VetAxis 360.",
       news: "Official veterinary health guidelines: pet international travel requirements (USDA/IATA), vaccine schedules, and animal health alerts.",
@@ -269,7 +246,6 @@ export default function App() {
       clinical_tools: "VetAxis 360 – Veterinary Clinical Suite & Calculators",
       jobs: "VetAxis 360 – Veterinary Doctor Careers & Hospital Recruitment",
       pet_ads: "VetAxis 360 – Ethical Pet Adoption & Animal Rescues",
-      livestock: "VetAxis 360 – Livestock & Dairy Herd Health Management",
       marketplace: "VetAxis 360 – Certified Veterinary Medicine & Supplies",
       community: "VetAxis 360 – DVM Peer Community & Case Discussions",
       news: "VetAxis 360 – Veterinary Guidelines & Health Alerts",
@@ -574,8 +550,6 @@ export default function App() {
     setHighlightPostId(null);
     setHighlightJobId(null);
     setHighlightApplicationId(null);
-    setHighlightFarmId(null);
-    setHighlightAppointmentId(null);
 
     // Set correct highlight states based on targetType and redirect
     if (notif.targetType === 'post') {
@@ -587,12 +561,8 @@ export default function App() {
     } else if (notif.targetType === 'application') {
       setHighlightApplicationId(notif.targetId);
       setActiveSection('jobs');
-    } else if (notif.targetType === 'farm') {
-      setHighlightFarmId(notif.targetId);
-      setActiveSection('livestock');
     } else if (notif.targetType === 'appointment') {
-      setHighlightAppointmentId(notif.targetId);
-      setActiveSection('clinic_management');
+      setActiveSection('profile');
     }
   };
 
@@ -606,7 +576,7 @@ export default function App() {
     if (normalized === 'support') normalized = 'contact';
     if (normalized === 'clinical_suite' || normalized === 'calculators' || normalized === 'calculator' || normalized === 'tools') normalized = 'clinical_tools';
 
-    const PRIVATE_SECTIONS = ['messenger', 'profile', 'admin', 'clinic_management'];
+    const PRIVATE_SECTIONS = ['messenger', 'profile', 'admin'];
     if (!currentUser && PRIVATE_SECTIONS.includes(normalized)) {
       triggerAuthWall(`sign in to access ${normalized.replace('_', ' ')}`);
       return;
@@ -618,8 +588,6 @@ export default function App() {
     setHighlightPostId(null);
     setHighlightJobId(null);
     setHighlightApplicationId(null);
-    setHighlightFarmId(null);
-    setHighlightAppointmentId(null);
 
     // Sync URL without full page reload for Google Search and external deep-linking
     try {
@@ -889,7 +857,6 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
     setAuthModalContext(null);
-    setTemporaryBypassGuestForAuth(false);
   };
 
   const handleLogout = async () => {
@@ -911,24 +878,10 @@ export default function App() {
         <div className="relative z-10">
           <ThreeDAnimalLoader
             message="Connecting to VetAxis 360"
-            subMessage="Securing connection to clinical & farm database..."
+            subMessage="Securing connection to clinical database..."
           />
         </div>
       </div>
-    );
-  }
-
-  // Intercept guest visits that scanned a veterinary ear-tag/collar code
-  if (!currentUser && scannedAnimalRecordId && !temporaryBypassGuestForAuth) {
-    return (
-      <GuestAnimalViewer 
-        animalRecordId={scannedAnimalRecordId}
-        onGoToAuth={() => {
-          setTemporaryBypassGuestForAuth(true);
-          triggerAuthWall('sign in or create an account to view full clinical details');
-        }}
-        onClear={() => setScannedAnimalRecordId(null)}
-      />
     );
   }
 
@@ -1071,22 +1024,6 @@ export default function App() {
               />
             )}
 
-            {activeSection === 'livestock' && (
-              currentUser ? (
-                <LivestockManagement 
-                  currentUser={currentUser} 
-                  highlightFarmId={highlightFarmId}
-                  scannedAnimalRecordId={scannedAnimalRecordId}
-                  onClearScannedAnimal={() => setScannedAnimalRecordId(null)}
-                />
-              ) : (
-                <LivestockPublicPortal 
-                  onSignIn={() => triggerAuthWall('sign in to manage your livestock herds')} 
-                  onNavigate={handleNavigate}
-                />
-              )
-            )}
-
             {activeSection === 'profile' && (
               currentUser ? (
                 <ProfilePage
@@ -1148,31 +1085,6 @@ export default function App() {
               )
             )}
 
-            {activeSection === 'clinic_management' && (
-              currentUser && currentUser.role === 'clinic' ? (
-                <ClinicManagement 
-                  user={currentUser} 
-                  highlightAppointmentId={highlightAppointmentId}
-                  onClearHighlightAppointment={() => setHighlightAppointmentId(null)}
-                />
-              ) : (
-                <div className="bg-white border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-8 md:p-12 rounded-3xl text-center max-w-xl mx-auto my-12 space-y-4 shadow-sm">
-                  <div className="text-4xl">🏥</div>
-                  <h2 className="text-2xl font-serif font-black text-stone-800">Veterinary Clinic Portal</h2>
-                  <p className="text-sm text-stone-600 leading-relaxed">
-                    Hospital scheduling, client queue management, and electronic patient check-ins are exclusively available to verified clinics.
-                  </p>
-                  <button 
-                    onClick={() => triggerAuthWall('sign in with your clinic account')} 
-                    className="btn-tactile-3d-primary py-3 px-6 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
-                  >
-                    <span>🔐</span>
-                    <span>Clinic Sign In</span>
-                  </button>
-                </div>
-              )
-            )}
-
             {activeSection === 'news' && (
               <BlogSection 
                 currentUser={currentUser} 
@@ -1214,7 +1126,7 @@ export default function App() {
               />
             )}
 
-            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'livestock', 'profile', 'subscription', 'admin', 'clinic_management', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'directory', 'search_hub', 'seo', 'search_portal'].includes(activeSection) && (
+            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'profile', 'subscription', 'admin', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'directory', 'search_hub', 'seo', 'search_portal'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>
@@ -1222,7 +1134,7 @@ export default function App() {
       </main>
 
       {/* COMPLIANT GLOBAL FOOTER NAVIGATION */}
-      <Footer onNavigate={handleNavigate} activeSection={activeSection} />
+      <Footer onNavigate={handleNavigate} activeSection={activeSection} currentUser={currentUser} />
 
       {/* Floating Popup Toast Alerts System */}
       <div className="fixed bottom-5 right-5 z-[1000] flex flex-col gap-3 max-w-sm w-[90%] pointer-events-none">

@@ -464,10 +464,11 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
         homeVisitCharges: (currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant') ? homeVisitCharges.trim() : ''
       };
 
-      if (currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') {
+      if (currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user' || currentUser.role === 'vendor') {
         payload.expertise = expertise.trim() || (
           currentUser.role === 'doctor' ? 'General Practitioner' :
           currentUser.role === 'assistant' ? 'Nurse' :
+          currentUser.role === 'vendor' ? 'Pet Store & Veterinary Vendor' :
           'Livestock Breeder / Pet Owner'
         );
         payload.address = doctorCity.trim() || 'Islamabad';
@@ -569,6 +570,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
               {currentUser.subscriptionTier ? `${currentUser.subscriptionTier} ` : ''} {
                 currentUser.role === 'doctor' ? 'Practitioner' :
                 currentUser.role === 'clinic' ? 'Hospital Centre' :
+                currentUser.role === 'vendor' ? 'Pet Store & Veterinary Vendor' :
                 currentUser.role === 'assistant' ? 'Assistant Nurse' :
                 'General User (Farmer / Pet Owner)'
               }
@@ -805,13 +807,14 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                   </div>
                 </div>
 
-                {/* CONDITIONAL: Specialty Doctor, Assistant or General User */}
-                {(currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') && (
+                {/* CONDITIONAL: Specialty Doctor, Assistant, Vendor or General User */}
+                {(currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user' || currentUser.role === 'vendor') && (
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">
                         {currentUser.role === 'doctor' ? 'Board Specialization competencies' :
                          currentUser.role === 'assistant' ? 'Technical & Nursing competencies' :
+                         currentUser.role === 'vendor' ? 'Store & Supplies Specialization' :
                          'Animal Focus & Farm/Pet Interest'}
                       </span>
                       <input
@@ -820,6 +823,7 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                         placeholder={
                           currentUser.role === 'doctor' ? 'e.g. Feline Care, Small Animal Orthopedic and Surgery' :
                           currentUser.role === 'assistant' ? 'e.g. Dressing surgery support, animal vaccinations' :
+                          currentUser.role === 'vendor' ? 'e.g. Pet Food, Accessories, Surgical Tools, Pharmaceuticals' :
                           'e.g. Dairy Buffalo breeding, pet owner focus, pedigree cats'
                         }
                         value={expertise}
@@ -829,7 +833,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                     </div>
                     <div className="space-y-1">
                       <span className="text-xs font-black uppercase text-[#5a5a40] tracking-wider">
-                        {currentUser.role === 'user' ? 'Location City / district *' : 'Practice City / Town *'}
+                        {currentUser.role === 'user' ? 'Location City / district *' : 
+                         currentUser.role === 'vendor' ? 'Store Location / City *' : 
+                         'Practice City / Town *'}
                       </span>
                       <input
                         type="text"
@@ -1103,18 +1109,20 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
                   </div>
                 </div>
 
-                {(currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user') && (
+                {(currentUser.role === 'doctor' || currentUser.role === 'assistant' || currentUser.role === 'user' || currentUser.role === 'vendor') && (
                   <div className="grid grid-cols-1 gap-4.5">
                     <div className="bg-white p-3.5 rounded-xl border border-[#e3dec9]/60">
                       <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">
                         {currentUser.role === 'doctor' ? 'Board Specialization Competencies' :
                          currentUser.role === 'assistant' ? 'Nursing & Clinical Competencies' :
+                         currentUser.role === 'vendor' ? 'Store & Supplies Specialization' :
                          'Animal Focus & Breeder Interests'}
                       </span>
                       <span className="text-xs font-extrabold text-[#373735]">
                         {currentUser.expertise || (
                           currentUser.role === 'doctor' ? 'General Practitioner' :
                           currentUser.role === 'assistant' ? 'Nurse' :
+                          currentUser.role === 'vendor' ? 'Pet Store & Veterinary Vendor' :
                           'Livestock Breeder / Pet Owner'
                         )}
                       </span>
@@ -1122,7 +1130,9 @@ export function ProfilePage({ currentUser, onUpdateUser, onDeleteSuccess }: Prof
 
                     <div className="bg-white p-3.5 rounded-xl border border-[#e3dec9]/60">
                       <span className="text-[9px] font-black uppercase text-[#a49f92] block tracking-wider leading-none mb-1">
-                        {currentUser.role === 'user' ? 'Location City / District' : 'Practice City / Town'}
+                        {currentUser.role === 'user' ? 'Location City / District' : 
+                         currentUser.role === 'vendor' ? 'Store Location / City' : 
+                         'Practice City / Town'}
                       </span>
                       <span className="text-xs font-extrabold text-[#373735]">{currentUser.address || 'Islamabad'}</span>
                     </div>

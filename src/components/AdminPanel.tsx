@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserProfile, UserRole, ManualPayment, LivestockFarm, JobPost } from '../types';
+import { UserProfile, UserRole, ManualPayment, JobPost } from '../types';
 import { PaymentService, AuthService, NotificationService, PromotionalAdsService, AdminService, JobBoardService } from '../lib/storage';
 import {
   Loader2,
@@ -36,12 +36,11 @@ interface AdminPanelProps {
   currentUser: UserProfile;
 }
 
-type AdminTab = 'users' | 'farms' | 'payments' | 'ads' | 'jobs' | 'broadcast';
+type AdminTab = 'users' | 'payments' | 'ads' | 'jobs' | 'broadcast';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [farms, setFarms] = useState<LivestockFarm[]>([]);
   const [pendingPayments, setPendingPayments] = useState<ManualPayment[]>([]);
   const [promotionalAds, setPromotionalAds] = useState<any[]>([]);
   const [jobs, setJobs] = useState<JobPost[]>([]);
@@ -53,8 +52,6 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
   const [tierFilter, setTierFilter] = useState<'all' | 'subscribed' | 'general'>('all');
 
-  // Search for Farms
-  const [farmSearchTerm, setFarmSearchTerm] = useState('');
 
   // Search & Filters for Jobs
   const [jobSearchTerm, setJobSearchTerm] = useState('');
@@ -82,19 +79,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const [roleChangeReason, setRoleChangeReason] = useState<string>('');
   const [isProcessingRole, setIsProcessingRole] = useState<boolean>(false);
 
-  // Farm Reassign Owner Modal State
-  const [reassignFarm, setReassignFarm] = useState<LivestockFarm | null>(null);
-  const [selectedNewOwner, setSelectedNewOwner] = useState<UserProfile | null>(null);
-  const [ownerSearchQuery, setOwnerSearchQuery] = useState<string>('');
-  const [reassignOwnerReason, setReassignOwnerReason] = useState<string>('');
-  const [isProcessingFarmOwner, setIsProcessingFarmOwner] = useState<boolean>(false);
 
-  // Farm Reassign Manager (Vet) Modal State
-  const [managerFarm, setManagerFarm] = useState<LivestockFarm | null>(null);
-  const [selectedNewManager, setSelectedNewManager] = useState<UserProfile | null>(null);
-  const [managerSearchQuery, setManagerSearchQuery] = useState<string>('');
-  const [reassignManagerReason, setReassignManagerReason] = useState<string>('');
-  const [isProcessingFarmManager, setIsProcessingFarmManager] = useState<boolean>(false);
 
   // Clinic Profile Handover Modal State
   const [clinicMigrateSource, setClinicMigrateSource] = useState<UserProfile | null>(null);
@@ -146,17 +131,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [payments, allUsers, ads, allFarms, allJobs] = await Promise.all([
+      const [payments, allUsers, ads, allJobs] = await Promise.all([
         PaymentService.getPendingPayments().catch(() => []),
         AdminService.getAllUsers().catch(() => []),
         PromotionalAdsService.fetchActiveAds(false).catch(() => []),
-        AdminService.getAllFarms().catch(() => []),
         JobBoardService.fetchJobs().catch(() => [])
       ]);
       setPendingPayments(payments);
       setUsers(allUsers);
       setPromotionalAds(ads);
-      setFarms(allFarms);
       setJobs(allJobs);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -287,70 +270,6 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
       nextState ? 'Grant Verification' : 'Revoke',
       !nextState
     );
-  };
-
-  // Reassign Farm Owner
-  const handleConfirmFarmOwnerReassign = async () => {
-    if (!reassignFarm || !selectedNewOwner) return;
-    setIsProcessingFarmOwner(true);
-
-    try {
-      const success = await AdminService.reassignFarmOwner(reassignFarm.id, selectedNewOwner, {
-        reason: reassignOwnerReason,
-        adminName: currentUser.name
-      });
-
-      if (success) {
-        showNotification(
-          'Farm Ownership Reassigned',
-          `Farm "${reassignFarm.name}" (ID: ${reassignFarm.id}) ownership has been successfully transferred to ${selectedNewOwner.name} (${selectedNewOwner.email}).`,
-          'success'
-        );
-        setReassignFarm(null);
-        setSelectedNewOwner(null);
-        setOwnerSearchQuery('');
-        fetchData();
-      } else {
-        showNotification('Transfer Failed', 'Failed to reassign farm ownership.', 'error');
-      }
-    } catch (err) {
-      showNotification('Error', 'Unexpected error reassigning farm ownership.', 'error');
-    } finally {
-      setIsProcessingFarmOwner(false);
-    }
-  };
-
-  // Reassign Farm Manager / Vet
-  const handleConfirmFarmManagerReassign = async () => {
-    if (!managerFarm) return;
-    setIsProcessingFarmManager(true);
-
-    try {
-      const success = await AdminService.reassignFarmManager(managerFarm.id, selectedNewManager, {
-        reason: reassignManagerReason,
-        adminName: currentUser.name
-      });
-
-      if (success) {
-        showNotification(
-          'Veterinary Manager Updated',
-          selectedNewManager
-            ? `Dr. / Clinic ${selectedNewManager.name} has been appointed as the official Veterinary Manager for farm "${managerFarm.name}".`
-            : `Veterinary manager has been unlinked from farm "${managerFarm.name}".`,
-          'success'
-        );
-        setManagerFarm(null);
-        setSelectedNewManager(null);
-        setManagerSearchQuery('');
-        fetchData();
-      } else {
-        showNotification('Update Failed', 'Failed to update farm manager.', 'error');
-      }
-    } catch (err) {
-      showNotification('Error', 'Unexpected error updating farm manager.', 'error');
-    } finally {
-      setIsProcessingFarmManager(false);
-    }
   };
 
   // Clinic Profile Handover
@@ -610,24 +529,6 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     });
   }, [users, searchTerm, roleFilter, tierFilter]);
 
-  // Filtered Farms list
-  const filteredFarms = useMemo(() => {
-    return farms.filter(f => {
-      if (!f) return false;
-      const queryStr = farmSearchTerm.toLowerCase().trim();
-      return (
-        !queryStr ||
-        (f.name || '').toLowerCase().includes(queryStr) ||
-        (f.location || '').toLowerCase().includes(queryStr) ||
-        (f.farmType || '').toLowerCase().includes(queryStr) ||
-        (f.ownerName || '').toLowerCase().includes(queryStr) ||
-        (f.ownerEmail || '').toLowerCase().includes(queryStr) ||
-        (f.managerName || '').toLowerCase().includes(queryStr) ||
-        (f.id || '').toLowerCase().includes(queryStr)
-      );
-    });
-  }, [farms, farmSearchTerm]);
-
   // Overview Counts
   const stats = useMemo(() => {
     const pendingJobs = jobs.filter(j => j.approvalStatus === 'pending' || (!j.approvalStatus && j.status === 'open' && j.posterRole === 'user')).length;
@@ -639,13 +540,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
       farmers: users.filter(u => u.role === 'user').length,
       subscribed: users.filter(u => u.subscriptionTier && u.subscriptionTier !== 'General' as any).length,
       verified: users.filter(u => u.isVerified).length,
-      farmsCount: farms.length,
       pendingPaymentsCount: pendingPayments.length,
       pendingAdsCount: promotionalAds.filter(a => a.status === 'pending' || !a.status).length,
       jobsCount: jobs.length,
       pendingJobsCount: pendingJobs
     };
-  }, [users, farms, pendingPayments, promotionalAds, jobs]);
+  }, [users, pendingPayments, promotionalAds, jobs]);
 
   const isSystemAdmin = currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin;
 
@@ -673,7 +573,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">Admin Control Panel</h1>
               <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
-                Manage roles, resolve unauthorized registrations, reassign farm/clinic ownership, verify jobs, and approve payments.
+                Manage roles, resolve unauthorized registrations, reassign clinic ownership, verify jobs, and approve payments.
               </p>
             </div>
           </div>
@@ -708,11 +608,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
           <div className="text-2xl font-black text-indigo-900 mt-1">{stats.clinics}</div>
           <div className="text-[10px] text-indigo-500 mt-0.5">Hospital centres</div>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
-          <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Farms / Owners</div>
-          <div className="text-2xl font-black text-emerald-900 mt-1">{stats.farmsCount}</div>
-          <div className="text-[10px] text-emerald-500 mt-0.5">{stats.farmers} farmer accounts</div>
-        </div>
+        
         <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-xs">
           <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Jobs Queue</div>
           <div className="text-2xl font-black text-amber-900 mt-1">{stats.jobsCount}</div>
@@ -738,17 +634,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
           <Users className="w-4 h-4" />
           User Roles & Accounts ({filteredUsers.length})
         </button>
-        <button
-          onClick={() => setActiveTab('farms')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'farms'
-              ? 'bg-stone-900 text-white shadow-xs'
-              : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          Farms & Ownership ({farms.length})
-        </button>
+        
         <button
           onClick={() => setActiveTab('jobs')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap transition-all cursor-pointer relative ${
@@ -831,7 +717,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             {/* Role Filter Buttons */}
             <div className="flex items-center gap-1.5 flex-wrap w-full md:w-auto">
               <span className="text-xs text-stone-400 font-bold uppercase mr-1">Role:</span>
-              {(['all', 'doctor', 'clinic', 'assistant', 'user'] as const).map(r => (
+              {(['all', 'doctor', 'clinic', 'vendor', 'assistant', 'user'] as const).map(r => (
                 <button
                   key={r}
                   onClick={() => setRoleFilter(r)}
@@ -841,7 +727,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                       : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                   }`}
                 >
-                  {r === 'user' ? 'Farmer / User' : r}
+                  {r === 'user' ? 'Farmer / User' : r === 'vendor' ? 'Vendor / Store' : r}
                 </button>
               ))}
 
@@ -1083,134 +969,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         </section>
       )}
 
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {/* TAB 2: FARMS & OWNERSHIP REASSIGNMENT */}
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {activeTab === 'farms' && (
-        <section className="space-y-4">
-          <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search farm name, location, owner, manager..."
-                value={farmSearchTerm}
-                onChange={e => setFarmSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-stone-900"
-              />
-            </div>
-            <div className="text-xs text-stone-500 font-bold">
-              Showing {filteredFarms.length} of {farms.length} registered farms
-            </div>
-          </div>
-
-          <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] text-left">
-                <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 font-bold text-xs uppercase tracking-wider">
-                  <tr>
-                    <th className="p-3.5">Farm Identity</th>
-                    <th className="p-3.5">Location & Type</th>
-                    <th className="p-3.5">Current Owner</th>
-                    <th className="p-3.5">Assigned Vet Manager</th>
-                    <th className="p-3.5 text-right">Ownership & Manager Controls</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100 text-sm">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={5} className="p-12 text-center text-stone-400">
-                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-stone-500" />
-                        Loading farms database...
-                      </td>
-                    </tr>
-                  ) : filteredFarms.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-12 text-center text-stone-400 font-bold">
-                        No livestock farms found.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredFarms.map(f => (
-                      <tr key={f.id} className="hover:bg-stone-50/70 transition-colors">
-                        <td className="p-3.5">
-                          <div className="font-bold text-stone-900 text-sm">{f.name}</div>
-                          <div className="text-[11px] font-mono text-stone-400 mt-0.5">ID: {f.id}</div>
-                        </td>
-                        <td className="p-3.5">
-                          <span className="inline-block bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md text-xs font-bold">
-                            {f.farmType}
-                          </span>
-                          <div className="text-xs text-stone-500 mt-1">{f.location}</div>
-                        </td>
-                        <td className="p-3.5">
-                          <div className="font-bold text-stone-900 text-xs">{f.ownerName || 'Unknown Owner'}</div>
-                          <div className="text-xs text-stone-500 font-mono">{f.ownerEmail}</div>
-                          <div className="text-[10px] text-stone-400 font-mono">UID: {f.ownerUid || f.ownerId}</div>
-                        </td>
-                        <td className="p-3.5">
-                          {f.managerUid ? (
-                            <div>
-                              <div className="font-bold text-blue-900 text-xs flex items-center gap-1">
-                                <Stethoscope className="w-3.5 h-3.5 text-blue-600" />
-                                {f.managerName || 'Assigned Doctor'}
-                              </div>
-                              <span
-                                className={`inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md mt-1 ${
-                                  f.managerStatus === 'linked'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : f.managerStatus === 'pending'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                {f.managerStatus}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-stone-400 font-bold bg-stone-50 px-2 py-1 rounded-md border border-stone-200">
-                              Unassigned
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                setReassignFarm(f);
-                                setSelectedNewOwner(null);
-                                setOwnerSearchQuery('');
-                                setReassignOwnerReason('');
-                              }}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
-                            >
-                              Transfer Owner
-                            </button>
-                            <button
-                              onClick={() => {
-                                setManagerFarm(f);
-                                setSelectedNewManager(null);
-                                setManagerSearchQuery('');
-                                setReassignManagerReason('');
-                              }}
-                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
-                            >
-                              Appoint / Change Vet
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {/* TAB 3: PENDING PAYMENTS */}
+            {/* TAB 3: PENDING PAYMENTS */}
       {/* ───────────────────────────────────────────────────────────────── */}
       {activeTab === 'payments' && (
         <section className="space-y-4">
@@ -1799,6 +1558,25 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     </div>
                     <div className="text-[10px] text-stone-500 mt-0.5">Livestock & Pet Client</div>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetRole('vendor');
+                      setRevokeSubs(false);
+                      setRevokeVerif(false);
+                    }}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      targetRole === 'vendor'
+                        ? 'border-teal-600 bg-teal-50/50 ring-2 ring-teal-500/20'
+                        : 'border-stone-200 hover:border-stone-300 bg-white'
+                    }`}
+                  >
+                    <div className="font-bold text-stone-900 text-xs flex items-center gap-1.5">
+                      <span>🏪</span> Pet Store / Vendor
+                    </div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">Commercial seller & supplier</div>
+                  </button>
                 </div>
               </div>
 
@@ -1899,274 +1677,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         </div>
       )}
 
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {/* MODAL 2: REASSIGN FARM OWNER DIALOG */}
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {reassignFarm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-stone-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-stone-100">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-stone-900">Transfer Farm Ownership</h3>
-                    <p className="text-xs text-stone-500">Reassign primary ownership (ownerUid) for farm #{reassignFarm.id}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setReassignFarm(null)}
-                  className="text-stone-400 hover:text-stone-600 p-1 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200">
-                <div className="text-xs font-bold text-stone-400 uppercase">Target Farm</div>
-                <div className="font-black text-stone-900 text-sm mt-0.5">{reassignFarm.name} ({reassignFarm.farmType})</div>
-                <div className="text-xs text-stone-500 mt-1">Current Owner: <span className="font-bold text-stone-700">{reassignFarm.ownerName}</span> ({reassignFarm.ownerEmail})</div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
-                  Select Genuine Practitioner or Farmer *
-                </label>
-                <div className="relative mb-2">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search candidate by name, email, or role..."
-                    value={ownerSearchQuery}
-                    onChange={e => setOwnerSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm"
-                  />
-                </div>
-
-                <div className="border border-stone-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-stone-100">
-                  {users
-                    .filter(u => {
-                      if (!u) return false;
-                      const q = ownerSearchQuery.toLowerCase().trim();
-                      return !q || (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
-                    })
-                    .slice(0, 8)
-                    .map(cand => (
-                      <div
-                        key={cand.uid}
-                        onClick={() => setSelectedNewOwner(cand)}
-                        className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                          selectedNewOwner?.uid === cand.uid ? 'bg-emerald-50 border-l-4 border-emerald-600' : 'hover:bg-stone-50'
-                        }`}
-                      >
-                        <div>
-                          <div className="font-bold text-stone-900 text-xs">{cand.name}</div>
-                          <div className="text-[11px] text-stone-500 font-mono">{cand.email}</div>
-                        </div>
-                        <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">
-                          {cand.role}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {selectedNewOwner && (
-                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-900">
-                  Selected New Owner: <strong>{selectedNewOwner.name}</strong> ({selectedNewOwner.email})
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">
-                  Reason / Admin Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Correcting original registration on behalf of doctor"
-                  value={reassignOwnerReason}
-                  onChange={e => setReassignOwnerReason(e.target.value)}
-                  className="w-full p-2 bg-stone-50 border border-stone-200 rounded-xl text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="bg-stone-50 px-6 py-4 flex justify-end gap-2.5 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setReassignFarm(null)}
-                disabled={isProcessingFarmOwner}
-                className="px-4 py-2 text-xs sm:text-sm font-semibold text-stone-600 hover:text-stone-800 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmFarmOwnerReassign}
-                disabled={isProcessingFarmOwner || !selectedNewOwner}
-                className="px-5 py-2 text-xs sm:text-sm font-black text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
-              >
-                {isProcessingFarmOwner ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Transferring...
-                  </>
-                ) : (
-                  <>Confirm Owner Transfer</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {/* MODAL 3: REASSIGN FARM MANAGER (VET) DIALOG */}
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {managerFarm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-stone-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-stone-100">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200">
-                    <Stethoscope className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-stone-900">Appoint / Reassign Veterinary Manager</h3>
-                    <p className="text-xs text-stone-500">Assign a verified Doctor or Clinic to farm #{managerFarm.id}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setManagerFarm(null)}
-                  className="text-stone-400 hover:text-stone-600 p-1 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200">
-                <div className="text-xs font-bold text-stone-400 uppercase">Target Farm</div>
-                <div className="font-black text-stone-900 text-sm mt-0.5">{managerFarm.name}</div>
-                <div className="text-xs text-stone-500 mt-1">
-                  Current Manager: <span className="font-bold text-stone-700">{managerFarm.managerName || 'None'}</span> ({managerFarm.managerStatus})
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                    Select Practitioner or Clear Assignment
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedNewManager(null)}
-                    className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
-                  >
-                    Unassign Manager
-                  </button>
-                </div>
-
-                <div className="relative mb-2">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search doctor or clinic by name..."
-                    value={managerSearchQuery}
-                    onChange={e => setManagerSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm"
-                  />
-                </div>
-
-                <div className="border border-stone-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-stone-100">
-                  {users
-                    .filter(u => {
-                      if (!u) return false;
-                      const isVet = u.role === 'doctor' || u.role === 'clinic' || u.role === 'assistant';
-                      const q = managerSearchQuery.toLowerCase().trim();
-                      return isVet && (!q || (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
-                    })
-                    .map(cand => (
-                      <div
-                        key={cand.uid}
-                        onClick={() => setSelectedNewManager(cand)}
-                        className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                          selectedNewManager?.uid === cand.uid ? 'bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-stone-50'
-                        }`}
-                      >
-                        <div>
-                          <div className="font-bold text-stone-900 text-xs">{cand.name}</div>
-                          <div className="text-[11px] text-stone-500 font-mono">{cand.email}</div>
-                        </div>
-                        <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">
-                          {cand.role}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {selectedNewManager ? (
-                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900">
-                  Selected Manager: <strong>{selectedNewManager.name}</strong> ({selectedNewManager.role})
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
-                  Manager status will be reset to <strong>Unassigned</strong>.
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">
-                  Reason / Admin Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Official appointment by administration"
-                  value={reassignManagerReason}
-                  onChange={e => setReassignManagerReason(e.target.value)}
-                  className="w-full p-2 bg-stone-50 border border-stone-200 rounded-xl text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="bg-stone-50 px-6 py-4 flex justify-end gap-2.5 border-t border-stone-100">
-              <button
-                type="button"
-                onClick={() => setManagerFarm(null)}
-                disabled={isProcessingFarmManager}
-                className="px-4 py-2 text-xs sm:text-sm font-semibold text-stone-600 hover:text-stone-800 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmFarmManagerReassign}
-                disabled={isProcessingFarmManager}
-                className="px-5 py-2 text-xs sm:text-sm font-black text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
-              >
-                {isProcessingFarmManager ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>Save Manager Assignment</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {/* MODAL 4: CLINIC PROFILE & JOB DATA HANDOVER */}
+            {/* MODAL 4: CLINIC PROFILE & JOB DATA HANDOVER */}
       {/* ───────────────────────────────────────────────────────────────── */}
       {clinicMigrateSource && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">

@@ -18,8 +18,7 @@ import {
   ShieldCheck,
   Activity
 } from 'lucide-react';
-import { AuthService, CommunityService } from '../lib/storage';
-import { LivestockService } from '../lib/livestockService';
+import { AuthService, CommunityService, PetAdsService } from '../lib/storage';
 
 interface AboutUsDirectoryProps {
   isOpen: boolean;
@@ -53,8 +52,8 @@ export function AboutUsDirectory({
     async function loadRealStats() {
       try {
         // Fetch real-time data in parallel with fallbacks
-        const [animals, users, posts] = await Promise.all([
-          LivestockService.fetchAllAnimals().catch(() => []),
+        const [petAds, users, posts] = await Promise.all([
+          PetAdsService.fetchAds().catch(() => []),
           AuthService.getPublicClinicians().catch(() => []),
           CommunityService.fetchPosts().catch(() => [])
         ]);
@@ -68,7 +67,7 @@ export function AboutUsDirectory({
         const clinicsCount = (users || []).filter(u => u.role === 'clinic').length || 8;
 
         setStats({
-          animalsEnrolled: (animals || []).length || 124,
+          animalsEnrolled: (petAds || []).length || 124,
           certifiedVets: vetsCount,
           clinicsEnrolled: clinicsCount,
           activePosts: (posts || []).length || 15,
@@ -101,26 +100,6 @@ export function AboutUsDirectory({
       description: 'Instantly search, find, and consult with certified veterinary doctors and clinic hospitals near your location. Filter by cities across Pakistan, view qualifications, check reviews, and connect directly via WhatsApp/Phone for physical or home-call emergencies.',
       cta: 'Explore Doctors',
       bg: 'hover:bg-emerald-50/30'
-    },
-    {
-      id: 'clinic_management',
-      title: 'Clinic Management Suite',
-      icon: <Hospital className="w-5 h-5 text-amber-600" />,
-      tagline: 'Comprehensive EHR & Practice Software',
-      audience: 'Clinics & Vet Practitioners',
-      description: 'A powerful cloud-based ERP designed exclusively for veterinary clinics and veterinary hospitals. Manage active consultation queues, register patient profiles with digital immunization logs, handle point-of-sale bills, and send automated client notifications.',
-      cta: 'Open Clinic Desk',
-      bg: 'hover:bg-amber-50/30'
-    },
-    {
-      id: 'livestock',
-      title: 'Farm & Livestock Management',
-      icon: <ClipboardList className="w-5 h-5 text-teal-600" />,
-      tagline: 'Record Herd Health & Pedigree Weights',
-      audience: 'Livestock Breeders & Farm Owners',
-      description: 'Tailored for dairy farms, poultry operators, and livestock breeders. Keep detailed logs of individual animals, species distributions, historical health procedures, diagnostic bio-safety containment, and growth weight benchmarks with real-time analytics.',
-      cta: 'Manage Livestock',
-      bg: 'hover:bg-teal-50/30'
     },
     {
       id: 'community',
@@ -400,7 +379,7 @@ export function AboutUsDirectory({
                       </div>
                       <h5 className="font-serif font-bold text-stone-800 text-sm">AgTech Agri-Sustenance</h5>
                       <p className="text-xs font-semibold text-stone-500 leading-relaxed">
-                        Supporting livestock dairy operators with state-of-the-art pedigree history charts, diagnostic analytics, and growth rate logs.
+                        Supporting dairy and livestock operators with veterinary diagnostic formulas, health calculators, and clinical reference tools.
                       </p>
                     </div>
 

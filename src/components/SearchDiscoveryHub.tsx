@@ -295,7 +295,7 @@ const SEO_SEARCH_CLUSTERS: {
         badge: 'DVM Forum',
         targetTab: 'community',
         targetParam: 'filter=all',
-        description: 'Join peer-to-peer discussions on diagnostic challenges, pharmacology, and clinic management.'
+        description: 'Join peer-to-peer discussions on diagnostic challenges, pharmacology, and clinical cases.'
       },
       {
         query: 'veterinary information network login VIN',

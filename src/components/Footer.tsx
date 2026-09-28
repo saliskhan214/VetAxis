@@ -15,12 +15,15 @@ import {
   Info
 } from 'lucide-react';
 
+import { UserProfile } from '../types';
+
 interface FooterProps {
   onNavigate: (section: string) => void;
   activeSection: string;
+  currentUser?: UserProfile | null;
 }
 
-export function Footer({ onNavigate, activeSection }: FooterProps) {
+export function Footer({ onNavigate, activeSection, currentUser }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   const handleNavClick = (section: string, e: React.MouseEvent) => {
@@ -97,14 +100,6 @@ export function Footer({ onNavigate, activeSection }: FooterProps) {
                   className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'explore' ? 'font-bold text-[#5a5a40]' : ''}`}
                 >
                   Find Clinics &amp; Doctors
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={(e) => handleNavClick('livestock', e)}
-                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors ${activeSection === 'livestock' ? 'font-bold text-[#5a5a40]' : ''}`}
-                >
-                  Livestock &amp; Herd Ledgers
                 </button>
               </li>
               <li>

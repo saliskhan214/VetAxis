@@ -5,364 +5,740 @@
       "description": "A VetAxis user account (doctor, clinic, assistant, or pet owner)",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "The Firebase Auth user ID" },
-        "name": { "type": "string", "description": "Display name of the user" },
-        "email": { "type": "string", "format": "email", "description": "User email address" },
-        "phone": { "type": "string", "description": "Contact phone number" },
-        "role": { "type": "string", "enum": ["doctor", "clinic", "assistant", "user"], "description": "Account role" },
-        "expertise": { "type": "string", "description": "Professional expertise (doctors/assistants only)" },
-        "facilities": { "type": "string", "description": "Clinic facilities listed (clinics only)" },
-        "address": { "type": "string", "description": "Physical address" },
-        "profilePic": { "type": "string", "description": "Base64 image string or default string" },
-        "createdAt": { "type": "number", "description": "Creation timestamp in milliseconds" },
+        "uid": {
+          "type": "string",
+          "description": "The Firebase Auth user ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "clinic",
+            "assistant",
+            "user",
+            "vendor"
+          ],
+          "description": "Account role"
+        },
+        "expertise": {
+          "type": "string",
+          "description": "Professional expertise (doctors/assistants only)"
+        },
+        "facilities": {
+          "type": "string",
+          "description": "Clinic facilities listed (clinics only)"
+        },
+        "address": {
+          "type": "string",
+          "description": "Physical address"
+        },
+        "profilePic": {
+          "type": "string",
+          "description": "Base64 image string or default string"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
         "location": {
           "type": "object",
           "description": "Geographical location object",
           "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" },
-            "address": { "type": "string" }
+            "lat": {
+              "type": "number"
+            },
+            "lng": {
+              "type": "number"
+            },
+            "address": {
+              "type": "string"
+            }
           }
         },
-        "isVerified": { "type": "boolean" },
-        "promoAdsUsed": { "type": "number", "description": "Number of promotional ads created using subscription limits" },
-        "subscriptionTier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
-        "subscriptionExpiresAt": { "type": "number" },
-        "avgRating": { "type": "number" },
-        "totalReviews": { "type": "number" }
+        "isVerified": {
+          "type": "boolean"
+        },
+        "promoAdsUsed": {
+          "type": "number",
+          "description": "Number of promotional ads created using subscription limits"
+        },
+        "subscriptionTier": {
+          "type": "string",
+          "enum": [
+            "Silver",
+            "Gold",
+            "Platinum"
+          ]
+        },
+        "subscriptionExpiresAt": {
+          "type": "number"
+        },
+        "avgRating": {
+          "type": "number"
+        },
+        "totalReviews": {
+          "type": "number"
+        }
       },
-      "required": ["name", "email", "role", "createdAt"]
+      "required": [
+        "name",
+        "email",
+        "role",
+        "createdAt"
+      ]
     },
     "Review": {
       "title": "Review",
       "description": "A review with a rating left by another user",
       "type": "object",
       "properties": {
-        "reviewerEmail": { "type": "string" },
-        "reviewerName": { "type": "string" },
-        "reviewerRole": { "type": "string" },
-        "rating": { "type": "number" },
-        "comment": { "type": "string" },
-        "date": { "type": "number" }
+        "reviewerEmail": {
+          "type": "string"
+        },
+        "reviewerName": {
+          "type": "string"
+        },
+        "reviewerRole": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "number"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "date": {
+          "type": "number"
+        }
       },
-      "required": ["reviewerEmail", "reviewerName", "rating", "date"]
+      "required": [
+        "reviewerEmail",
+        "reviewerName",
+        "rating",
+        "date"
+      ]
     },
     "PetAd": {
       "title": "PetAd",
       "description": "An advertisement for pet adoption or sale",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "adType": { "type": "string", "enum": ["sale", "adoption"] },
-        "petType": { "type": "string" },
-        "breed": { "type": "string" },
-        "age": { "type": "number" },
-        "price": { "type": "number" },
-        "description": { "type": "string" },
-        "location": { "type": "string" },
-        "whatsapp": { "type": "string" },
-        "image": { "type": "string" },
-        "ownerEmail": { "type": "string" },
-        "ownerName": { "type": "string" },
-        "ownerRole": { "type": "string" },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "adType": {
+          "type": "string",
+          "enum": [
+            "sale",
+            "adoption"
+          ]
+        },
+        "petType": {
+          "type": "string"
+        },
+        "breed": {
+          "type": "string"
+        },
+        "age": {
+          "type": "number"
+        },
+        "price": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "whatsapp": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "ownerEmail": {
+          "type": "string"
+        },
+        "ownerName": {
+          "type": "string"
+        },
+        "ownerRole": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["adType", "petType", "description", "location", "whatsapp", "ownerEmail", "createdAt"]
+      "required": [
+        "adType",
+        "petType",
+        "description",
+        "location",
+        "whatsapp",
+        "ownerEmail",
+        "createdAt"
+      ]
     },
     "Product": {
       "title": "Product",
       "description": "A pet accessory or product for sale in the marketplace",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "quantity": { "type": "number" },
-        "description": { "type": "string" },
-        "whatsapp": { "type": "string" },
-        "image": { "type": "string" },
-        "ownerEmail": { "type": "string" },
-        "ownerName": { "type": "string" },
-        "ownerRole": { "type": "string" },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number"
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "whatsapp": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "ownerEmail": {
+          "type": "string"
+        },
+        "ownerName": {
+          "type": "string"
+        },
+        "ownerRole": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["name", "price", "quantity", "description", "whatsapp", "ownerEmail", "createdAt"]
+      "required": [
+        "name",
+        "price",
+        "quantity",
+        "description",
+        "whatsapp",
+        "ownerEmail",
+        "createdAt"
+      ]
     },
     "CommunityPost": {
       "title": "CommunityPost",
       "description": "A message or query shared on the public community board",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "authorEmail": { "type": "string" },
-        "authorName": { "type": "string" },
-        "role": { "type": "string" },
-        "profilePic": { "type": "string" },
-        "text": { "type": "string" },
-        "category": { "type": "string", "enum": ["lost", "adoption", "help", "general", "emergency", "ask_vet"] },
-        "ts": { "type": "number" },
-        "reactions": { "type": "object" },
+        "id": {
+          "type": "string"
+        },
+        "authorEmail": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "profilePic": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "lost",
+            "adoption",
+            "help",
+            "general",
+            "emergency",
+            "ask_vet"
+          ]
+        },
+        "ts": {
+          "type": "number"
+        },
+        "reactions": {
+          "type": "object"
+        },
         "answers": {
           "type": "array",
           "description": "Answers from verified practitioners"
         }
       },
-      "required": ["authorEmail", "authorName", "text", "category", "ts"]
+      "required": [
+        "authorEmail",
+        "authorName",
+        "text",
+        "category",
+        "ts"
+      ]
     },
     "JobPost": {
       "title": "JobPost",
       "description": "A veterinary or assistant job posting published by a clinic",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "clinicId": { "type": "string" },
-        "clinicName": { "type": "string" },
-        "clinicEmail": { "type": "string" },
-        "title": { "type": "string" },
-        "jobType": { "type": "string", "enum": ["Full-time", "Part-time", "Freelance", "Internship"] },
-        "location": { "type": "string" },
-        "salaryMin": { "type": "number" },
-        "salaryMax": { "type": "number" },
-        "experience": { "type": "string" },
-        "workingHours": { "type": "string" },
-        "genderPreference": { "type": "string", "enum": ["No Preference", "Male", "Female"] },
-        "deadline": { "type": "string" },
-        "positions": { "type": "number" },
-        "status": { "type": "string", "enum": ["open", "closed"] },
-        "screeningQuestions": { "type": "array" },
-        "requiredDocuments": { "type": "array" },
-        "minQualificationGate": { "type": "string", "enum": ["none", "assistant", "doctor"] },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "clinicId": {
+          "type": "string"
+        },
+        "clinicName": {
+          "type": "string"
+        },
+        "clinicEmail": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "jobType": {
+          "type": "string",
+          "enum": [
+            "Full-time",
+            "Part-time",
+            "Freelance",
+            "Internship"
+          ]
+        },
+        "location": {
+          "type": "string"
+        },
+        "salaryMin": {
+          "type": "number"
+        },
+        "salaryMax": {
+          "type": "number"
+        },
+        "experience": {
+          "type": "string"
+        },
+        "workingHours": {
+          "type": "string"
+        },
+        "genderPreference": {
+          "type": "string",
+          "enum": [
+            "No Preference",
+            "Male",
+            "Female"
+          ]
+        },
+        "deadline": {
+          "type": "string"
+        },
+        "positions": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "screeningQuestions": {
+          "type": "array"
+        },
+        "requiredDocuments": {
+          "type": "array"
+        },
+        "minQualificationGate": {
+          "type": "string",
+          "enum": [
+            "none",
+            "assistant",
+            "doctor"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["clinicId", "clinicName", "clinicEmail", "title", "jobType", "location", "salaryMin", "salaryMax", "deadline", "createdAt"]
+      "required": [
+        "clinicId",
+        "clinicName",
+        "clinicEmail",
+        "title",
+        "jobType",
+        "location",
+        "salaryMin",
+        "salaryMax",
+        "deadline",
+        "createdAt"
+      ]
     },
     "JobApplication": {
       "title": "JobApplication",
       "description": "An application submitted by a candidate for a clinic job posting",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "jobId": { "type": "string" },
-        "clinicId": { "type": "string" },
-        "applicantId": { "type": "string" },
-        "applicantName": { "type": "string" },
-        "applicantEmail": { "type": "string" },
-        "applicantPhone": { "type": "string" },
-        "applicantRole": { "type": "string" },
-        "answers": { "type": "array" },
-        "submittedDocs": { "type": "object" },
-        "status": { "type": "string", "enum": ["Pending", "Reviewed", "Shortlisted", "Rejected", "Hired"] },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "clinicId": {
+          "type": "string"
+        },
+        "applicantId": {
+          "type": "string"
+        },
+        "applicantName": {
+          "type": "string"
+        },
+        "applicantEmail": {
+          "type": "string"
+        },
+        "applicantPhone": {
+          "type": "string"
+        },
+        "applicantRole": {
+          "type": "string"
+        },
+        "answers": {
+          "type": "array"
+        },
+        "submittedDocs": {
+          "type": "object"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Reviewed",
+            "Shortlisted",
+            "Rejected",
+            "Hired"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["jobId", "clinicId", "applicantId", "applicantName", "applicantEmail", "status", "createdAt"]
+      "required": [
+        "jobId",
+        "clinicId",
+        "applicantId",
+        "applicantName",
+        "applicantEmail",
+        "status",
+        "createdAt"
+      ]
     },
     "VetNotification": {
       "title": "VetNotification",
       "description": "A notification item representing an access, like, post reaction or job status update",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string", "description": "The recipient's user UID" },
-        "senderId": { "type": "string", "description": "The initiator's user UID" },
-        "senderName": { "type": "string", "description": "Display name of the initiator" },
-        "type": { "type": "string", "enum": ["like", "comment", "apply", "status_change", "farm_assign", "farm_response", "farm_reminder"], "description": "Type of event" },
-        "targetId": { "type": "string", "description": "ID of post or job or application or farm" },
-        "targetType": { "type": "string", "enum": ["post", "job", "application", "farm"], "description": "Target entity category" },
-        "message": { "type": "string", "description": "Display text of the alert" },
-        "read": { "type": "boolean", "description": "Whether the user read the notification" },
-        "createdAt": { "type": "number", "description": "Event timestamp" }
+        "id": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The recipient's user UID"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "The initiator's user UID"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Display name of the initiator"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "like",
+            "comment",
+            "apply",
+            "status_change"
+          ],
+          "description": "Type of event"
+        },
+        "targetId": {
+          "type": "string",
+          "description": "ID of post or job or application or farm"
+        },
+        "targetType": {
+          "type": "string",
+          "enum": [
+            "post",
+            "job",
+            "application",
+            "appointment"
+          ],
+          "description": "Target entity category"
+        },
+        "message": {
+          "type": "string",
+          "description": "Display text of the alert"
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the user read the notification"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Event timestamp"
+        }
       },
-      "required": ["userId", "senderId", "senderName", "type", "targetId", "targetType", "message", "read", "createdAt"]
-    },
-    "LivestockFarm": {
-      "title": "LivestockFarm",
-      "description": "A farm registered under livestock management with veterinary assigned context",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "location": { "type": "string" },
-        "farmType": { "type": "string" },
-        "mixedOptions": { "type": "object" },
-        "ownerUid": { "type": "string" },
-        "ownerId": { "type": "string", "description": "UID of the farm owner" },
-        "ownerName": { "type": "string" },
-        "ownerEmail": { "type": "string" },
-        "managerUid": { "type": "string" },
-        "managerName": { "type": "string" },
-        "managerRole": { "type": "string" },
-        "managerStatus": { "type": "string", "enum": ["unassigned", "pending", "linked", "declined"] },
-        "managerDeclinedReason": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "team": { "type": "array" },
-        "memberUids": { "type": "array", "description": "List of user UIDs authorized to access this farm workspace" },
-        "authorizedUsers": { "type": "array", "description": "List of user UIDs explicitly authorized to access this farm" }
-      },
-      "required": ["name", "location", "farmType", "ownerUid", "ownerName", "ownerEmail", "managerStatus", "createdAt"]
-    },
-    "LivestockAnimal": {
-      "title": "LivestockAnimal",
-      "description": "An individual animal registered on a farm",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "farmId": { "type": "string" },
-        "animalId": { "type": "string" },
-        "species": { "type": "string" },
-        "tagNumber": { "type": "string" },
-        "gender": { "type": "string" },
-        "dob": { "type": "string" },
-        "breed": { "type": "string" },
-        "weight": { "type": "number" },
-        "healthStatus": { "type": "string" },
-        "entryType": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["farmId", "animalId", "species", "gender", "healthStatus", "entryType", "createdAt"]
-    },
-    "LivestockBatch": {
-      "title": "LivestockBatch",
-      "description": "A batch entry of multiple birds or animals, useful for poultry segments",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "farmId": { "type": "string" },
-        "batchName": { "type": "string" },
-        "species": { "type": "string" },
-        "quantity": { "type": "number" },
-        "arrivalDate": { "type": "string" },
-        "breed": { "type": "string" },
-        "entryType": { "type": "string" },
-        "status": { "type": "string", "enum": ["Active", "Sold", "Archived"] },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["farmId", "batchName", "species", "quantity", "entryType", "status", "createdAt"]
-    },
-    "LivestockTask": {
-      "title": "LivestockTask",
-      "description": "A scheduled husbandry or medical service activity linked to an animal/batch",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "farmId": { "type": "string" },
-        "targetId": { "type": "string" },
-        "targetType": { "type": "string" },
-        "targetName": { "type": "string" },
-        "serviceType": { "type": "string" },
-        "dueDate": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending", "Completed"] },
-        "completedDate": { "type": "string" },
-        "vaccineUsed": { "type": "string" },
-        "notes": { "type": "string" },
-        "createdBy": { "type": "string" },
-        "completedByUid": { "type": "string" },
-        "completedByName": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["farmId", "targetId", "targetType", "targetName", "serviceType", "dueDate", "status", "createdBy", "createdAt"]
+      "required": [
+        "userId",
+        "senderId",
+        "senderName",
+        "type",
+        "targetId",
+        "targetType",
+        "message",
+        "read",
+        "createdAt"
+      ]
     },
     "PromotionalAd": {
       "title": "PromotionalAd",
       "description": "A paid campaign advertisement by a doctor or clinic",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "sponsorName": { "type": "string" },
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "couponCode": { "type": "string" },
-        "ctaText": { "type": "string" },
-        "ctaUrl": { "type": "string" },
-        "bgGradient": { "type": "string" },
-        "badge": { "type": "string" },
-        "icon": { "type": "string" },
-        "ownerEmail": { "type": "string" },
-        "ownerUid": { "type": "string" },
-        "ownerRole": { "type": "string", "enum": ["doctor", "clinic"] },
-        "pricePaid": { "type": "number", "enum": [0, 1000, 1500] },
-        "durationDays": { "type": "number", "enum": [3, 7] },
-        "expiresAt": { "type": "number" },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "sponsorName": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "couponCode": {
+          "type": "string"
+        },
+        "ctaText": {
+          "type": "string"
+        },
+        "ctaUrl": {
+          "type": "string"
+        },
+        "bgGradient": {
+          "type": "string"
+        },
+        "badge": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "ownerEmail": {
+          "type": "string"
+        },
+        "ownerUid": {
+          "type": "string"
+        },
+        "ownerRole": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "clinic"
+          ]
+        },
+        "pricePaid": {
+          "type": "number",
+          "enum": [
+            0,
+            1000,
+            1500
+          ]
+        },
+        "durationDays": {
+          "type": "number",
+          "enum": [
+            3,
+            7
+          ]
+        },
+        "expiresAt": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["sponsorName", "title", "description", "ctaText", "ctaUrl", "ownerUid", "ownerEmail", "ownerRole", "pricePaid", "durationDays", "expiresAt", "createdAt"]
-    },
-    "IndividualAnimalRecord": {
-      "title": "IndividualAnimalRecord",
-      "description": "Comprehensive individual life file details for breeding and finances",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "farmId": { "type": "string" },
-        "animalId": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["farmId", "animalId", "createdAt"]
-    },
-    "HerdLevelMasterRecord": {
-      "title": "HerdLevelMasterRecord",
-      "description": "Comprehensive herd-level registry stats, demographics and inventory",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "farmId": { "type": "string" },
-        "farmName": { "type": "string" },
-        "totalHerdSize": { "type": "number" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["farmId", "farmName", "totalHerdSize", "createdAt"]
+      "required": [
+        "sponsorName",
+        "title",
+        "description",
+        "ctaText",
+        "ctaUrl",
+        "ownerUid",
+        "ownerEmail",
+        "ownerRole",
+        "pricePaid",
+        "durationDays",
+        "expiresAt",
+        "createdAt"
+      ]
     },
     "Conversation": {
       "title": "Conversation",
       "description": "A direct consultation conversation between a pet owner/farmer and veterinary doctor/clinic",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "participantIds": { "type": "array" },
-        "lastMessage": { "type": "string" },
-        "lastMessageTime": { "type": "number" },
-        "lastSenderId": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "updatedAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "participantIds": {
+          "type": "array"
+        },
+        "lastMessage": {
+          "type": "string"
+        },
+        "lastMessageTime": {
+          "type": "number"
+        },
+        "lastSenderId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        }
       },
-      "required": ["participantIds", "createdAt", "updatedAt"]
+      "required": [
+        "participantIds",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "ChatMessage": {
       "title": "ChatMessage",
       "description": "An instant chat message within a conversation with 15-day retention and sent/delivered/seen ticks",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "conversationId": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "receiverId": { "type": "string" },
-        "text": { "type": "string" },
-        "timestamp": { "type": "number" },
-        "status": { "type": "string", "enum": ["sent", "delivered", "seen"] },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "senderId": {
+          "type": "string"
+        },
+        "senderName": {
+          "type": "string"
+        },
+        "receiverId": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "sent",
+            "delivered",
+            "seen"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["conversationId", "senderId", "receiverId", "text", "timestamp", "status", "createdAt"]
+      "required": [
+        "conversationId",
+        "senderId",
+        "receiverId",
+        "text",
+        "timestamp",
+        "status",
+        "createdAt"
+      ]
     },
     "AdminBroadcast": {
       "title": "AdminBroadcast",
       "description": "System-wide broadcast notification sent by administrator to all users with in-app and browser notifications",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "adminUid": { "type": "string" },
-        "adminName": { "type": "string" },
-        "adminEmail": { "type": "string" },
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "category": { "type": "string" },
-        "targetAudience": { "type": "string" },
-        "priority": { "type": "string" },
-        "recipientCount": { "type": "number" },
-        "sendInApp": { "type": "boolean" },
-        "sendBrowser": { "type": "boolean" },
-        "createdAt": { "type": "number" }
+        "id": {
+          "type": "string"
+        },
+        "adminUid": {
+          "type": "string"
+        },
+        "adminName": {
+          "type": "string"
+        },
+        "adminEmail": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "targetAudience": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string"
+        },
+        "recipientCount": {
+          "type": "number"
+        },
+        "sendInApp": {
+          "type": "boolean"
+        },
+        "sendBrowser": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "number"
+        }
       },
-      "required": ["id", "adminUid", "title", "message", "category", "targetAudience", "createdAt"]
+      "required": [
+        "id",
+        "adminUid",
+        "title",
+        "message",
+        "category",
+        "targetAudience",
+        "createdAt"
+      ]
     }
   },
   "firestore": {

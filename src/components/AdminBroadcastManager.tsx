@@ -338,6 +338,7 @@ export function AdminBroadcastManager({ currentUser, users, onShowNotification }
                     <option value="all">🌍 All Users ({users.length})</option>
                     <option value="doctor">🩺 Veterinarians Only ({users.filter(u => u.role === 'doctor').length})</option>
                     <option value="clinic">🏥 Clinics & Hospitals ({users.filter(u => u.role === 'clinic').length})</option>
+                    <option value="vendor">🏪 Pet Stores & Vendors ({users.filter(u => u.role === 'vendor').length})</option>
                     <option value="assistant">💉 Assistant Clinicians ({users.filter(u => u.role === 'assistant').length})</option>
                     <option value="user">🌾 Farmers & Pet Owners ({users.filter(u => u.role === 'user').length})</option>
                   </select>

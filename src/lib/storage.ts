@@ -1857,12 +1857,27 @@ export const CommunityService = {
     }
     const validEmails = await getValidUserEmails();
     const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+    const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
     const now = Date.now();
+
+    // Trigger async background auto-cleanup of expired emergency posts (> 15 days)
+    setTimeout(() => {
+      this.autoCleanupEmergencyPosts().catch(e => console.error('Auto cleanup emergency posts error:', e));
+    }, 200);
+
     return list.filter(post => {
       const email = (post.authorEmail || '').toLowerCase().trim();
       const isValidUser = !email || validEmails.has(email);
       if (!isValidUser) return false;
       
+      // 🚨 Emergency stories & boosted radar alerts: automatically disappear after 15 days
+      const isEmergencyStoryOrAlert = post.category === 'emergency' || !!post.isBoosted;
+      if (isEmergencyStoryOrAlert) {
+        if (now - post.ts > fifteenDaysMs) {
+          return false; // Auto-disappeared after 15 days
+        }
+      }
+
       // Auto-expire 'general' category posts after 90 days
       if (post.category === 'general') {
         if (now - post.ts > ninetyDaysMs) {
@@ -1871,6 +1886,51 @@ export const CommunityService = {
       }
       return true;
     });
+  },
+
+  /**
+   * Automatically delete expired emergency stories and pet alerts older than 15 days from database & storage
+   */
+  async autoCleanupEmergencyPosts(): Promise<void> {
+    const now = Date.now();
+    const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
+
+    // 1. Clean from localStorage
+    try {
+      const localList: CommunityPost[] = JSON.parse(localStorage.getItem(LOCAL_POSTS_KEY) || '[]');
+      const freshLocal = localList.filter(p => {
+        const isEmergency = p.category === 'emergency' || !!p.isBoosted;
+        if (isEmergency && (now - p.ts > fifteenDaysMs)) {
+          return false;
+        }
+        return true;
+      });
+      if (freshLocal.length !== localList.length) {
+        localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(freshLocal));
+      }
+    } catch {}
+
+    // 2. Clean from Firestore
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await getDocs(collection(db, 'community_posts'));
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data() as CommunityPost;
+          const isEmergency = data.category === 'emergency' || !!data.isBoosted;
+          if (isEmergency && (now - (data.ts || 0) > fifteenDaysMs)) {
+            try {
+              await deleteDoc(doc(db, 'community_posts', docSnap.id));
+              console.log(`[Auto-Cleanup] Deleted 15-day expired emergency post from Firestore: ${docSnap.id}`);
+            } catch (delErr) {
+              // Non-fatal if permissions block deleting other users' docs directly
+              console.warn('[Auto-Cleanup] Skipped document deletion:', docSnap.id, delErr);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Auto-Cleanup] Firestore emergency cleanup check:', err);
+      }
+    }
   },
 
   async createPost(
@@ -2330,9 +2390,25 @@ export const PetAdsService = {
     }, 100);
 
     const validEmails = await getValidUserEmails();
+    const now = Date.now();
+    const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
     return list.filter(ad => {
       const email = (ad.ownerEmail || '').toLowerCase().trim();
-      return !email || validEmails.has(email);
+      if (email && !validEmails.has(email)) return false;
+
+      // 🚨 Ads from vendors, clinics, and doctors, as well as emergency alerts automatically disappear after 15 days
+      const is15DayAd = ad.ownerRole === 'vendor' || 
+                        ad.ownerRole === 'clinic' || 
+                        ad.ownerRole === 'doctor' || 
+                        ad.description?.toLowerCase().includes('emergency') || 
+                        ad.petType?.toLowerCase().includes('emergency') || 
+                        (ad as any).isEmergency || 
+                        (ad as any).isBoosted ||
+                        !ad.isPremium;
+      if (is15DayAd && (now - ad.createdAt > fifteenDaysMs)) {
+        return false;
+      }
+      return true;
     });
   },
 
@@ -2355,13 +2431,26 @@ export const PetAdsService = {
     }
 
     const now = Date.now();
+    const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
     for (const ad of list) {
-      // Determine if premium (has active subscription)
+      // Determine if 15-day limit applies (vendor, clinic, doctor, emergency, or unsubscribed)
+      const is15DayAd = ad.ownerRole === 'vendor' || 
+                        ad.ownerRole === 'clinic' || 
+                        ad.ownerRole === 'doctor' || 
+                        ad.description?.toLowerCase().includes('emergency') || 
+                        ad.petType?.toLowerCase().includes('emergency') || 
+                        (ad as any).isEmergency || 
+                        (ad as any).isBoosted ||
+                        !ad.isPremium;
+      const isEmergencyAd = (ad.description?.toLowerCase().includes('emergency') || 
+                             ad.petType?.toLowerCase().includes('emergency') || 
+                             (ad as any).isEmergency || 
+                             (ad as any).isBoosted);
       const isPremium = !!ad.isPremium;
-      const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+      const maxAge = is15DayAd ? fifteenDaysMs : 90 * 24 * 60 * 60 * 1000;
       if (now - ad.createdAt > maxAge) {
         // Expired! Delete it
-        console.log(`Auto-cleaning expired ad: ${ad.id} (${ad.petType}) - premium: ${isPremium}`);
+        console.log(`Auto-cleaning expired ad: ${ad.id} (${ad.petType}) - role: ${ad.ownerRole}, emergency: ${isEmergencyAd}`);
         await this.deleteAd(ad.id);
 
         // Notify the user
@@ -2375,7 +2464,9 @@ export const PetAdsService = {
               type: 'status_change',
               targetId: ad.id,
               targetType: 'post',
-              message: `Your classified ad listing for "${ad.petType} - ${ad.breed || ''}" has expired and was auto-removed after ${isPremium ? 90 : 30} days.`,
+              message: isEmergencyAd 
+                ? `Your emergency alert listing for "${ad.petType} - ${ad.breed || ''}" has reached its 15-day limit and was automatically cleared.`
+                : `Your classified ad listing for "${ad.petType} - ${ad.breed || ''}" has reached its 15-day active period and was automatically cleared.`,
               read: false,
               createdAt: Date.now()
             });
@@ -2466,9 +2557,21 @@ export const MarketplaceService = {
     }, 100);
 
     const validEmails = await getValidUserEmails();
+    const now = Date.now();
+    const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
     return list.filter(p => {
       const email = (p.ownerEmail || '').toLowerCase().trim();
-      return !email || validEmails.has(email);
+      if (email && !validEmails.has(email)) return false;
+
+      // 🕒 Product ads from vendors, clinics, and doctors automatically disappear after 15 days
+      const is15DayAd = p.ownerRole === 'vendor' || 
+                        p.ownerRole === 'clinic' || 
+                        p.ownerRole === 'doctor' || 
+                        !p.isPremium;
+      if (is15DayAd && (now - p.createdAt > fifteenDaysMs)) {
+        return false; // Auto-disappeared after 15 days
+      }
+      return true;
     });
   },
 
@@ -2491,11 +2594,16 @@ export const MarketplaceService = {
     }
 
     const now = Date.now();
+    const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
     for (const p of list) {
-      const isPremium = p.isPremium || (p.ownerRole === 'clinic' || p.ownerRole === 'doctor');
-      const maxAge = isPremium ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+      // Vendors, clinics, and doctors ads disappear after 15 days
+      const is15DayAd = p.ownerRole === 'vendor' || 
+                        p.ownerRole === 'clinic' || 
+                        p.ownerRole === 'doctor' || 
+                        !p.isPremium;
+      const maxAge = is15DayAd ? fifteenDaysMs : 90 * 24 * 60 * 60 * 1000;
       if (now - p.createdAt > maxAge) {
-        console.log(`Auto-cleaning expired product: ${p.id} (${p.name}) - premium: ${isPremium}`);
+        console.log(`Auto-cleaning expired 15-day product: ${p.id} (${p.name}) - role: ${p.ownerRole}`);
         await this.deleteProduct(p.id);
 
         // Notify the user
@@ -2509,7 +2617,7 @@ export const MarketplaceService = {
               type: 'status_change',
               targetId: p.id,
               targetType: 'post',
-              message: `Your product listing for "${p.name}" has expired and was auto-removed after ${isPremium ? 90 : 30} days.`,
+              message: `Your marketplace product listing for "${p.name}" reached its 15-day active period and was automatically cleared.`,
               read: false,
               createdAt: Date.now()
             });

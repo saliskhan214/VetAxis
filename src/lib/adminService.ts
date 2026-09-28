@@ -9,12 +9,11 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { db, auth, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, UserRole, LivestockFarm, PromotionalAd, JobPost, JobApplication, ManualPayment } from '../types';
+import { UserProfile, UserRole, PromotionalAd, JobPost, JobApplication, ManualPayment } from '../types';
 import { NotificationService } from './storage';
 
 const LOCAL_USERS_KEY = 'va_users';
 const LOCAL_SESSION_KEY = 'va_session';
-const LOCAL_FARMS_KEY = 'va_farms';
 
 function cleanUndefined<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {
@@ -178,6 +177,7 @@ export const AdminService = {
       const roleLabels: Record<UserRole, string> = {
         doctor: 'Veterinary Doctor',
         clinic: 'Veterinary Hospital / Clinic',
+        vendor: 'Pet Store / Vendor / Supplier',
         assistant: 'Veterinary Assistant / Paravet',
         user: 'Livestock Farmer / Pet Owner'
       };
@@ -245,218 +245,6 @@ export const AdminService = {
           : 'Your practitioner profile verification checkmark has been removed by the administrator.'
       });
     } catch {}
-
-    return true;
-  },
-
-  /**
-   * Fetch all registered livestock farms across the platform
-   */
-  async getAllFarms(): Promise<LivestockFarm[]> {
-    if (isFirebaseConfigured && db) {
-      try {
-        const snap = await getDocs(collection(db, 'livestock_farms'));
-        return snap.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        })) as LivestockFarm[];
-      } catch (err) {
-        console.error('AdminService: Error fetching all livestock farms:', err);
-        handleFirestoreError(err, OperationType.LIST, 'livestock_farms');
-      }
-    }
-
-    try {
-      const local = localStorage.getItem(LOCAL_FARMS_KEY);
-      if (local) {
-        return JSON.parse(local) as LivestockFarm[];
-      }
-    } catch {}
-    return [];
-  },
-
-  /**
-   * Reassign Farm Ownership to a genuine practitioner or farmer
-   */
-  async reassignFarmOwner(
-    farmId: string,
-    newOwnerUser: UserProfile,
-    options: { reason?: string; adminName?: string } = {}
-  ): Promise<boolean> {
-    const { reason = '', adminName = 'System Admin' } = options;
-
-    if (isFirebaseConfigured && db) {
-      try {
-        const farmDocRef = doc(db, 'livestock_farms', farmId);
-        const farmSnap = await getDoc(farmDocRef);
-        
-        let existingTeam: any[] = [];
-        let existingMembers: string[] = [];
-        let existingAuth: string[] = [];
-
-        if (farmSnap.exists()) {
-          const data = farmSnap.data() as LivestockFarm;
-          existingTeam = data.team || [];
-          existingMembers = data.memberUids || [];
-          existingAuth = data.authorizedUsers || [];
-        }
-
-        // Add new owner to team if not present
-        const updatedTeam = existingTeam.filter(t => t.uid !== newOwnerUser.uid);
-        updatedTeam.unshift({
-          uid: newOwnerUser.uid,
-          name: newOwnerUser.name,
-          email: newOwnerUser.email,
-          role: 'Owner'
-        });
-
-        const updatedMembers = Array.from(new Set([...existingMembers, newOwnerUser.uid]));
-        const updatedAuth = Array.from(new Set([...existingAuth, newOwnerUser.uid]));
-
-        const updates = {
-          ownerUid: newOwnerUser.uid,
-          ownerId: newOwnerUser.uid,
-          ownerName: newOwnerUser.name,
-          ownerEmail: newOwnerUser.email,
-          team: updatedTeam,
-          memberUids: updatedMembers,
-          authorizedUsers: updatedAuth
-        };
-
-        await updateDoc(farmDocRef, cleanUndefined(updates));
-      } catch (err) {
-        console.error(`AdminService: Failed to reassign farm owner for ${farmId}:`, err);
-        handleFirestoreError(err, OperationType.UPDATE, `livestock_farms/${farmId}`);
-        return false;
-      }
-    }
-
-    // Update local storage
-    try {
-      const local = localStorage.getItem(LOCAL_FARMS_KEY);
-      if (local) {
-        const farms = JSON.parse(local) as LivestockFarm[];
-        const idx = farms.findIndex(f => f.id === farmId);
-        if (idx !== -1) {
-          farms[idx].ownerUid = newOwnerUser.uid;
-          farms[idx].ownerId = newOwnerUser.uid;
-          farms[idx].ownerName = newOwnerUser.name;
-          farms[idx].ownerEmail = newOwnerUser.email;
-          localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(farms));
-        }
-      }
-    } catch {}
-
-    // Send notification to the new owner
-    try {
-      await NotificationService.createNotification({
-        userId: newOwnerUser.uid,
-        senderId: 'admin',
-        senderName: adminName,
-        type: 'farm_assign',
-        targetId: farmId,
-        targetType: 'farm',
-        message: `🌾 Farm Ownership Reassigned: You have been assigned as the official Owner of farm #${farmId}.${reason ? ` Note: "${reason}"` : ''}`
-      });
-    } catch (e) {
-      console.warn('AdminService: Notification dispatch error:', e);
-    }
-
-    return true;
-  },
-
-  /**
-   * Reassign or Appoint Farm Veterinary Manager
-   */
-  async reassignFarmManager(
-    farmId: string,
-    newManagerUser: UserProfile | null,
-    options: { reason?: string; adminName?: string } = {}
-  ): Promise<boolean> {
-    const { reason = '', adminName = 'System Admin' } = options;
-
-    if (isFirebaseConfigured && db) {
-      try {
-        const farmDocRef = doc(db, 'livestock_farms', farmId);
-        const farmSnap = await getDoc(farmDocRef);
-
-        let existingMembers: string[] = [];
-        let existingAuth: string[] = [];
-
-        if (farmSnap.exists()) {
-          const data = farmSnap.data() as LivestockFarm;
-          existingMembers = data.memberUids || [];
-          existingAuth = data.authorizedUsers || [];
-        }
-
-        let updates: Record<string, any> = {};
-
-        if (newManagerUser) {
-          const updatedMembers = Array.from(new Set([...existingMembers, newManagerUser.uid]));
-          const updatedAuth = Array.from(new Set([...existingAuth, newManagerUser.uid]));
-
-          updates = {
-            managerUid: newManagerUser.uid,
-            managerName: newManagerUser.name,
-            managerRole: newManagerUser.role as any,
-            managerStatus: 'linked',
-            memberUids: updatedMembers,
-            authorizedUsers: updatedAuth
-          };
-        } else {
-          updates = {
-            managerUid: null,
-            managerName: null,
-            managerRole: null,
-            managerStatus: 'unassigned'
-          };
-        }
-
-        await updateDoc(farmDocRef, cleanUndefined(updates));
-      } catch (err) {
-        console.error(`AdminService: Failed to reassign farm manager for ${farmId}:`, err);
-        handleFirestoreError(err, OperationType.UPDATE, `livestock_farms/${farmId}`);
-        return false;
-      }
-    }
-
-    // Local Storage update
-    try {
-      const local = localStorage.getItem(LOCAL_FARMS_KEY);
-      if (local) {
-        const farms = JSON.parse(local) as LivestockFarm[];
-        const idx = farms.findIndex(f => f.id === farmId);
-        if (idx !== -1) {
-          if (newManagerUser) {
-            farms[idx].managerUid = newManagerUser.uid;
-            farms[idx].managerName = newManagerUser.name;
-            farms[idx].managerRole = newManagerUser.role as any;
-            farms[idx].managerStatus = 'linked';
-          } else {
-            farms[idx].managerUid = undefined;
-            farms[idx].managerName = undefined;
-            farms[idx].managerRole = undefined;
-            farms[idx].managerStatus = 'unassigned';
-          }
-          localStorage.setItem(LOCAL_FARMS_KEY, JSON.stringify(farms));
-        }
-      }
-    } catch {}
-
-    // Send notification
-    if (newManagerUser) {
-      try {
-        await NotificationService.createNotification({
-          userId: newManagerUser.uid,
-          senderId: 'admin',
-          senderName: adminName,
-          type: 'farm_assign',
-          targetId: farmId,
-          targetType: 'farm',
-          message: `👨‍⚕️ Veterinary Assignment: You have been appointed as the Veterinary Manager for farm #${farmId} by the Administration.${reason ? ` Note: "${reason}"` : ''}`
-        });
-      } catch {}
-    }
 
     return true;
   },

@@ -3,7 +3,7 @@ import { UserProfile, Product } from '../types';
 import { MarketplaceService } from '../lib/storage';
 import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { AdContainer } from './AdContainer';
 
 interface MarketplaceProps {
@@ -24,11 +24,30 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
   });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
-  const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(true);
+  const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('vetaxis_safe_trade_guide_open');
+      return saved !== null ? saved === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSafeTrade = () => {
+    setSafeTradeOpen(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('vetaxis_safe_trade_guide_open', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const [legalAgreed, setLegalAgreed] = useState<boolean>(false);
 
-  // Form compose state (only allowed for doctor, clinic)
-  const isAuthorizedSeller = currentUser ? (currentUser.role === 'doctor' || currentUser.role === 'clinic') : false;
+  // Form compose state (allowed for doctor, clinic, and certified pet store vendors)
+  const isAuthorizedSeller = currentUser ? (currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'vendor') : false;
+  const isVendorAccount = currentUser?.role === 'vendor';
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [prodName, setProdName] = useState<string>('');
   const [prodPrice, setProdPrice] = useState<number>(0);
@@ -154,9 +173,12 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
       return;
     }
 
-    // Subscription Limit check for posting product ads (Unlimited for premium, max 15 per month for clinics/doctors)
+    // Subscription Limit check for posting product ads (Unlimited for vendors & premium, max 15 per month for unsubscribed clinics/doctors)
     const isPremium = !!currentUser.subscriptionTier;
-    if (!isPremium) {
+    const isVendor = currentUser.role === 'vendor';
+    
+    // Vendors have UNLIMITED marketplace postings by default
+    if (!isPremium && !isVendor) {
       const isClinicOrDoctor = currentUser.role === 'clinic' || currentUser.role === 'doctor';
       
       if (isClinicOrDoctor) {
@@ -169,7 +191,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
           return;
         }
       } else {
-        // Other roles are restricted to 3 active listings
+        // Other general roles are restricted to 3 active listings
         const myProductsCount = products.filter(p => p.ownerEmail === currentUser.email).length;
         if (myProductsCount >= 3) {
           setFormError('⚠️ Placement Limit: Unsubscribed accounts are restricted to 3 active product postings. Please upgrade to Silver, Gold, or Platinum to unlock unlimited marketplace listings!');
@@ -222,6 +244,12 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
   // Filters
   const filteredProducts = products
     .filter((p) => {
+      // Auto-disappear after 15 days for vendors, clinics, and doctors
+      const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
+      const is15DayAd = p.ownerRole === 'vendor' || p.ownerRole === 'clinic' || p.ownerRole === 'doctor' || !p.isPremium;
+      if (is15DayAd && Date.now() - p.createdAt > fifteenDaysMs) {
+        return false;
+      }
       const search = searchTerm.toLowerCase().trim();
       if (!search) return true;
       return (
@@ -241,35 +269,66 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
     <div className="space-y-8 max-w-7xl mx-auto w-[98%] px-1 md:px-4 text-left">
       
       {/* 🛡️ SAFE TRADING COMPLIANCE & LEGAL PROTECTION CENTER */}
-      <div className="bg-[#fcf9f2] border-2 border-amber-200 border-b-[6px] border-b-amber-300 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between border-b border-amber-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-lg">🛡️</div>
-            <div>
-              <h3 className="font-serif font-black text-sm md:text-base text-stone-900">
-                Safe Trading Compliance & Anti-Scam Precautions
-              </h3>
-              <p className="text-[10px] md:text-xs font-bold text-stone-500">
+      <div className="bg-[#fcf9f2] border-2 border-amber-200 border-b-[6px] border-b-amber-300 rounded-3xl p-4 sm:p-5 md:p-6 space-y-4 shadow-sm transition-all">
+        <div 
+          onClick={toggleSafeTrade}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSafeTrade(); } }}
+          className="flex items-center justify-between border-b border-amber-100 pb-3 cursor-pointer select-none group hover:bg-amber-100/30 -mx-2 px-2 rounded-xl transition-colors"
+          title={safeTradeOpen ? 'Click to hide compliance details' : 'Click to show compliance details'}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">🛡️</div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif font-black text-sm md:text-base text-stone-900 truncate">
+                  Safe Trading Compliance & Anti-Scam Precautions
+                </h3>
+                {safeTradeOpen ? (
+                  <ChevronUp className="w-4 h-4 text-amber-700 shrink-0" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
+                )}
+              </div>
+              <p className="text-[10px] md:text-xs font-bold text-stone-500 truncate">
                 Direct regulations for buying and listing products in the veterinary marketplace.
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() => setSafeTradeOpen(!safeTradeOpen)}
-            className="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-[10px] font-black uppercase text-stone-700 rounded-lg border border-stone-200 transition-all cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSafeTrade();
+            }}
+            className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all cursor-pointer shrink-0 ml-2 shadow-2xs flex items-center gap-1 ${
+              safeTradeOpen 
+                ? 'bg-stone-200 hover:bg-stone-300 text-stone-800 border-stone-300' 
+                : 'bg-amber-600 hover:bg-amber-700 text-white border-amber-700 animate-pulse'
+            }`}
           >
-            {safeTradeOpen ? 'Hide Panel' : 'Show Guide'}
+            {safeTradeOpen ? (
+              <>
+                <ChevronUp className="w-3 h-3" /> Hide Panel
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3" /> Show Guide
+              </>
+            )}
           </button>
         </div>
 
-        {safeTradeOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-4"
-          >
+        <AnimatePresence initial={false}>
+          {safeTradeOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-4 overflow-hidden"
+            >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Alert 1 */}
               <div className="p-3 bg-white rounded-2xl border border-amber-100 text-left space-y-1.5">
@@ -311,6 +370,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
             </div>
           </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* TOAST SYSTEM */}
@@ -332,8 +392,8 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
         <div className="text-left bg-[#fcf9f2] border border-[#e3dec9] border-b-[4px] border-b-[#cdc6ad] p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
           <div>
             <span className="bg-[#5a5a40] text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Public Marketplace</span>
-            <h4 className="font-serif font-black text-stone-900 text-sm mt-1">Want to list veterinary equipment, medicines, or accessories?</h4>
-            <p className="text-xs text-stone-600 mt-0.5">Sign in to your practitioner or clinic account to catalog products to verified buyers across Pakistan.</p>
+            <h4 className="font-serif font-black text-stone-900 text-sm mt-1">Want to list veterinary equipment, medicines, or pet supplies?</h4>
+            <p className="text-xs text-stone-600 mt-0.5">Sign in to your doctor, clinic, or verified pet store vendor account to catalog products to verified buyers across Pakistan.</p>
           </div>
           <button
             onClick={() => onRequireAuth?.('sign in to list veterinary equipment or pharmaceuticals')}
@@ -347,13 +407,20 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
       {/* COLLAPSIBLE COMPOSE FORM (Sellers only) */}
       {isAuthorizedSeller && (
         <div className="text-left">
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setFormOpen(!formOpen)}
-            className="cursor-pointer btn-tactile-3d-primary py-3 px-6 text-xs inline-flex items-center gap-2"
-          >
-            {formOpen ? '✕ Close Composer' : '➕ List a New Product'}
-          </motion.button>
+          <div className="flex flex-wrap items-center gap-3">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setFormOpen(!formOpen)}
+              className="cursor-pointer btn-tactile-3d-primary py-3 px-6 text-xs inline-flex items-center gap-2"
+            >
+              {formOpen ? '✕ Close Composer' : '➕ List a New Product'}
+            </motion.button>
+            {isVendorAccount && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-2xs">
+                <span>🏪</span> Unlimited Vendor Listings · 15-Day Auto-Expiry
+              </span>
+            )}
+          </div>
 
           <AnimatePresence>
             {formOpen && (
@@ -363,9 +430,15 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
                 exit={{ opacity: 0, height: 0, y: -20 }}
                 className="mt-5 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 rounded-3xl shadow-md overflow-hidden"
               >
-                <div className="flex items-center gap-2 border-b border-[#f4f1e9] pb-3 mb-5">
-                  <Tag className="w-5 h-5 text-[#5a5a40]" />
-                  <h3 className="font-serif font-black text-lg text-[#373735]">Catalog New Product Listing</h3>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f4f1e9] pb-3 mb-5">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-[#5a5a40]" />
+                    <h3 className="font-serif font-black text-lg text-[#373735]">Catalog New Product Listing</h3>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-xl inline-flex items-center gap-1 shadow-2xs">
+                    <Clock className="w-3 h-3 text-amber-700" />
+                    <span>Active 15 Days · Auto-Expires</span>
+                  </span>
                 </div>
 
                 {formError && (
@@ -578,6 +651,8 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
             }
 
             const isHighlighted = highlightProductId === p.id;
+            const daysPassed = Math.floor((Date.now() - p.createdAt) / (24 * 60 * 60 * 1000));
+            const daysRemaining = Math.max(1, 15 - daysPassed);
             return (
               <React.Fragment key={p.id}>
                 <motion.div
@@ -617,12 +692,23 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] uppercase tracking-widest font-black border font-mono shadow-inner ${
                         tier === 'Platinum' ? 'bg-zinc-800 border-zinc-700 text-zinc-300' : 'bg-stone-100 border-stone-200 text-[#5a5a40]'
                       }`}>
                         <Package className="w-3 h-3" />
                         <span>Stock: {p.quantity} left</span>
+                      </span>
+
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] uppercase tracking-widest font-black border font-mono shadow-inner ${
+                        daysRemaining <= 3
+                          ? 'bg-red-50 border-red-200 text-red-700'
+                          : tier === 'Platinum'
+                            ? 'bg-zinc-800 border-zinc-700 text-teal-300'
+                            : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                      }`} title="Listings automatically disappear after 15 days">
+                        <Clock className={`w-3 h-3 ${daysRemaining <= 3 ? 'text-red-500' : 'text-amber-600'}`} />
+                        <span>{daysRemaining}d left</span>
                       </span>
                     </div>
 
@@ -638,7 +724,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
                       <span className="font-extrabold uppercase text-[9px] text-[#5a5a40]">Seller:</span>
                       <strong className={`font-bold ${tier === 'Platinum' ? 'text-white' : 'text-black'}`}>{p.ownerName}</strong>
                       <span className="inline-flex px-1.5 py-0.5 rounded-lg bg-white/10 uppercase tracking-widest text-[8px] font-black border border-stone-200/20">
-                        {p.ownerRole}
+                        {p.ownerRole === 'vendor' ? '🏪 Vendor / Store' : p.ownerRole}
                       </span>
                     </div>
                   </div>

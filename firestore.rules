@@ -41,19 +41,6 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isFarmMember(farmId) {
-      return isSignedIn() &&
-        farmId != null &&
-        farmId != "" &&
-        exists(/databases/$(database)/documents/livestock_farms/$(farmId)) && (
-          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('ownerId', '') == request.auth.uid ||
-          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.ownerUid == request.auth.uid ||
-          get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.managerUid == request.auth.uid ||
-          request.auth.uid in get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('authorizedUsers', []) ||
-          request.auth.uid in get(/databases/$(database)/documents/livestock_farms/$(farmId)).data.get('memberUids', [])
-        );
-    }
-
     function isClinician() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -68,14 +55,14 @@ service cloud.firestore {
     // USERS COLLECTION Rules
     // ─────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow get: if resource.data.role in ['doctor', 'clinic', 'assistant'] || isSignedIn();
+      allow get: if resource.data.role in ['doctor', 'clinic', 'assistant', 'vendor'] || isSignedIn();
       
-      allow list: if resource.data.role in ['doctor', 'clinic', 'assistant'] || isSignedIn();
+      allow list: if resource.data.role in ['doctor', 'clinic', 'assistant', 'vendor'] || isSignedIn();
 
       allow create: if isSignedIn() && isOwner(userId) && (
         incoming().keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
         incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
-        incoming().role in ['doctor', 'clinic', 'assistant', 'user'] &&
+        incoming().role in ['doctor', 'clinic', 'assistant', 'user', 'vendor'] &&
         incoming().name is string && incoming().name.size() <= 80 &&
         incoming().email is string && incoming().email.size() <= 128 &&
         (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 20)) &&
@@ -150,7 +137,7 @@ service cloud.firestore {
           userId != request.auth.uid &&
           incoming().reviewerEmail == request.auth.token.email &&
           incoming().reviewerName is string &&
-          incoming().reviewerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
+          incoming().reviewerRole in ['doctor', 'clinic', 'assistant', 'user', 'vendor'] &&
           incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5 &&
           (!('comment' in incoming()) || (incoming().comment is string && incoming().comment.size() <= 1000)) &&
           incoming().date is number && incoming().date <= request.time.toMillis() + 60000 &&
@@ -200,7 +187,7 @@ service cloud.firestore {
 
       allow create: if isSignedIn() && (
         incoming().ownerEmail == request.auth.token.email &&
-        incoming().ownerRole in ['doctor', 'clinic', 'assistant', 'user'] &&
+        incoming().ownerRole in ['doctor', 'clinic', 'assistant', 'user', 'vendor'] &&
         incoming().adType in ['sale', 'adoption'] &&
         incoming().petType is string && incoming().petType.size() <= 50 &&
         incoming().description is string && incoming().description.size() <= 1500 &&
@@ -226,7 +213,9 @@ service cloud.firestore {
       );
 
       allow delete: if isSignedIn() && (
-        existing().ownerEmail == request.auth.token.email
+        existing().ownerEmail == request.auth.token.email ||
+        isAdmin() ||
+        (request.time.toMillis() > existing().createdAt + 15 * 24 * 60 * 60 * 1000)
       );
     }
 
@@ -237,10 +226,10 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if isSignedIn() && (
-        // Authority check: Only Clinicians (Doctors or Clinics) can post marketplace items
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic'] &&
+        // Authority check: Clinicians and Certified Vendors/Pet Stores can post marketplace items
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'clinic', 'vendor'] &&
         incoming().ownerEmail == request.auth.token.email &&
-        incoming().ownerRole in ['doctor', 'clinic'] &&
+        incoming().ownerRole in ['doctor', 'clinic', 'vendor'] &&
         incoming().name is string && incoming().name.size() <= 100 &&
         incoming().price is number && incoming().price >= 0 &&
         incoming().quantity is number && incoming().quantity >= 1 &&
@@ -264,7 +253,9 @@ service cloud.firestore {
       );
 
       allow delete: if isSignedIn() && (
-        existing().ownerEmail == request.auth.token.email
+        existing().ownerEmail == request.auth.token.email ||
+        isAdmin() ||
+        (request.time.toMillis() > existing().createdAt + 15 * 24 * 60 * 60 * 1000)
       );
     }
 
@@ -290,7 +281,11 @@ service cloud.firestore {
 
       allow delete: if isSignedIn() && (
         existing().get('authorUid', '') == request.auth.uid ||
-        existing().get('authorEmail', '') == request.auth.token.email
+        existing().get('authorEmail', '') == request.auth.token.email ||
+        isAdmin() ||
+        // Auto-cleanup permission for 15-day expired emergency signals
+        ((existing().get('category', '') == 'emergency' || existing().get('isBoosted', false) == true) && 
+         request.time.toMillis() > existing().get('ts', 0) + 15 * 24 * 60 * 60 * 1000)
       );
     }
 
@@ -416,90 +411,6 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // LIVESTOCK FARMS RULES
-    // ─────────────────────────────────────────────────────────────────
-    match /livestock_farms/{farmId} {
-      allow get: if isSignedIn() && (
-        resource.data.get('ownerId', '') == request.auth.uid ||
-        resource.data.ownerUid == request.auth.uid ||
-        resource.data.managerUid == request.auth.uid ||
-        request.auth.uid in resource.data.get('authorizedUsers', []) ||
-        request.auth.uid in resource.data.get('memberUids', []) ||
-        isAdmin()
-      );
-      
-      allow list: if isSignedIn() && (
-        resource.data.get('ownerId', '') == request.auth.uid ||
-        resource.data.ownerUid == request.auth.uid ||
-        resource.data.managerUid == request.auth.uid ||
-        request.auth.uid in resource.data.get('authorizedUsers', []) ||
-        request.auth.uid in resource.data.get('memberUids', []) ||
-        isAdmin()
-      );
-      
-      allow create: if isSignedIn() && (
-        (incoming().get('ownerId', '') == request.auth.uid || incoming().ownerUid == request.auth.uid) &&
-        incoming().name is string && incoming().name.size() <= 150 &&
-        incoming().location is string && incoming().location.size() <= 200 &&
-        incoming().farmType in ['Poultry Farm', 'Dairy Farm', 'Buffalo Farm', 'Goat Farm', 'Sheep Farm', 'Mixed Farm']
-      );
-
-      allow update: if isSignedIn() && (
-        // Farm Owner can edit farm details
-        existing().get('ownerId', '') == request.auth.uid ||
-        existing().ownerUid == request.auth.uid ||
-        // Or assigned vet can update status or notes
-        existing().managerUid == request.auth.uid ||
-        // Allow vet to link / decline when requested
-        (existing().get('managerStatus', '') == 'pending' && incoming().managerUid == request.auth.uid) ||
-        // Allow updating teams or records
-        (incoming().get('ownerId', '') == existing().get('ownerId', '') || incoming().ownerUid == existing().ownerUid) ||
-        request.auth.uid in existing().get('authorizedUsers', []) ||
-        request.auth.uid in existing().get('memberUids', []) ||
-        isAdmin()
-      );
-
-      allow delete: if isSignedIn() && (
-        existing().get('ownerId', '') == request.auth.uid ||
-        existing().ownerUid == request.auth.uid ||
-        isAdmin()
-      );
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // LIVESTOCK ANIMALS RULES
-    // ─────────────────────────────────────────────────────────────────
-    match /livestock_animals/{animalId} {
-      allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
-      allow create: if isFarmMember(incoming().farmId);
-      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
-      allow delete: if isFarmMember(existing().farmId);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // LIVESTOCK BATCHES RULES
-    // ─────────────────────────────────────────────────────────────────
-    match /livestock_batches/{batchId} {
-      allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
-      allow create: if isFarmMember(incoming().farmId);
-      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
-      allow delete: if isFarmMember(existing().farmId);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // LIVESTOCK TASKS RULES
-    // ─────────────────────────────────────────────────────────────────
-    match /livestock_tasks/{taskId} {
-      allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
-      allow create: if isFarmMember(incoming().farmId);
-      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
-      allow delete: if isFarmMember(existing().farmId);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
     // PROMOTIONAL ADS RULES
     // ─────────────────────────────────────────────────────────────────
     match /promotional_ads/{adId} {
@@ -508,7 +419,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         incoming().ownerUid == request.auth.uid &&
         incoming().ownerEmail == request.auth.token.email &&
-        incoming().ownerRole in ['doctor', 'clinic'] &&
+        incoming().ownerRole in ['doctor', 'clinic', 'vendor'] &&
         incoming().sponsorName is string && incoming().sponsorName.size() <= 100 &&
         incoming().title is string && incoming().title.size() <= 155 &&
         incoming().description is string && incoming().description.size() <= 1000 &&
@@ -545,66 +456,14 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // LIVESTOCK INDIVIDUAL RECORDS RULES
+    // CLINIC APPOINTMENTS RULES
     // ─────────────────────────────────────────────────────────────────
-    match /livestock_individual_records/{recordId} {
-      allow get: if true;
-      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
-      allow create: if isFarmMember(incoming().farmId);
-      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
-      allow delete: if isFarmMember(existing().farmId);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // LIVESTOCK HERD RECORDS RULES
-    // ─────────────────────────────────────────────────────────────────
-    match /livestock_herd_records/{recordId} {
-      allow get: if isFarmMember(existing().farmId);
-      allow list: if isSignedIn() && isFarmMember(resource.data.farmId);
-      allow create: if isFarmMember(incoming().farmId);
-      allow update: if isFarmMember(existing().farmId) && (!('farmId' in incoming()) || incoming().farmId == existing().farmId);
-      allow delete: if isFarmMember(existing().farmId);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // VETAXIS CLINIC AND CLINICAL RECORDS RULES
-    // ─────────────────────────────────────────────────────────────────
-
     match /clinic_appointments/{apptId} {
       allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
       allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
       allow create: if isSignedIn() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid || isClinician());
       allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
       allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-    }
-
-    match /clinic_soap_records/{soapId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
-      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-    }
-
-    match /clinic_prescriptions/{prescId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
-      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-    }
-
-    match /clinic_invoices/{invoiceId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow list: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow create: if isClinician() && (request.resource.data.get('clinicId', '') == request.auth.uid || request.resource.data.get('authorUid', '') == request.auth.uid || request.resource.data.get('userId', '') == request.auth.uid);
-      allow update: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-      allow delete: if isSignedIn() && (resource.data.get('clinicId', '') == request.auth.uid || resource.data.get('authorUid', '') == request.auth.uid || resource.data.get('userId', '') == request.auth.uid || isAdmin() || isClinician());
-    }
-
-    match /clinic_service_catalog/{serviceId} {
-      allow read: if isSignedIn();
-      allow write: if isClinician() && (resource == null || resource.data.get('clinicId', '') == request.auth.uid || isAdmin()) && (request.resource.data.clinicId == request.auth.uid || isAdmin());
     }
 
     // ─────────────────────────────────────────────────────────────────

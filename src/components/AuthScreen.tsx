@@ -122,6 +122,17 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs, onClose,
           address: coords.address
         };
       }
+      if (selectedRole === 'vendor') {
+        extra.expertise = expertise.trim() || 'Pet Store / Veterinary Supplies & Accessories Vendor';
+        extra.facilities = 'Certified Pet Store, Equipment & Veterinary Supplies';
+        extra.address = address.trim() || doctorCity.trim() || 'Commercial Market, Pakistan';
+        const coords = LocationService.resolveCoordinates(extra.address, pendingUid);
+        extra.location = {
+          lat: coords.lat,
+          lng: coords.lng,
+          address: coords.address
+        };
+      }
 
       if (authService.registerGoogleUser) {
         const user = await authService.registerGoogleUser(
@@ -300,12 +311,13 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs, onClose,
               {/* ROLE PICKER GRID */}
               <div className="space-y-2">
                 <label className="text-xs uppercase font-extrabold text-[#5a5a40] tracking-wider mb-1 block">Designate Your Platform Role *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {[
-                    { id: 'doctor', icon: '🩺', title: 'Doctor', desc: 'Licensed practitioner portfolio' },
-                    { id: 'clinic', icon: '🏥', title: 'Clinic Facility', desc: 'Hospital register & profiles' },
-                    { id: 'user', icon: '👨‍🌾', title: 'General User', desc: 'Farmer, breeder, or pet owner' },
-                    { id: 'assistant', icon: '🧑‍⚕️', title: 'Vet Assistant', desc: 'Clinical assistant / technician' }
+                    { id: 'doctor', icon: '🩺', title: 'Doctor', desc: 'Practitioner portfolio' },
+                    { id: 'clinic', icon: '🏥', title: 'Clinic / Hospital', desc: 'Facility register' },
+                    { id: 'vendor', icon: '🏪', title: 'Vendor / Store', desc: 'Pet shop & supplier' },
+                    { id: 'user', icon: '👨‍🌾', title: 'General User', desc: 'Pet parent / breeder' },
+                    { id: 'assistant', icon: '🧑‍⚕️', title: 'Vet Assistant', desc: 'Technician / staff' }
                   ].map((roleOpt) => {
                     const isSelected = selectedRole === roleOpt.id;
                     return (
@@ -432,6 +444,40 @@ export function AuthScreen({ onAuthSuccess, authService, onOpenAboutUs, onClose,
                         type="text"
                         className="form-control bg-white"
                         placeholder="Plot, Block, Cantonment, City"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        disabled={loading}
+                        required
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {selectedRole === 'vendor' && (
+                  <motion.div
+                    key="vendor-form"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    className="p-5 bg-[#fcf9f2] border border-[#e3dec9] border-b-[3px] rounded-2xl space-y-4"
+                  >
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-extrabold text-[#5a5a40] tracking-wider block">Store / Business Specialization</label>
+                      <input
+                        type="text"
+                        className="form-control bg-white"
+                        placeholder="e.g. Pet Food, Accessories, Surgical Tools, Pharmaceuticals"
+                        value={expertise}
+                        onChange={(e) => setExpertise(e.target.value)}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-extrabold text-[#5a5a40] tracking-wider block">Store or Warehouse Address *</label>
+                      <input
+                        type="text"
+                        className="form-control bg-white"
+                        placeholder="Shop / Commercial Market, City"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         disabled={loading}

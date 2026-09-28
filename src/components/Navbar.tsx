@@ -33,8 +33,6 @@ export function Navbar({
 }: NavbarProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [lockPopupMessage, setLockPopupMessage] = useState<string | null>(null);
-  const [timerId, setTimerId] = useState<any>(null);
   const [unreadMessages, setUnreadMessages] = useState<number>(0);
   const [browserPerm, setBrowserPerm] = useState<string>('default');
   const [isAlertBannerDismissed, setIsAlertBannerDismissed] = useState<boolean>(() => BrowserNotificationService.isDismissed());
@@ -55,19 +53,6 @@ export function Navbar({
     return () => unsub();
   }, [user?.uid]);
 
-  const isClinicSubscribed = user?.subscriptionTier === 'Silver' || user?.subscriptionTier === 'Gold' || user?.subscriptionTier === 'Platinum';
-
-  const triggerLockPopup = () => {
-    if (timerId) {
-      clearTimeout(timerId);
-    }
-    setLockPopupMessage("facility is lock please subscribe to premium category");
-    const tid = setTimeout(() => {
-      setLockPopupMessage(null);
-    }, 5000);
-    setTimerId(tid);
-  };
-
   const initials = user?.name
     ? user.name
         .trim()
@@ -87,8 +72,6 @@ export function Navbar({
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
     { id: 'messenger', label: 'Messenger', icon: '💬' },
     { id: 'clinical_tools', label: 'Vet & Pet Calculators', icon: '🧮' },
-    { id: 'clinic_management', label: 'Clinic Management', icon: '🏥' },
-    { id: 'livestock', label: 'Farm Management', icon: '🐄' },
     { id: 'community', label: 'Community', icon: '💬' },
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },
@@ -440,9 +423,6 @@ export function Navbar({
               PrefetchService.prefetchMarketplace();
               PrefetchService.prefetchPetAds();
               PrefetchService.prefetchJobs();
-              if (user?.uid) {
-                PrefetchService.prefetchLivestock(user.uid);
-              }
             }}
             className={`flex items-center justify-center p-2.5 rounded-xl border border-b-[3px] transition-all duration-150 cursor-pointer shadow-xs ${
               isSidebarOpen 
@@ -496,6 +476,10 @@ export function Navbar({
                       <span className="bg-amber-500 text-white rounded-md text-[8px] font-black px-1.5 py-0.5 tracking-wider uppercase">
                         ⭐ GOLD
                       </span>
+                    ) : user?.role === 'vendor' ? (
+                      <span className="bg-emerald-600 text-white rounded-md text-[8px] font-black px-1.5 py-0.5 tracking-wider uppercase shadow-xs">
+                        🏪 VENDOR
+                      </span>
                     ) : !user ? (
                       <span className="bg-stone-200 text-stone-700 rounded-md text-[8px] font-black px-1.5 py-0.5 tracking-wider uppercase">
                         GUEST
@@ -523,14 +507,10 @@ export function Navbar({
                       if (item.id === 'messenger') {
                         return !!user;
                       }
-                      if (item.id === 'clinic_management') {
-                        return user?.role === 'clinic';
-                      }
                       return true;
                     })
                     .map(item => {
                       const isActive = activeSection === item.id;
-                      const isLocked = item.id === 'clinic_management' && user?.role === 'clinic' && !isClinicSubscribed;
                       return (
                         <motion.button
                           key={item.id}
@@ -538,13 +518,7 @@ export function Navbar({
                           onMouseEnter={() => PrefetchService.prefetchOnIntent(item.id, user?.uid)}
                           onTouchStart={() => PrefetchService.prefetchOnIntent(item.id, user?.uid)}
                           onFocus={() => PrefetchService.prefetchOnIntent(item.id, user?.uid)}
-                          onClick={() => {
-                            if (isLocked) {
-                              triggerLockPopup();
-                            } else {
-                              handleMobileNav(item.id);
-                            }
-                          }}
+                          onClick={() => handleMobileNav(item.id)}
                           className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-extrabold transition-all border border-transparent text-left cursor-pointer ${
                             isActive
                               ? 'bg-[#5a5a40] text-white border-[#5a5a40] border-b-[4px] border-b-[#3e3e2b]'
@@ -558,11 +532,6 @@ export function Navbar({
                           {item.id === 'messenger' && unreadMessages > 0 && (
                             <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-black flex items-center justify-center text-[10px] shadow-xs">
                               {unreadMessages}
-                            </span>
-                          )}
-                          {isLocked && (
-                            <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-lg font-black flex items-center gap-1 uppercase tracking-wider text-[8px]">
-                              🔒 Lock
                             </span>
                           )}
                         </motion.button>
@@ -692,23 +661,6 @@ export function Navbar({
         )}
       </AnimatePresence>
 
-      {/* 5-second Lock Popup toast */}
-      <AnimatePresence>
-        {lockPopupMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -50, scale: 0.9 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-sm bg-stone-900 border-2 border-red-500 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3"
-          >
-            <span className="text-2xl">🔒</span>
-            <div className="flex flex-col text-left">
-              <span className="font-serif font-black text-xs uppercase tracking-wider text-red-400">Access Restricted</span>
-              <span className="text-xs font-bold text-stone-100">{lockPopupMessage}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }

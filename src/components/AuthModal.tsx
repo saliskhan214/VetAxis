@@ -111,6 +111,15 @@ export function AuthModal({
           lng: 73.0479,
           address: address.trim() || 'Commercial Area, Islamabad'
         };
+      } else if (selectedRole === 'vendor') {
+        extra.expertise = expertise.trim() || 'Pet Store / Veterinary Supplies & Accessories Vendor';
+        extra.facilities = 'Certified Pet Store, Equipment & Veterinary Supplies';
+        extra.address = address.trim() || doctorCity.trim() || 'Commercial Market, Pakistan';
+        extra.location = {
+          lat: 33.6844,
+          lng: 73.0479,
+          address: extra.address
+        };
       }
 
       if (authService.registerGoogleUser) {
@@ -234,6 +243,7 @@ export function AuthModal({
                   {[
                     { id: 'doctor', icon: '🩺', title: 'Doctor (DVM)', desc: 'Licensed practitioner' },
                     { id: 'clinic', icon: '🏥', title: 'Clinic / Hospital', desc: 'Facility manager' },
+                    { id: 'vendor', icon: '🏪', title: 'Vendor / Store', desc: 'Pet shop & supplier' },
                     { id: 'user', icon: '👨‍🌾', title: 'Pet Owner / Farmer', desc: 'Breeder or pet parent' },
                     { id: 'assistant', icon: '🧑‍⚕️', title: 'Vet Assistant', desc: 'Technician / staff' }
                   ].map((roleOpt) => {
@@ -276,16 +286,16 @@ export function AuthModal({
                 />
               </div>
 
-              {/* City or Clinic Address */}
-              {selectedRole === 'clinic' ? (
+              {/* City or Clinic/Vendor Address */}
+              {selectedRole === 'clinic' || selectedRole === 'vendor' ? (
                 <div className="text-left">
                   <label className="text-[11px] uppercase font-extrabold text-[#5a5a40] tracking-wider mb-1 block">
-                    Hospital Street Address *
+                    {selectedRole === 'vendor' ? 'Store / Business Location *' : 'Hospital Street Address *'}
                   </label>
                   <input
                     type="text"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#cdc6ad] focus:outline-none focus:ring-2 focus:ring-[#5a5a40] text-xs font-sans"
-                    placeholder="Plot / Street / City"
+                    placeholder={selectedRole === 'vendor' ? 'Shop / Commercial Market / City' : 'Plot / Street / City'}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     disabled={loading}

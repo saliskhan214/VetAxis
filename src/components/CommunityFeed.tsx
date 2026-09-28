@@ -601,9 +601,9 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
       
       {/* ACTIVE EMERGENCY STORIES ROW (Now occupying top spot as requested) */}
       {(() => {
-        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const fifteenDaysAgo = Date.now() - 15 * 24 * 60 * 60 * 1000;
         const activeEmergencyPosts = posts.filter(
-          (p) => (p.category === 'emergency' || p.isBoosted) && p.ts >= thirtyDaysAgo
+          (p) => (p.category === 'emergency' || p.isBoosted) && p.ts >= fifteenDaysAgo
         );
 
         const scrollStories = (direction: 'left' | 'right') => {
@@ -697,7 +697,7 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
               <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-2 z-10 w-full">
                 {activeEmergencyPosts.map((post) => {
                   const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
-                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const daysRemaining = Math.max(1, 15 - daysPassed);
                   const hasImage = post.images && post.images.length > 0;
                   
                   return (
@@ -771,7 +771,7 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
               >
                 {activeEmergencyPosts.map((post) => {
                   const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
-                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const daysRemaining = Math.max(1, 15 - daysPassed);
                   const hasImage = post.images && post.images.length > 0;
                   
                   return (
@@ -895,7 +895,7 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
                   <h4 className="font-serif font-black text-red-900 text-sm">Have an Emergency? Post a General Emergency Alert</h4>
                 </div>
                 <p className="text-xs text-red-700/80 font-semibold leading-normal">
-                  Publish a high-priority emergency alert. It will be posted with the general tag and shared as a 30-day sliding story preview. Free for all local guardians.
+                  Publish a high-priority emergency alert. It will be posted with the general tag and shared as a 15-day sliding story preview. Free for all local guardians.
                 </p>
               </div>
             </div>
@@ -1960,7 +1960,7 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
                   <div className="space-y-1.5 leading-snug">
                     <h4 className="font-serif font-black text-gray-900 text-base">Emergency Alert Active!</h4>
                     <p className="text-xs text-stone-600 max-w-sm mx-auto">
-                      Your emergency alert was successfully published to the general feed and integrated into the active sliding stories banner at the top for 30 days!
+                      Your emergency alert was successfully published to the general feed and integrated into the active sliding stories banner at the top for 15 days!
                     </p>
                   </div>
                   <button

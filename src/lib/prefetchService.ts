@@ -1,7 +1,5 @@
 import { UserProfile, CommunityPost, Product, PetAd, JobPost } from '../types';
 import { ExploreService, CommunityService, MarketplaceService, PetAdsService, JobBoardService, PromotionalAdsService } from './storage';
-import { LivestockService } from './livestockService';
-import { LivestockFarm } from '../types';
 
 interface CacheEntry<T> {
   data: T;
@@ -18,7 +16,6 @@ class PredictivePrefetchService {
   private productsCache: CacheEntry<Product[]> | null = null;
   private petAdsCache: CacheEntry<PetAd[]> | null = null;
   private jobsCache: CacheEntry<JobPost[]> | null = null;
-  private farmsCache: Record<string, CacheEntry<LivestockFarm[]>> = {};
 
   // In-flight promise tracker to deduplicate concurrent requests
   private inFlight = new Map<string, Promise<any>>();
@@ -342,55 +339,7 @@ class PredictivePrefetchService {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 6. LIVESTOCK / FARM MANAGEMENT PRE-FETCHING
-  // ─────────────────────────────────────────────────────────────
-
-  public async prefetchLivestock(userUid?: string, force = false): Promise<LivestockFarm[]> {
-    const farmKey = userUid || 'all';
-    const key = `livestock_${farmKey}`;
-    const cached = this.farmsCache[farmKey];
-    const isStale = !cached || Date.now() - cached.timestamp > CACHE_TTL_MS;
-
-    if (!force && !isStale) {
-      return cached.data;
-    }
-
-    if (this.inFlight.has(key)) {
-      return this.inFlight.get(key);
-    }
-
-    const promise = (async () => {
-      try {
-        const data = await LivestockService.fetchFarms(userUid);
-        this.farmsCache[farmKey] = { data, timestamp: Date.now() };
-        this.emit(`farms_${farmKey}`, data);
-        return data;
-      } catch (err) {
-        console.warn('[Prefetch] Error prefetching farms:', err);
-        return cached?.data || [];
-      } finally {
-        this.inFlight.delete(key);
-      }
-    })();
-
-    this.inFlight.set(key, promise);
-    return promise;
-  }
-
-  public getCachedFarms(userUid?: string): LivestockFarm[] | null {
-    const farmKey = userUid || 'all';
-    const cached = this.farmsCache[farmKey];
-    return cached ? cached.data : null;
-  }
-
-  public setFarmsCache(farms: LivestockFarm[], userUid?: string) {
-    const farmKey = userUid || 'all';
-    this.farmsCache[farmKey] = { data: farms, timestamp: Date.now() };
-    this.emit(`farms_${farmKey}`, farms);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // 7. PREDICTIVE NAVIGATION INTENT PRE-FETCHING
+  // 6. PREDICTIVE NAVIGATION INTENT PRE-FETCHING
   // ─────────────────────────────────────────────────────────────
 
   /**
@@ -409,8 +358,6 @@ class PredictivePrefetchService {
       this.prefetchPetAds();
     } else if (s === 'jobs' || s === 'job_board') {
       this.prefetchJobs();
-    } else if (s === 'livestock' || s === 'farm') {
-      this.prefetchLivestock(userUid);
     }
   }
 
@@ -443,13 +390,6 @@ class PredictivePrefetchService {
       this.prefetchMarketplace();
       this.prefetchJobs();
     }, 3000);
-
-    // 4. Warm up Livestock
-    if (userUid) {
-      schedule(() => {
-        this.prefetchLivestock(userUid);
-      }, 4500);
-    }
   }
 }
 

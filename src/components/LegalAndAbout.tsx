@@ -25,7 +25,7 @@ Operated by: VetAxis Healthcare Network
 By creating an account, browsing, or utilizing any feature of VetAxis 360, you confirm that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, you must discontinue using the platform immediately. These terms apply equally to all users, including Pet Owners, Livestock Farmers, Licensed Veterinarians (DVM), Certified Clinics, and Veterinary Nursing Assistants.
 
 2. Nature of Platform & Medical Disclaimer
-VetAxis 360 is an independent technology directory, farm ledger, and clinical management ecosystem. VetAxis 360 does not directly dispense medical prescriptions, perform surgeries, or provide direct emergency clinical diagnosis. All veterinary advice, clinical procedures, treatments, and prescriptions are provided strictly by independent, licensed veterinary professionals. In acute animal emergencies, users must physically transport animals to verified 24/7 veterinary hospitals.
+VetAxis 360 is an independent technology directory, veterinary resource network, and clinical care ecosystem. VetAxis 360 does not directly dispense medical prescriptions, perform surgeries, or provide direct emergency clinical diagnosis. All veterinary advice, clinical procedures, treatments, and prescriptions are provided strictly by independent, licensed veterinary professionals. In acute animal emergencies, users must physically transport animals to verified 24/7 veterinary hospitals.
 
 3. User Eligibility & Account Integrity
 To register an account or interact with commercial/medical features, users must:
@@ -74,7 +74,7 @@ VetAxis 360 displays third-party advertisements served by Google AdSense to fund
 
 4. How We Use & Protect Your Information
 - Facilitating direct appointments between pet owners and licensed DVM doctors.
-- Processing digital QR pet passports and farm management analytics.
+- Processing digital QR pet passports and verified veterinary profiles.
 - Private contact details of pet owners are never sold, rented, or broadcast to third-party telemarketers.
 - All stored records utilize industry-standard TLS encryption and authenticated cloud access controls.
 
@@ -324,9 +324,9 @@ export function AboutUsPage({ onNavigate }: NavigablePageProps) {
 
           <div className="p-5 rounded-2xl bg-[#fbfaf6] border border-[#e3dec9]">
             <div className="text-2xl mb-2">🐄</div>
-            <h3 className="text-base font-serif font-black text-[#2b2b24]">Livestock &amp; Dairy Ledgers</h3>
+            <h3 className="text-base font-serif font-black text-[#2b2b24]">Veterinary Clinical Intelligence</h3>
             <p className="text-xs text-[#5a5a40] mt-1 leading-relaxed">
-              Cloud-backed herd tracking, digital ear-tag management, lactation schedules, and automated disease alerts for commercial and rural breeders.
+              Clinical diagnostic formulas, fluid therapy calculators, drug dosages, and evidence-based reference guidelines for practitioners.
             </p>
           </div>
 
@@ -518,7 +518,7 @@ Sent via VetAxis 360 Web Portal`;
           <div className="bg-[#fbfaf6] rounded-3xl border border-[#e3dec9] p-5 text-xs text-[#5a5a40] space-y-2">
             <h3 className="font-bold text-[#2b2b24]">Verified Clinic &amp; DVM Inquiries</h3>
             <p>
-              Are you a licensed veterinary hospital or DVM practitioner seeking verification or clinic management access? Send a note via WhatsApp or Gmail for priority review.
+              Are you a licensed veterinary hospital or DVM practitioner seeking directory verification or practice profile review? Send a note via WhatsApp or Gmail for priority review.
             </p>
           </div>
         </div>

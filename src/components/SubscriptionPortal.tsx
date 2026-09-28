@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { AuthService, PromotionalAdsService, PaymentService, secureSetItem } from '../lib/storage';
-import { LivestockService } from '../lib/livestockService';
 
 interface SubscriptionPortalProps {
   currentUser: UserProfile;
@@ -33,11 +32,10 @@ export function SubscriptionPortal({
       badgeColor: 'bg-slate-100 text-slate-700 border-slate-300',
       icon: '✦',
       benefits: [
-        'Full Clinic Management Facility (Clinics only)',
+        'Official Verified Practice Profile on Directory',
         'Premium Silver badge on directory portfolio',
         'Custom interactive 3D Silver member card',
         'High directory sorted listing rank',
-        'Manage up to 3 Farm Workspaces',
         '15 FREE Emergency Radar Alerts',
         'Unlimited Product & Pet Ads',
         'Post up to 3 FREE Veterinary Billboard Ads'
@@ -53,15 +51,13 @@ export function SubscriptionPortal({
       badgeColor: 'bg-amber-100 text-amber-950 border-amber-300',
       icon: '👑',
       benefits: [
-        'Full Clinic Management Facility (Clinics only)',
         'Official Gold partner directory badge',
         'Durable Guilloche golden 3D member card styling',
         'Advanced directory listing sort priority',
-        'Manage up to 10 Farm Workspaces',
         '30 FREE Emergency Radar Alerts',
         'Unlimited Product & Pet Ads',
         'Post up to 5 FREE Veterinary Billboard Ads',
-        'Advanced customized digital clinic analytics'
+        'Priority Appointment Booking for Clients'
       ],
       popular: true
     },
@@ -75,10 +71,8 @@ export function SubscriptionPortal({
       badgeColor: 'bg-indigo-900/10 text-indigo-700 border-indigo-200',
       icon: '💎',
       benefits: [
-        'Full Clinic Management Facility (Clinics only)',
         'Ultra Elite interactive holographic 3D dark metal card',
         'Absolute topmost search directory ranking',
-        'Manage Unlimited Farm Workspaces',
         'Unlimited FREE Emergency Radar Alerts',
         'Unlimited Product & Pet Ads',
         'Post up to 10 FREE Veterinary Billboard Ads',
@@ -854,28 +848,6 @@ export function SubscriptionPortal({
             </thead>
             <tbody className="divide-y divide-[#f4f1e9] font-semibold text-[#373735]">
               {/* CATEGORY 1 */}
-              <tr className="bg-stone-50/80">
-                <td colSpan={5} className="p-3 pl-6 font-black text-[#5a5a40] tracking-wider uppercase text-[9px] border-y border-[#e3dec9]/60">
-                  🏥 Clinical Operations & Practice Management
-                </td>
-              </tr>
-              <tr>
-                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Clinic Management Access</td>
-                <td className={`p-4 text-center text-red-500 font-extrabold ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>❌ Restricted / Locked</td>
-                <td className={`p-4 text-center text-emerald-700 font-extrabold ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>✅ Fully Unlocked</td>
-                <td className={`p-4 text-center text-emerald-700 font-extrabold ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>✅ Fully Unlocked</td>
-                <td className={`p-4 text-center text-emerald-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>✅ Fully Unlocked</td>
-              </tr>
-              <tr>
-                <td className="p-4 pl-6 text-[#5a5a40] font-bold">Farm Workspaces managed</td>
-                <td className={`p-4 text-center text-red-500 ${!currentUser.subscriptionTier ? 'bg-amber-50/10' : ''}`}>Max 1 Farm</td>
-                <td className={`p-4 text-center text-slate-700 ${currentUser.subscriptionTier === 'Silver' ? 'bg-slate-100/10' : ''}`}>Max 3 Farms</td>
-                <td className={`p-4 text-center text-amber-800 ${currentUser.subscriptionTier === 'Gold' ? 'bg-amber-50/10' : ''}`}>Max 10 Farms</td>
-                <td className={`p-4 text-center text-indigo-700 font-extrabold ${currentUser.subscriptionTier === 'Platinum' ? 'bg-indigo-50/10' : ''}`}>Unlimited Farms</td>
-              </tr>
-
-
-              {/* CATEGORY 2 */}
               <tr className="bg-stone-50/80">
                 <td colSpan={5} className="p-3 pl-6 font-black text-[#5a5a40] tracking-wider uppercase text-[9px] border-y border-[#e3dec9]/60">
                   📢 Directory & Professional Branding

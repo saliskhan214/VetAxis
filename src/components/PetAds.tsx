@@ -3,7 +3,7 @@ import { UserProfile, PetAd } from '../types';
 import { PetAdsService, CommunityService } from '../lib/storage';
 import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X } from 'lucide-react';
+import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { AdContainer } from './AdContainer';
 
 interface PetAdsProps {
@@ -32,7 +32,25 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(true);
+  const [safeTradeOpen, setSafeTradeOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('vetaxis_safe_trade_guide_open');
+      return saved !== null ? saved === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSafeTrade = () => {
+    setSafeTradeOpen(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('vetaxis_safe_trade_guide_open', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const [legalAgreed, setLegalAgreed] = useState<boolean>(false);
 
   // Form states
@@ -89,7 +107,10 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
     }
   };
 
-  const visibleBoostedPosts = boostedPosts.filter(p => !dismissedAlertIds.includes(p.id));
+  const visibleBoostedPosts = boostedPosts.filter(p => {
+    const fifteenDaysAgo = Date.now() - 15 * 24 * 60 * 60 * 1000;
+    return !dismissedAlertIds.includes(p.id) && (p.ts || 0) >= fifteenDaysAgo;
+  });
 
   const storiesContainerRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -154,7 +175,10 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
   const loadBoostedEmergencyPosts = async () => {
     try {
       const posts = await CommunityService.fetchPosts();
-      const boosted = posts.filter((p: any) => p.isBoosted);
+      const fifteenDaysAgo = Date.now() - 15 * 24 * 60 * 60 * 1000;
+      const boosted = posts.filter((p: any) => 
+        (p.isBoosted || p.category === 'emergency') && (p.ts || 0) >= fifteenDaysAgo
+      );
       setBoostedPosts(boosted);
     } catch (err) {
       console.error('Failed to load boosted emergency posts in PetAds section', err);
@@ -237,14 +261,15 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
     }
 
     // Subscription Limit check for posting classified ads:
-    // Subscribed (clinics/doctors) can post unlimited with 90 days expiration visibility (already implemented).
-    // Unsubscribed general users, clinics, and doctors are restricted to Maximum 3 pet ads weekly (rolling 7 days) with 30 Days expiration cycle.
+    // Certified vendors, clinics, and doctors post classified advertisements with 15 days active validity (auto-expires after 15 days).
+    // Unsubscribed general users are restricted to maximum 3 pet ads weekly (rolling 7 days).
     const isPremium = !!currentUser.subscriptionTier;
-    if (!isPremium) {
+    const isVendor = currentUser.role === 'vendor';
+    if (!isPremium && !isVendor) {
       const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       const myWeeklyAdsCount = ads.filter(a => a.ownerEmail === currentUser.email && a.createdAt >= oneWeekAgo).length;
       if (myWeeklyAdsCount >= 3) {
-        setFormError('⚠️ Weekly Limit Reached: Unsubscribed accounts (including general users, clinics, and doctors) are allowed to post a maximum of 3 pet classified advertisements weekly. Please upgrade inside the Practitioner Billing Centre to enjoy unlimited posting with 90 days retention!');
+        setFormError('⚠️ Weekly Limit Reached: Unsubscribed accounts are allowed to post a maximum of 3 pet classified advertisements weekly. Upgrade inside the Billing Centre to enjoy unlimited posting with priority highlighting!');
         return;
       }
     }
@@ -321,6 +346,20 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
       const max = parseFloat(maxPrice);
       if (!isNaN(min) && a.price < min) return false;
       if (!isNaN(max) && a.price > max) return false;
+
+      // Auto-disappear after 15 days for vendors, clinics, doctors, and emergency/unsubscribed ads
+      const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
+      const is15DayAd = a.ownerRole === 'vendor' || 
+                        a.ownerRole === 'clinic' || 
+                        a.ownerRole === 'doctor' || 
+                        a.description?.toLowerCase().includes('emergency') || 
+                        a.petType?.toLowerCase().includes('emergency') || 
+                        (a as any).isEmergency || 
+                        (a as any).isBoosted ||
+                        !a.isPremium;
+      if (is15DayAd && Date.now() - a.createdAt > fifteenDaysMs) {
+        return false;
+      }
 
       return true;
     })
@@ -450,7 +489,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
                       EMERGENCY STORIES
                     </span>
                     <span className="text-[10px] text-red-900/80 font-bold">
-                      Active 30 Days Signal Life
+                      Active 15 Days Signal Life
                     </span>
                   </div>
                   <h3 className="font-serif font-black text-red-950 text-lg leading-tight">
@@ -486,7 +525,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
               <div className="grid grid-cols-1 gap-4 mt-2 z-10 w-full relative">
                 {visibleBoostedPosts.map((post) => {
                   const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
-                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const daysRemaining = Math.max(1, 15 - daysPassed);
                   const hasImage = post.images && post.images.length > 0;
                   
                   return (
@@ -570,7 +609,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
               >
                 {visibleBoostedPosts.map((post) => {
                   const daysPassed = Math.floor((Date.now() - post.ts) / (24 * 60 * 60 * 1000));
-                  const daysRemaining = Math.max(1, 30 - daysPassed);
+                  const daysRemaining = Math.max(1, 15 - daysPassed);
                   const hasImage = post.images && post.images.length > 0;
                   
                   return (
@@ -642,35 +681,66 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
       })()}
 
       {/* 🛡️ SAFE TRADING COMPLIANCE & LEGAL PROTECTION CENTER */}
-      <div className="bg-[#fcf9f2] border-2 border-amber-200 border-b-[6px] border-b-amber-300 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between border-b border-amber-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-lg">🛡️</div>
-            <div>
-              <h3 className="font-serif font-black text-sm md:text-base text-stone-900">
-                Safe Trading Compliance & Anti-Scam Precautions
-              </h3>
-              <p className="text-[10px] md:text-xs font-bold text-stone-500">
+      <div className="bg-[#fcf9f2] border-2 border-amber-200 border-b-[6px] border-b-amber-300 rounded-3xl p-4 sm:p-5 md:p-6 space-y-4 shadow-sm transition-all">
+        <div 
+          onClick={toggleSafeTrade}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSafeTrade(); } }}
+          className="flex items-center justify-between border-b border-amber-100 pb-3 cursor-pointer select-none group hover:bg-amber-100/30 -mx-2 px-2 rounded-xl transition-colors"
+          title={safeTradeOpen ? 'Click to hide compliance details' : 'Click to show compliance details'}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">🛡️</div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif font-black text-sm md:text-base text-stone-900 truncate">
+                  Safe Trading Compliance & Anti-Scam Precautions
+                </h3>
+                {safeTradeOpen ? (
+                  <ChevronUp className="w-4 h-4 text-amber-700 shrink-0" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
+                )}
+              </div>
+              <p className="text-[10px] md:text-xs font-bold text-stone-500 truncate">
                 Mandatory directives for secure transactions on local classified forums.
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() => setSafeTradeOpen(!safeTradeOpen)}
-            className="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-[10px] font-black uppercase text-stone-700 rounded-lg border border-stone-200 transition-all cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSafeTrade();
+            }}
+            className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all cursor-pointer shrink-0 ml-2 shadow-2xs flex items-center gap-1 ${
+              safeTradeOpen 
+                ? 'bg-stone-200 hover:bg-stone-300 text-stone-800 border-stone-300' 
+                : 'bg-amber-600 hover:bg-amber-700 text-white border-amber-700 animate-pulse'
+            }`}
           >
-            {safeTradeOpen ? 'Hide Panel' : 'Show Guide'}
+            {safeTradeOpen ? (
+              <>
+                <ChevronUp className="w-3 h-3" /> Hide Panel
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3" /> Show Guide
+              </>
+            )}
           </button>
         </div>
 
-        {safeTradeOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-4"
-          >
+        <AnimatePresence initial={false}>
+          {safeTradeOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="space-y-4 overflow-hidden"
+            >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Alert 1 */}
               <div className="p-3 bg-white rounded-2xl border border-amber-100 text-left space-y-1.5">
@@ -712,6 +782,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
             </div>
           </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* TOAST SYSTEM */}
@@ -769,9 +840,15 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
               exit={{ opacity: 0, height: 0, y: -20 }}
               className="mt-5 bg-white border border-[#e3dec9] border-b-[5px] border-b-[#cdc6ad] p-6 rounded-3xl shadow-md overflow-hidden space-y-5"
             >
-              <div className="flex items-center gap-2 border-b border-[#f4f1e9] pb-3">
-                <Tag className="w-5 h-5 text-[#5a5a40]" />
-                <h3 className="font-serif font-black text-lg text-[#373735]">Publish Pet Classified Ad</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f4f1e9] pb-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-[#5a5a40]" />
+                  <h3 className="font-serif font-black text-lg text-[#373735]">Publish Pet Classified Ad</h3>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-xl inline-flex items-center gap-1 shadow-2xs">
+                  <Clock className="w-3 h-3 text-amber-700" />
+                  <span>Active 15 Days · Auto-Expires</span>
+                </span>
               </div>
 
               {formError && (
@@ -1131,6 +1208,8 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
             }
 
             const isHighlighted = highlightAdId === ad.id;
+            const daysPassed = Math.floor((Date.now() - ad.createdAt) / (24 * 60 * 60 * 1000));
+            const daysRemaining = Math.max(1, 15 - daysPassed);
             return (
               <React.Fragment key={ad.id}>
                 <motion.div
@@ -1194,6 +1273,17 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
                       }`}>
                         <MapPin className="w-3 h-3 text-amber-500" />
                         <span>{ad.location}</span>
+                      </span>
+
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase border font-mono ${
+                        daysRemaining <= 3
+                          ? 'bg-red-50 border-red-200 text-red-700'
+                          : tier === 'Platinum'
+                            ? 'bg-zinc-800 border-zinc-700 text-teal-300'
+                            : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                      }`} title="Classified listings automatically disappear after 15 days">
+                        <Clock className={`w-3 h-3 ${daysRemaining <= 3 ? 'text-red-500' : 'text-amber-600'}`} />
+                        <span>{daysRemaining}d left</span>
                       </span>
                     </div>
 

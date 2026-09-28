@@ -19,11 +19,10 @@ export function SubscriptionPricingPublic({ onSignIn, onNavigate }: Subscription
       color: 'border-slate-300 bg-white',
       badgeColor: 'bg-slate-100 text-slate-800 border-slate-300',
       features: [
-        'Full Clinic Management Facility (Verified Clinics)',
+        'Official Verified Practice Profile on Directory',
         'Silver Verified Badge on Directory & Search Listings',
         'Interactive 3D Silver Member Card on Public Profile',
         'Elevated Search Ranking in City Clinic Directory',
-        'Manage up to 3 Commercial Farm Workspaces',
         '15 Monthly Emergency Radar Proximity Alerts',
         'Unlimited Pet Adoption & Product Listings',
         '3 Free Billboard Promotions in News Brief'
@@ -36,15 +35,13 @@ export function SubscriptionPricingPublic({ onSignIn, onNavigate }: Subscription
       period: 'per month',
       badge: 'Most Popular',
       popular: true,
-      description: 'Designed for high-volume 24/7 veterinary hospitals, surgical centers, and commercial farms.',
+      description: 'Designed for high-volume 24/7 veterinary hospitals and specialized surgical centers.',
       color: 'border-amber-400 bg-gradient-to-b from-amber-50/40 via-white to-amber-50/20',
       badgeColor: 'bg-amber-600 text-white border-amber-600',
       features: [
-        'Full Clinic Management Facility (Verified Clinics)',
         'Official Gold Authority Partner Directory Badge',
         'Golden Guilloche 3D Membership Card Styling',
         'High Priority Placement in "Vets Near Me" Search',
-        'Manage up to 10 Commercial Farm Workspaces',
         '30 Monthly Emergency Radar Proximity Alerts',
         'Unlimited Pet Adoption & Product Listings',
         '5 Free Billboard Promotions in News Brief',
@@ -58,14 +55,12 @@ export function SubscriptionPricingPublic({ onSignIn, onNavigate }: Subscription
       price: 'PKR 8,000',
       period: 'per month',
       badge: 'Hospital Network',
-      description: 'The ultimate tier for major veterinary hospital groups, universities, and commercial dairy cooperatives.',
+      description: 'The ultimate tier for major veterinary hospital groups, medical centres, and healthcare cooperatives.',
       color: 'border-indigo-300 bg-gradient-to-b from-indigo-50/40 via-white to-purple-50/20',
       badgeColor: 'bg-indigo-900 text-white border-indigo-900',
       features: [
-        'Full Clinic Management Facility & Multi-Staff Queue',
         'Topmost Search Placement across Pakistan',
         'Holographic Diamond Badge on Search & Profile',
-        'Manage Unlimited Commercial Farm Workspaces',
         'Unlimited Emergency Radar Proximity Alerts',
         'Unlimited Pet Adoption & Product Listings',
         '10 Free Billboard Promotions in News Brief',
@@ -85,8 +80,8 @@ export function SubscriptionPricingPublic({ onSignIn, onNavigate }: Subscription
       a: 'We accept Bank Wire Transfer, JazzCash, and EasyPaisa. After initiating a plan, submit your transaction ID receipt for rapid verification by our administrative team.'
     },
     {
-      q: 'What is the Clinic Management facility?',
-      a: 'Our digital EHR suite allows clinics to manage outpatient appointments, maintain digital patient records, monitor triage queues, and issue electronic vaccination certificates.'
+      q: 'What benefits do verified practitioners receive?',
+      a: 'Verified practitioners receive official trust badges across search listings, top directory rankings, priority emergency radar alerts, and promotional spotlight privileges.'
     },
     {
       q: 'Can I cancel or change my plan anytime?',
@@ -107,7 +102,7 @@ export function SubscriptionPricingPublic({ onSignIn, onNavigate }: Subscription
           Accelerate Your Practice with Pakistan's Leading Veterinary Network
         </h1>
         <p className="text-sm sm:text-base text-stone-600 font-medium leading-relaxed">
-          Attract pet owners seeking verified DVM care, unlock complete digital hospital management tools, and rank at the top of local directory searches.
+          Attract pet owners seeking verified DVM care, elevate your practice reputation, and rank at the top of local directory searches.
         </p>
       </div>
 
