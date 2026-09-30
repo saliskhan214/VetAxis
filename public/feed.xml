@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>VetAxis 360 – Pakistan's Veterinary &amp; Clinical Care Network</title>
+    <link>https://vetaxis360.com/</link>
+    <description>Latest clinical veterinary intelligence, animal healthcare news, emergency pet hospital updates, and verified DVM job announcements across Pakistan.</description>
+    <language>en-pk</language>
+    <lastBuildDate>Wed, 30 Sep 2026 05:00:00 +0500</lastBuildDate>
+    <atom:link href="https://vetaxis360.com/feed.xml" rel="self" type="application/rss+xml" />
+
+    <item>
+      <title>AAHA Canine &amp; Feline Vaccination Guidelines (Core vs Non-Core Schedule)</title>
+      <link>https://vetaxis360.com/?tab=news&amp;topic=aaha_vaccine_guidelines</link>
+      <guid>https://vetaxis360.com/?tab=news&amp;topic=aaha_vaccine_guidelines</guid>
+      <pubDate>Mon, 28 Sep 2026 08:00:00 +0500</pubDate>
+      <description>Comprehensive core vaccination schedule for puppies and kittens: Parvovirus, Distemper, Adenovirus, Rabies, and FVRCP booster protocols.</description>
+    </item>
+
+    <item>
+      <title>Canine Blood Test Normal Ranges &amp; Reference Guide</title>
+      <link>https://vetaxis360.com/?tab=clinical_tools&amp;sub=blood_chart</link>
+      <guid>https://vetaxis360.com/?tab=clinical_tools&amp;sub=blood_chart</guid>
+      <pubDate>Wed, 23 Sep 2026 12:00:00 +0500</pubDate>
+      <description>Diagnostic reference ranges for veterinary practitioners and pet owners: Complete Blood Count (CBC), serum biochemistry (BUN, Creatinine, ALT, ALKP), and electrolyte interpretations.</description>
+    </item>
+
+    <item>
+      <title>International Pet Travel Guidelines: USDA APHIS, CDC &amp; IATA Flight Crate Rules</title>
+      <link>https://vetaxis360.com/?tab=news&amp;topic=pet_travel</link>
+      <guid>https://vetaxis360.com/?tab=news&amp;topic=pet_travel</guid>
+      <pubDate>Fri, 18 Sep 2026 10:00:00 +0500</pubDate>
+      <description>Complete travel checklist: ISO 11784 microchipping, rabies serology titer tests (FAVN), Animal Health Certificates, and airline carrier dimensions.</description>
+    </item>
+
+    <item>
+      <title>24/7 Emergency Veterinary Hospitals &amp; Walk-in Clinics Directory</title>
+      <link>https://vetaxis360.com/?tab=explore&amp;filter=emergency</link>
+      <guid>https://vetaxis360.com/?tab=explore&amp;filter=emergency</guid>
+      <pubDate>Tue, 15 Sep 2026 14:00:00 +0500</pubDate>
+      <description>Instant directory of emergency veterinary hospitals, night trauma surgeons, and mobile home visit animal doctors open now across Islamabad, Lahore, Karachi, and nationwide.</description>
+    </item>
+  </channel>
+</rss>

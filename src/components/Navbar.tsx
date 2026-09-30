@@ -72,6 +72,7 @@ export function Navbar({
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
     { id: 'messenger', label: 'Messenger', icon: '💬' },
     { id: 'clinical_tools', label: 'Vet & Pet Calculators', icon: '🧮' },
+    { id: 'directory', label: 'SEO & Search Hub', icon: '🚀' },
     { id: 'community', label: 'Community', icon: '💬' },
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },

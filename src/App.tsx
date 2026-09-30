@@ -31,6 +31,7 @@ import { Footer } from './components/Footer';
 import { SearchDiscoveryHub } from './components/SearchDiscoveryHub';
 import PageNotFound from './components/PageNotFound';
 import { PrefetchService } from './lib/prefetchService';
+import { seoService } from './lib/seoService';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -205,108 +206,13 @@ export default function App() {
     }
   }, [currentUser?.uid]);
 
-  // Dynamic SEO meta tags and Title management per active section
+  // Dynamic SEO meta tags, OpenGraph cards, Twitter cards & Schema.org JSON-LD management
   useEffect(() => {
-    const titles: Record<string, string> = {
-      explore: "VetAxis 360 – Pakistan's Veterinary & Clinical Care Network",
-      clinical_tools: "Veterinary Clinical Intelligence & Diagnostic Suite | VetAxis 360",
-      jobs: "Veterinary Doctor Careers & Hospital Recruitment | VetAxis 360",
-      pet_ads: "Ethical Pet Adoption, Rescues & Missing Pet Alerts | VetAxis 360",
-      marketplace: "Veterinary Medicine, Clinical Equipment & Supplies | VetAxis 360",
-      community: "DVM Community Forum, Case Studies & Clinical CE | VetAxis 360",
-      news: "Veterinary News, Health Alerts & Travel Guidelines | VetAxis 360",
-      subscription: "Practitioner Credentials & Verification Portal | VetAxis 360",
-      profile: "Veterinary Profile & Pet Medical Passports | VetAxis 360",
-      about: "About VetAxis 360 | Premier Veterinary Care Ecosystem",
-      directory: "Veterinary Directory & Clinical Search | VetAxis 360",
-      terms: "Terms of Service | VetAxis 360",
-      privacy: "Privacy Policy & Medical Data Security | VetAxis 360",
-      contact: "Contact & Clinical Support | VetAxis 360"
-    };
-
-    const descriptions: Record<string, string> = {
-      explore: "Pakistan's premier veterinary clinical community platform. Connect with qualified doctors, general hospitals, nurse assistant directories, veterinary calculators, and certified marketplace products.",
-      clinical_tools: "Clinical veterinary intelligence suite: Canine blood test reference ranges, Parvovirus day-by-day triage, Feline CKD staging, and drug dosage calculators on VetAxis 360.",
-      jobs: "Browse open veterinary doctor jobs, hospital vacancies, and clinical assistant positions across Pakistan on VetAxis 360.",
-      pet_ads: "Adopt rescue pets from verified shelters, browse loving companion animal listings, and review safe pet adoption guidelines on VetAxis 360.",
-      marketplace: "Certified veterinary medical supplies: prescription medicines, diagnostic kits, ultrasound equipment, and surgical instruments on VetAxis 360.",
-      community: "Connect with veterinarians and DVM students. Share clinical cases, surgical protocols, and accredited continuing education webinars on VetAxis 360.",
-      news: "Official veterinary health guidelines: pet international travel requirements (USDA/IATA), vaccine schedules, and animal health alerts.",
-      subscription: "Veterinary practitioner subscriptions: verify clinical credentials, publish billboard listings, and enable client bookings on VetAxis 360.",
-      profile: "Manage your veterinary practitioner credentials, client consultations, and digital pet medical passports.",
-      about: "Learn about VetAxis 360, Pakistan's premier veterinary care and clinical intelligence ecosystem.",
-      directory: "Search Pakistan veterinary services: verified clinics, animal doctors, emergency care, and diagnostic tools.",
-      terms: "Terms of Service and clinical usage policies for the VetAxis 360 platform.",
-      privacy: "Privacy policy and veterinary medical data protection standards on VetAxis 360.",
-      contact: "Get in touch with the VetAxis 360 support and clinical emergency response triage team."
-    };
-
-    const socialTitles: Record<string, string> = {
-      explore: "VetAxis 360 – Pakistan's Veterinary & Clinical Care Network",
-      clinical_tools: "VetAxis 360 – Veterinary Clinical Suite & Calculators",
-      jobs: "VetAxis 360 – Veterinary Doctor Careers & Hospital Recruitment",
-      pet_ads: "VetAxis 360 – Ethical Pet Adoption & Animal Rescues",
-      marketplace: "VetAxis 360 – Certified Veterinary Medicine & Supplies",
-      community: "VetAxis 360 – DVM Peer Community & Case Discussions",
-      news: "VetAxis 360 – Veterinary Guidelines & Health Alerts",
-      subscription: "VetAxis 360 – Professional Verification & Tiers",
-      profile: "VetAxis 360 – Veterinary Profile & Pet Passports",
-      about: "VetAxis 360 – Premier Veterinary Care Platform",
-      directory: "VetAxis 360 – Veterinary Directory & Search",
-      terms: "VetAxis 360 – Clinical Terms of Service",
-      privacy: "VetAxis 360 – Data Privacy & Medical Security",
-      contact: "VetAxis 360 – Clinical Support & Triage"
-    };
-
-    if (titles[activeSection]) {
-      document.title = titles[activeSection];
-
-      // Update meta description
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc && descriptions[activeSection]) {
-        metaDesc.setAttribute('content', descriptions[activeSection]);
-      }
-
-      // Update og:title & twitter:title with clean, branded titles
-      const sTitle = socialTitles[activeSection] || "VetAxis 360 | Premier Veterinary Care & 24/7 Emergency Animal Clinics";
-      const ogTitle = document.querySelector('meta[property="og:title"]');
-      if (ogTitle) ogTitle.setAttribute('content', sTitle);
-      const twTitle = document.querySelector('meta[name="twitter:title"]');
-      if (twTitle) twTitle.setAttribute('content', sTitle);
-
-      // Update og:description & twitter:description
-      if (descriptions[activeSection]) {
-        const ogDesc = document.querySelector('meta[property="og:description"]');
-        if (ogDesc) ogDesc.setAttribute('content', descriptions[activeSection]);
-        const twDesc = document.querySelector('meta[name="twitter:description"]');
-        if (twDesc) twDesc.setAttribute('content', descriptions[activeSection]);
-      }
-
-      // Update og:image and twitter:image to guaranteed branded asset
-      try {
-        const previewImageUrl = `${window.location.origin}/og-image.png`;
-        const ogImg = document.querySelector('meta[property="og:image"]');
-        if (ogImg) ogImg.setAttribute('content', previewImageUrl);
-        const ogSecureImg = document.querySelector('meta[property="og:image:secure_url"]');
-        if (ogSecureImg) ogSecureImg.setAttribute('content', previewImageUrl);
-        const twImg = document.querySelector('meta[name="twitter:image"]');
-        if (twImg) twImg.setAttribute('content', previewImageUrl);
-      } catch (e) {
-        // Ignored
-      }
-
-      // Update canonical URL & og:url
-      try {
-        const canonicalUrl = `${window.location.origin}/?tab=${activeSection}`;
-        const canonical = document.querySelector('link[rel="canonical"]');
-        if (canonical) canonical.setAttribute('href', canonicalUrl);
-        const ogUrl = document.querySelector('meta[property="og:url"]');
-        if (ogUrl) ogUrl.setAttribute('content', canonicalUrl);
-      } catch (e) {
-        // Ignored in non-browser context
-      }
-    }
-  }, [activeSection]);
+    seoService.updateSEO({
+      tabKey: activeSection,
+      city: initialCity || undefined
+    });
+  }, [activeSection, initialCity]);
 
   // Predictive Movement & Pre-fetching Engine initialization
   useEffect(() => {

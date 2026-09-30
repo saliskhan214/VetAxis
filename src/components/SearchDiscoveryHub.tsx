@@ -20,8 +20,11 @@ import {
   FileText,
   BadgePercent,
   Plane,
-  Calculator
+  Calculator,
+  TrendingUp,
+  Award
 } from 'lucide-react';
+import { SEOGrowthCenter } from './SEOGrowthCenter';
 
 interface SearchQueryItem {
   query: string;
@@ -880,6 +883,7 @@ interface SearchDiscoveryHubProps {
 }
 
 export function SearchDiscoveryHub({ onNavigate, onClose }: SearchDiscoveryHubProps) {
+  const [viewMode, setViewMode] = useState<'growth_engine' | 'clusters'>('growth_engine');
   const [activeClusterId, setActiveClusterId] = useState<string>('all');
   const [filterQuery, setFilterQuery] = useState<string>('');
 
@@ -990,8 +994,49 @@ export function SearchDiscoveryHub({ onNavigate, onClose }: SearchDiscoveryHubPr
         </div>
       </div>
 
-      {/* Cluster Navigation Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-2 bg-[#fcfbf9] border border-[#e3dec9] p-2 rounded-2xl shadow-sm">
+      {/* Top Main Mode Selector: Growth Engine vs Search Clusters */}
+      <div className="flex items-center gap-2 p-1.5 bg-[#f3efe4] rounded-2xl border border-[#e3dec9] max-w-xl">
+        <button
+          onClick={() => setViewMode('growth_engine')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            viewMode === 'growth_engine'
+              ? 'bg-[#5a5a40] text-white shadow-sm border border-[#3e3e2b]'
+              : 'text-stone-700 hover:text-stone-900 hover:bg-white/60'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <span>SEO &amp; Traffic Growth Center</span>
+          <span className="text-[9px] bg-emerald-700 text-white px-1.5 py-0.5 rounded font-mono font-bold">LIVE</span>
+        </button>
+
+        <button
+          onClick={() => setViewMode('clusters')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            viewMode === 'clusters'
+              ? 'bg-[#5a5a40] text-white shadow-sm border border-[#3e3e2b]'
+              : 'text-stone-700 hover:text-stone-900 hover:bg-white/60'
+          }`}
+        >
+          <Search className="w-4 h-4" />
+          <span>Search Queries Directory ({totalQueriesCount})</span>
+        </button>
+      </div>
+
+      {viewMode === 'growth_engine' ? (
+        <SEOGrowthCenter
+          onNavigateToCity={(city) => {
+            onNavigate('explore', city);
+            if (onClose) onClose();
+          }}
+          onNavigateToSection={(sect) => {
+            onNavigate(sect);
+            if (onClose) onClose();
+          }}
+        />
+      ) : (
+        <>
+          {/* Cluster Navigation Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2 bg-[#fcfbf9] border border-[#e3dec9] p-2 rounded-2xl shadow-sm">
         <button
           onClick={() => setActiveClusterId('all')}
           className={`cursor-pointer px-4 py-2 text-xs font-black rounded-xl border transition-all ${
@@ -1120,6 +1165,8 @@ export function SearchDiscoveryHub({ onNavigate, onClose }: SearchDiscoveryHubPr
           })
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
