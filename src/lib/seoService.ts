@@ -113,6 +113,15 @@ export const PAKISTAN_CITIES_SEO: CitySEOData[] = [
     approxMonthlyQueries: '11,000+',
     topAreas: ['Sialkot Cantt', 'Model Town', 'Ugoki', 'Kashmir Road', 'Defence Road'],
     emergencyFocus: 'Veterinary surgical instrument precision standards, microchipping, and pet travel certificates.'
+  },
+  {
+    city: 'Hyderabad',
+    province: 'Sindh',
+    tagline: '24/7 Companion Animal Healthcare, Pet Vaccinations & Emergency Care in Hyderabad',
+    searchKeywords: ['vet clinic hyderabad latifabad', 'pet doctor hyderabad autobhan', 'emergency animal hospital hyderabad sindh', 'cheap vet in hyderabad'],
+    approxMonthlyQueries: '16,000+',
+    topAreas: ['Auto Bhan Road', 'Latifabad Unit 1-12', 'Qasimabad', 'Saddar', 'Citizen Colony'],
+    emergencyFocus: 'Round-the-clock emergency canine trauma triage, parvovirus inpatient isolation, and routine doorstep vaccines.'
   }
 ];
 
@@ -123,6 +132,27 @@ export const SEO_PROFILES: Record<string, SEOConfig> = {
     keywords: ['vet near me', 'emergency vet 24 hours', 'best vet open now', 'walk in pet clinic', 'veterinary hospital lahore', 'pet doctor karachi', 'animal clinic islamabad', 'vetaxis 360'],
     ogType: 'website',
     canonicalUrl: 'https://vetaxis360.com/?tab=explore'
+  },
+  radar: {
+    title: "Smart Vet Radar – Find Nearest Veterinary Clinics & 24/7 Emergency Care | VetAxis 360",
+    description: "Instantly scan and locate certified veterinary clinics, 24/7 pet emergency hospitals, and home-visit animal doctors near your current location across Pakistan. Real-time GPS distance calculation and 1-tap Google Maps directions.",
+    keywords: ['vet near me', 'clinic near me', 'animal hospital near me', 'emergency vet near me 24 hours', 'closest vet to my location', 'walk in pet clinic near me', '24 hour emergency animal doctor', 'pet clinic open now near me'],
+    ogType: 'website',
+    canonicalUrl: 'https://vetaxis360.com/?tab=radar'
+  },
+  cities: {
+    title: "Pakistan Veterinary Hospital & Clinic City Directory | VetAxis 360",
+    description: "Browse certified veterinary clinics, animal hospitals, and emergency animal trauma centers across all major cities in Pakistan: Lahore, Karachi, Islamabad, Rawalpindi, Faisalabad, Multan, and Peshawar.",
+    keywords: ['veterinary clinic lahore', 'pet doctor karachi', 'animal hospital islamabad', 'vet clinic rawalpindi', 'veterinary hospital pakistan', 'vet near me peshawar'],
+    ogType: 'website',
+    canonicalUrl: 'https://vetaxis360.com/?tab=cities'
+  },
+  gbp_guide: {
+    title: "Google Business Profile & Local 3-Pack SEO Playbook for Clinics | VetAxis 360",
+    description: "Master Google Maps and local search ranking for your veterinary clinic. How to rank #1 on Google for 'vet near me', generate 5-star review links, and maintain consistent NAP citations across Pakistan.",
+    keywords: ['vet clinic google business profile', 'vet near me google maps ranking', 'veterinary local seo guide', 'veterinary clinic citations', 'google local 3 pack vet'],
+    ogType: 'article',
+    canonicalUrl: 'https://vetaxis360.com/?tab=gbp_guide'
   },
   clinical_tools: {
     title: "Free Veterinary Calculators, Drug Dosage & Blood Reference | VetAxis 360",
@@ -301,7 +331,7 @@ class SEOService {
         '@type': 'VeterinaryCare',
         '@id': `https://vetaxis360.com/#city-${city.toLowerCase()}`,
         name: `VetAxis 360 Veterinary Care Network - ${city}`,
-        url: `https://vetaxis360.com/?tab=explore&city=${encodeURIComponent(city)}`,
+        url: `https://vetaxis360.com/?tab=cities&city=${encodeURIComponent(city)}`,
         description: `Verified veterinary doctors, 24/7 emergency pet surgery, and animal hospitals in ${city}, ${cityData?.province || 'Pakistan'}.`,
         areaServed: {
           '@type': 'City',
@@ -323,6 +353,76 @@ class SEOService {
         }
       };
       script.textContent = JSON.stringify(localSchema);
+      return;
+    }
+
+    if (tabKey === 'radar') {
+      const radarSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'Specialty',
+        name: 'VetAxis 360 Smart Vet Radar & Proximity Clinic Locator',
+        description: 'Instant geolocation locator for nearest 24/7 emergency veterinary hospitals and verified doctors across Pakistan.',
+        url: 'https://vetaxis360.com/?tab=radar',
+        serviceType: 'Emergency Veterinary Medical Triage and Clinic Locator',
+        provider: {
+          '@type': 'VeterinaryCare',
+          name: 'VetAxis 360 Clinical Network',
+          telephone: '+92-300-1216272',
+          areaServed: 'Pakistan'
+        }
+      };
+      script.textContent = JSON.stringify(radarSchema);
+      return;
+    }
+
+    if (tabKey === 'cities') {
+      const citiesSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        name: 'Pakistan Veterinary Clinic & Hospital City Directory',
+        description: 'Directory of certified animal hospitals and DVM specialists across 11 major metropolitan regions in Pakistan.',
+        url: 'https://vetaxis360.com/?tab=cities',
+        numberOfItems: PAKISTAN_CITIES_SEO.length,
+        itemListElement: PAKISTAN_CITIES_SEO.map((c, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: `Veterinary Care & Animal Clinics in ${c.city}`,
+          url: `https://vetaxis360.com/?tab=cities&city=${encodeURIComponent(c.city)}`
+        }))
+      };
+      script.textContent = JSON.stringify(citiesSchema);
+      return;
+    }
+
+    if (tabKey === 'gbp_guide') {
+      const gbpSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'HowTo',
+        name: 'How to Rank Your Veterinary Clinic #1 on Google Maps & Local 3-Pack',
+        description: 'Step-by-step optimization playbook for veterinary practitioners to capture high-intent "vet near me" searches through Google Business Profile, NAP consistency, and 5-star review acceleration.',
+        url: 'https://vetaxis360.com/?tab=gbp_guide',
+        step: [
+          {
+            '@type': 'HowToStep',
+            position: 1,
+            name: 'Claim and Verify Google Business Profile',
+            text: 'Create or claim your clinic on Google Business Profile with exact legal category VeterinaryCare.'
+          },
+          {
+            '@type': 'HowToStep',
+            position: 2,
+            name: 'Standardize NAP (Name, Address, Phone)',
+            text: 'Ensure the clinic name, physical address, and emergency phone match exactly across Google Maps and VetAxis 360.'
+          },
+          {
+            '@type': 'HowToStep',
+            position: 3,
+            name: 'Accelerate 5-Star Reviews',
+            text: 'Send automated WhatsApp review requests with direct Google review shortlinks to satisfied pet parents.'
+          }
+        ]
+      };
+      script.textContent = JSON.stringify(gbpSchema);
       return;
     }
 

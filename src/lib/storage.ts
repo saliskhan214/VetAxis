@@ -119,14 +119,24 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
     profile.isOnline = false;
   }
 
-  // If lastSeen is missing, set a stable fallback timestamp
+  // If lastSeen is missing, use real lastLoginAt or createdAt
   if (!profile.lastSeen) {
-    const charSum = profile.uid.split('').reduce((sum: number, ch: string) => sum + ch.charCodeAt(0), 0);
-    const hoursAgo = (charSum % 12) + 1;
-    profile.lastSeen = Date.now() - (hoursAgo * 60 * 60 * 1000);
+    profile.lastSeen = (profile as any).lastLoginAt || profile.createdAt || Date.now();
   }
 
   return profile;
+}
+
+export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function isPractitionerOffline30Days(profile: UserProfile): boolean {
+  if (profile.role !== 'doctor' && profile.role !== 'clinic') {
+    return false;
+  }
+  if (profile.isOnline) return false;
+  const lastActive = profile.lastSeen || (profile as any).lastLoginAt || profile.createdAt;
+  if (!lastActive) return false;
+  return (Date.now() - lastActive) > THIRTY_DAYS_MS;
 }
 
 function getLocalUsers(): UserProfile[] {
@@ -408,6 +418,174 @@ function populateInitialSeeds() {
           address: 'Khyber Road, Peshawar Cantonment'
         },
         avgRating: 4.9,
+        totalReviews: 19,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_4',
+        name: 'Clifton 24/7 Emergency Pet Hospital & Feline Critical Care',
+        email: 'emergency.karachi@clinic.pk',
+        phone: '02135832100',
+        role: 'clinic',
+        facilities: '24/7 Trauma Emergency, Feline Viral Isolation ICU, Digital Radiography, Gas Anesthesia, Doppler Ultrasound, Walk-in Triage',
+        address: 'Block 4, Clifton, Marine Drive, Karachi',
+        createdAt: Date.now() - 28 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Emergency night van with portable oxygen and feline triage unit',
+        location: {
+          lat: 24.8236,
+          lng: 67.0345,
+          address: 'Block 4, Clifton, Karachi'
+        },
+        avgRating: 4.9,
+        totalReviews: 54,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_5',
+        name: 'Rawalpindi Cantonment Companion Animal & Orthopedic Surgery Center',
+        email: 'rawalpindi.vet@clinic.pk',
+        phone: '0515564433',
+        role: 'clinic',
+        facilities: 'Orthopedic Bone Pinning, Parvovirus Isolation Ward, Puppy Vaccinations, In-house Blood Analyzer, Walk-ins Welcome',
+        address: 'The Mall, Saddar Cantt, Rawalpindi',
+        createdAt: Date.now() - 24 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Doorstep vaccination booster rounds across Rawalpindi Cantt & Westridge',
+        location: {
+          lat: 33.5932,
+          lng: 73.0531,
+          address: 'Saddar, Rawalpindi Cantt'
+        },
+        avgRating: 4.8,
+        totalReviews: 38,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_6',
+        name: 'Faisalabad Veterinary Diagnostic Hospital & Dairy Herd Care',
+        email: 'faisalabad.vet@clinic.pk',
+        phone: '0418721155',
+        role: 'clinic',
+        facilities: 'Small Animal Soft Tissue Surgery, Dairy Bovine Health, Ultrasonic Dental Scaling, Hematology & Biochemistry Lab',
+        address: 'D-Ground, Peoples Colony No. 1, Faisalabad',
+        createdAt: Date.now() - 22 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Mobile ambulatory clinic van for companion pets and dairy farms',
+        location: {
+          lat: 31.4187,
+          lng: 73.0791,
+          address: 'D-Ground, Peoples Colony, Faisalabad'
+        },
+        avgRating: 4.9,
+        totalReviews: 29,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_7',
+        name: 'Multan Trauma Animal Hospital & Heatstroke Emergency Unit',
+        email: 'multan.vet@clinic.pk',
+        phone: '0616523311',
+        role: 'clinic',
+        facilities: 'Heatstroke Emergency Cooling Triage, Mobile Farm Call Van, Digital X-Ray, Pet Microchipping, Core Vaccinations',
+        address: 'Bosan Road / Officers Colony, Multan',
+        createdAt: Date.now() - 19 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Emergency heatstroke triage response & doorstep puppy vaccinations',
+        location: {
+          lat: 30.1984,
+          lng: 71.4687,
+          address: 'Bosan Road, Officers Colony, Multan'
+        },
+        avgRating: 4.8,
+        totalReviews: 23,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_8',
+        name: 'Quetta Central Veterinary Hospital & Livestock Health Center',
+        email: 'quetta.vet@clinic.pk',
+        phone: '0812834400',
+        role: 'clinic',
+        facilities: 'Emergency Animal Trauma, Livestock & Ruminant Medicine, Rabies Prevention, Surgical Suite',
+        address: 'Zarghoon Road, Cantonment, Quetta',
+        createdAt: Date.now() - 16 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Mobile vet team for livestock disease control and pet house calls',
+        location: {
+          lat: 30.1924,
+          lng: 66.9987,
+          address: 'Zarghoon Road, Cantonment, Quetta'
+        },
+        avgRating: 4.9,
+        totalReviews: 17,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_9',
+        name: 'Gujranwala Companion Care & Surgical Pet Clinic',
+        email: 'gujranwala.vet@clinic.pk',
+        phone: '0553841122',
+        role: 'clinic',
+        facilities: 'Walk-in Puppy & Kitten Vaccinations, Spay/Neuter Laser Surgery, Diagnostic Ultrasound, Pet Boarding ICU',
+        address: 'DC Colony, Main Commercial Boulevard, Gujranwala',
+        createdAt: Date.now() - 14 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'Routine doorstep wellness exams & deworming protocol',
+        location: {
+          lat: 32.1617,
+          lng: 74.1883,
+          address: 'DC Colony, Gujranwala'
+        },
+        avgRating: 4.7,
+        totalReviews: 21,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_10',
+        name: 'Sialkot Surgical Precision Veterinary Care & Pet Hospital',
+        email: 'sialkot.vet@clinic.pk',
+        phone: '0524263300',
+        role: 'clinic',
+        facilities: 'Veterinary Surgical Specialty, International Pet Travel Health Certification, ISO Microchipping, Emergency Care',
+        address: 'Paris Road / Cantt, Sialkot',
+        createdAt: Date.now() - 12 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'USDA & APHIS travel health certificate home inspections',
+        location: {
+          lat: 32.5022,
+          lng: 74.5371,
+          address: 'Paris Road, Cantt, Sialkot'
+        },
+        avgRating: 4.9,
+        totalReviews: 26,
+        reviews: []
+      },
+      {
+        uid: 'seed_clinic_11',
+        name: 'Hyderabad Animal Healthcare & 24hr Emergency Clinic',
+        email: 'hyderabad.vet@clinic.pk',
+        phone: '0223812299',
+        role: 'clinic',
+        facilities: '24/7 Emergency Pet Triage, Companion Animal Vaccinations, Orthopedic Splinting, In-House Diagnostic Lab',
+        address: 'Auto Bhan Road, Latifabad Unit 3, Hyderabad',
+        createdAt: Date.now() - 10 * 24 * 3600000,
+        isVerified: true,
+        offersHomeVisit: true,
+        homeVisitCharges: 'On-call emergency triage & doorstep puppy vaccination booster pack',
+        location: {
+          lat: 25.3789,
+          lng: 68.3541,
+          address: 'Auto Bhan Road, Latifabad, Hyderabad'
+        },
+        avgRating: 4.8,
         totalReviews: 19,
         reviews: []
       },
@@ -1075,7 +1253,26 @@ export const AuthService = {
         }
 
         const data = userDoc.data() as UserProfile;
-        const profile: UserProfile = { ...data, uid: data.uid || userDoc.id };
+        const now = Date.now();
+        const profile: UserProfile = { 
+          ...data, 
+          uid: data.uid || userDoc.id,
+          lastSeen: now,
+          lastLoginAt: now,
+          isOnline: true
+        };
+
+        // Asynchronously update login timestamps in Firestore
+        try {
+          await updateDoc(doc(db, 'users', uid), {
+            lastSeen: now,
+            lastLoginAt: now,
+            isOnline: true
+          });
+        } catch (upErr) {
+          console.warn('Could not update lastLoginAt in Firestore:', upErr);
+        }
+
         saveLocalSession(profile);
         return profile;
       } catch (err: any) {
@@ -1111,6 +1308,12 @@ export const AuthService = {
       if (!isMatch) {
         throw new Error('Incorrect email address or password.');
       }
+
+      const now = Date.now();
+      user.lastSeen = now;
+      user.lastLoginAt = now;
+      user.isOnline = true;
+      saveLocalUsers(users);
 
       saveLocalSession(user);
       return user;
@@ -1262,9 +1465,25 @@ export const AuthService = {
         if (userDoc.exists()) {
           // Returning user
           const data = userDoc.data() as UserProfile;
-          const profile: UserProfile = { ...data, uid: data.uid || userDoc.id };
-          profile.emailVerified = userCredential.user.emailVerified;
-          await updateDoc(userRef, { emailVerified: profile.emailVerified });
+          const now = Date.now();
+          const profile: UserProfile = { 
+            ...data, 
+            uid: data.uid || userDoc.id,
+            emailVerified: userCredential.user.emailVerified,
+            lastSeen: now,
+            lastLoginAt: now,
+            isOnline: true
+          };
+          try {
+            await updateDoc(userRef, { 
+              emailVerified: profile.emailVerified,
+              lastSeen: now,
+              lastLoginAt: now,
+              isOnline: true
+            });
+          } catch (upErr) {
+            console.warn('Could not update lastLoginAt in Firestore during Google Sign-In:', upErr);
+          }
           saveLocalSession(profile);
           return { exists: true, profile };
         } else {
@@ -1637,7 +1856,14 @@ export const ExploreService = {
             profile.avgRating = 0;
             profile.totalReviews = 0;
           }
-          list.push(injectPresence(injectTemporaryPlatinum(profile)) as UserProfile);
+          const finalProfile = injectPresence(injectTemporaryPlatinum(profile)) as UserProfile;
+          if (role === 'doctor' || role === 'clinic') {
+            if (isPractitionerOffline30Days(finalProfile)) {
+              // Disappear card from home page if offline > 30 days
+              continue;
+            }
+          }
+          list.push(finalProfile);
         }
         return list;
       } catch (err) {
@@ -1651,7 +1877,15 @@ export const ExploreService = {
 
     // Local Fallback list
     const users = getLocalUsers();
-      return users.filter(u => u.role === role).map(u => {
+    return users.filter(u => {
+      if (u.role !== role) return false;
+      if (role === 'doctor' || role === 'clinic') {
+        if (isPractitionerOffline30Days(u)) {
+          return false;
+        }
+      }
+      return true;
+    }).map(u => {
         const reviews = u.reviews || [];
         const filteredReviews = reviews.filter(rev => {
           const email = (rev.reviewerEmail || '').toLowerCase().trim();
@@ -2699,14 +2933,17 @@ export const JobBoardService = {
   },
 
   async createJob(jobData: Partial<JobPost>, poster: UserProfile): Promise<JobPost> {
+    if (poster.role === 'user' && !poster.isAdmin) {
+      throw new Error('Individual and pet owner accounts are not permitted to publish jobs. Only clinics, veterinarians, assistants, and vendors are granted permission.');
+    }
     const isAutoApproved = poster.isAdmin || poster.email?.toLowerCase() === 'vetaxis360@gmail.com' || poster.email?.toLowerCase() === 'saliskhan214@gmail.com';
     const job: JobPost = {
       id: 'job_' + Date.now(),
       clinicId: poster.uid,
       clinicName: jobData.clinicName || poster.name,
       clinicEmail: poster.email,
-      posterRole: poster.role || 'user',
-      employerType: jobData.employerType || (poster.role === 'clinic' ? 'clinic' : 'farm'),
+      posterRole: poster.role,
+      employerType: jobData.employerType || (poster.role === 'clinic' ? 'clinic' : poster.role === 'doctor' ? 'hospital' : 'clinic'),
       title: jobData.title || '',
       jobType: jobData.jobType || 'Full-time',
       location: jobData.location || '',

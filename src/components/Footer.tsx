@@ -80,8 +80,16 @@ export function Footer({ onNavigate, activeSection, currentUser }: FooterProps) 
             <ul className="space-y-2">
               <li>
                 <button
+                  onClick={(e) => handleNavClick('radar', e)}
+                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-sky-800 ${activeSection === 'radar' ? 'underline font-black' : ''}`}
+                >
+                  📡 Vet Radar (Near Me)
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={(e) => handleNavClick('directory', e)}
-                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-amber-900 ${activeSection === 'directory' ? 'underline font-black' : ''}`}
+                  className={`hover:text-[#2b2b24] hover:underline cursor-pointer text-left transition-colors font-bold text-stone-700 ${activeSection === 'directory' ? 'underline font-black' : ''}`}
                 >
                   🔍 Search &amp; SEO Portal
                 </button>

@@ -91,6 +91,10 @@
         },
         "totalReviews": {
           "type": "number"
+        },
+        "lastLoginAt": {
+          "type": "number",
+          "description": "Timestamp of most recent login in milliseconds"
         }
       },
       "required": [

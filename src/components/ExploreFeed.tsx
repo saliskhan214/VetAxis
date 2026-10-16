@@ -7,6 +7,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from
 import { Star, MapPin, Search, Phone, Trophy, ChevronRight, ChevronLeft, X, Award, Compass, MessageSquare, ShoppingBag, Grid, Megaphone, RefreshCw, MessageCircle, ExternalLink, Sparkles, CheckCircle2, ShieldCheck, Navigation } from 'lucide-react';
 import { ThreeDPremiumCard } from './ThreeDPremiumCard';
 import { InteractiveClinicMap } from './InteractiveClinicMap';
+import { backButtonManager } from '../lib/backButtonManager';
 
 
 interface ExploreFeedProps {
@@ -812,6 +813,17 @@ export function ExploreFeed({
   // Sorted and filtered list
   const filteredProfessionals = ExploreService.sortUsers(
     professionals.filter((p) => {
+      // Automatic card disappearance for veterinarian or clinic offline > 30 days
+      if (p.role === 'doctor' || p.role === 'clinic') {
+        const isSelf = currentUser?.uid && currentUser.uid === p.uid;
+        if (!isSelf && !p.isOnline) {
+          const lastActive = p.lastSeen || (p as any).lastLoginAt || p.createdAt;
+          if (lastActive && (Date.now() - lastActive > 30 * 24 * 60 * 60 * 1000)) {
+            return false;
+          }
+        }
+      }
+
       // Filter by Home Visit only if toggle active
       if (homeVisitOnly && !p.offersHomeVisit) {
         return false;
@@ -1085,6 +1097,38 @@ export function ExploreFeed({
 
           </motion.div>
         </AnimatePresence>
+      </div>
+
+      {/* SMART VET RADAR & NEAR ME LOCATOR CALLOUT */}
+      <div className="rounded-2xl border border-sky-900/40 bg-gradient-to-r from-[#141e28] via-[#1a2634] to-[#141e28] p-5 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-left">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+            📡
+          </div>
+          <div className="space-y-0.5 text-left">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-sky-400 tracking-wider uppercase">Live Satellite Proximity Scan</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono">Real-time GPS</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-white font-display">
+              Looking for a Veterinarian or Emergency Clinic Near You?
+            </h3>
+            <p className="text-xs text-slate-300 max-w-xl">
+              Pinpoint the closest certified veterinary hospitals with real-time GPS distance calculation, 24/7 trauma hours, and 1-tap Google Maps directions.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => onNavigate?.('radar')}
+            className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+          >
+            <span>Launch Smart Radar</span>
+            <Navigation className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* FILTER & OPTION CONTROLS BAR */}

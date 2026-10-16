@@ -79,6 +79,7 @@ service cloud.firestore {
         (!('homeVisitCharges' in incoming()) || (incoming().homeVisitCharges is string && incoming().homeVisitCharges.size() <= 200)) &&
         (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
         (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
+        (!('lastLoginAt' in incoming()) || incoming().lastLoginAt is number) &&
         (!('location' in incoming()) || incoming().location == null || (
           incoming().location is map &&
           incoming().location.lat is number &&
@@ -110,6 +111,7 @@ service cloud.firestore {
           (!('profilePic' in incoming()) || (incoming().profilePic is string && incoming().profilePic.size() <= 2 * 1024 * 1024)) &&
           (!('isOnline' in incoming()) || incoming().isOnline is bool) &&
           (!('lastSeen' in incoming()) || incoming().lastSeen is number) &&
+          (!('lastLoginAt' in incoming()) || incoming().lastLoginAt is number) &&
           (!('location' in incoming()) || incoming().location == null || (
             incoming().location is map &&
             incoming().location.lat is number &&
@@ -314,8 +316,10 @@ service cloud.firestore {
         incoming().minQualificationGate in ['none', 'assistant', 'doctor'] &&
         incoming().createdAt is number && incoming().createdAt <= request.time.toMillis() + 60000 &&
         (!('approvalStatus' in incoming()) || incoming().approvalStatus in ['pending', 'approved', 'rejected']) &&
-        (!('posterRole' in incoming()) || incoming().posterRole in ['doctor', 'clinic', 'assistant', 'user']) &&
-        (!('employerType' in incoming()) || incoming().employerType in ['clinic', 'farm', 'individual', 'hospital']) &&
+        (!('posterRole' in incoming()) || incoming().posterRole in ['doctor', 'clinic', 'assistant', 'vendor']) &&
+        incoming().get('posterRole', '') != 'user' &&
+        (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'user' || isAdmin()) &&
+        (!('employerType' in incoming()) || incoming().employerType in ['clinic', 'farm', 'individual', 'hospital', 'vendor', 'enterprise']) &&
         incoming().get('clinicAddress', '') is string && incoming().get('clinicAddress', '').size() <= 400 &&
         incoming().get('clinicWebsite', '') is string && incoming().get('clinicWebsite', '').size() <= 200 &&
         incoming().get('clinicContactPhone', '') is string && incoming().get('clinicContactPhone', '').size() <= 50 &&

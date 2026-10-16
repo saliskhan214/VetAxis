@@ -22,9 +22,99 @@
   <!-- Veterinary Intelligence & SEO Search Directory (8 High-Volume Categories) -->
   <url>
     <loc>https://vetaxis360.com/?tab=directory</loc>
-    <lastmod>2026-09-30</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.98</priority>
+  </url>
+
+  <!-- Smart Vet Radar - Real-Time Geolocation Proximity Locator (Near Me) -->
+  <url>
+    <loc>https://vetaxis360.com/?tab=radar</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Pakistan Metropolitan City Clinic Directory Hubs -->
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.99</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Lahore</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.98</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Karachi</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.98</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Islamabad</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.98</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Rawalpindi</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.98</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Peshawar</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Faisalabad</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Multan</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Quetta</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Sialkot</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Gujranwala</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://vetaxis360.com/?tab=cities&amp;city=Hyderabad</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- Google Business Profile Local SEO Playbook -->
+  <url>
+    <loc>https://vetaxis360.com/?tab=gbp_guide</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
   </url>
 
   <!-- City-Specific Local Veterinary Clinic Directories (Top 10 Pakistan Cities) -->

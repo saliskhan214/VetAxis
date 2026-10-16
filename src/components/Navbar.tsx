@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MessengerService } from '../lib/messengerService';
 import { PrefetchService } from '../lib/prefetchService';
 import { BrowserNotificationService } from '../lib/browserNotification';
+import { backButtonManager } from '../lib/backButtonManager';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -46,6 +47,18 @@ export function Navbar({
   }, [isNotifOpen]);
 
   useEffect(() => {
+    if (isSidebarOpen) {
+      return backButtonManager.registerModal('navbar_sidebar', () => setIsSidebarOpen(false));
+    }
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (isNotifOpen) {
+      return backButtonManager.registerModal('navbar_notifications', () => setIsNotifOpen(false));
+    }
+  }, [isNotifOpen]);
+
+  useEffect(() => {
     if (!user?.uid) return;
     const unsub = MessengerService.subscribeToTotalUnreadCount(user.uid, (cnt) => {
       setUnreadMessages(cnt);
@@ -70,8 +83,9 @@ export function Navbar({
 
   const navItems = [
     { id: 'explore', label: 'Explore Vets', icon: '🩺' },
-    { id: 'messenger', label: 'Messenger', icon: '💬' },
+    { id: 'radar', label: 'Vet Radar (Near Me)', icon: '📡' },
     { id: 'clinical_tools', label: 'Vet & Pet Calculators', icon: '🧮' },
+    { id: 'messenger', label: 'Messenger', icon: '💬' },
     { id: 'community', label: 'Community', icon: '💬' },
     { id: 'marketplace', label: 'Products', icon: '🛒' },
     { id: 'pet_ads', label: 'Pet Ads', icon: '🐾' },

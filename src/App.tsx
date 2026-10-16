@@ -3,7 +3,7 @@ import { UserProfile, VetNotification } from './types';
 import { getLocalSession, AuthService, NotificationService, injectTemporaryPlatinum, secureSetItem } from './lib/storage';
 import { testConnection, isFirebaseConfigured, auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { ClinicService } from './lib/clinicService';
@@ -29,9 +29,11 @@ import { VeterinaryClinicalSuite } from './components/VeterinaryClinicalSuite';
 import { Messenger } from './components/Messenger';
 import { Footer } from './components/Footer';
 import { SearchDiscoveryHub } from './components/SearchDiscoveryHub';
+import { SmartVetRadar } from './components/SmartVetRadar';
 import PageNotFound from './components/PageNotFound';
 import { PrefetchService } from './lib/prefetchService';
 import { seoService } from './lib/seoService';
+import { backButtonManager } from './lib/backButtonManager';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(getLocalSession());
@@ -129,7 +131,18 @@ export default function App() {
     if (queryParam) {
       const qLower = queryParam.toLowerCase().trim();
       if (
-        qLower.includes('emergency') || qLower.includes('vet near me') || qLower.includes('clinic near me') || 
+        qLower.includes('vet near me') || qLower.includes('clinic near me') || 
+        qLower.includes('emergency vet near me') || qLower.includes('closest vet') || 
+        qLower.includes('vet radar') || qLower.includes('near me')
+      ) {
+        setActiveSection('radar');
+      } else if (
+        qLower.includes('city') || qLower.includes('lahore vet') || qLower.includes('karachi vet') ||
+        qLower.includes('islamabad vet') || qLower.includes('rawalpindi vet') || qLower.includes('peshawar vet')
+      ) {
+        setActiveSection('cities');
+      } else if (
+        qLower.includes('emergency') || 
         qLower.includes('walk in') || qLower.includes('cheap vet') || qLower.includes('mobile vet') || 
         qLower.includes('cat only') || qLower.includes('exotic') || qLower.includes('avian') || 
         qLower.includes('equine') || qLower.includes('reptile') || qLower.includes('ultrasound') || 
@@ -186,7 +199,8 @@ export default function App() {
         'terms_of_service', 'privacy', 'privacy_policy', 'contact', 
         'support', 'clinical_tools', 'clinical_suite',
         'calculators', 'calculator', 'tools', 'messenger',
-        'directory', 'search_hub', 'seo', 'search_portal'
+        'directory', 'search_hub', 'seo', 'search_portal',
+        'radar', 'near_me', 'smart_radar'
       ];
       let targetSection = tabParam.toLowerCase();
       if (targetSection === 'pets') targetSection = 'pet_ads';
@@ -197,6 +211,8 @@ export default function App() {
       if (targetSection === 'support') targetSection = 'contact';
       if (targetSection === 'clinical_suite' || targetSection === 'calculators' || targetSection === 'calculator' || targetSection === 'tools') targetSection = 'clinical_tools';
       if (targetSection === 'search_hub' || targetSection === 'seo' || targetSection === 'search_portal') targetSection = 'directory';
+      if (targetSection === 'near_me' || targetSection === 'smart_radar' || targetSection === 'cities' || targetSection === 'city_portal' || targetSection === 'local_vets') targetSection = 'radar';
+      if (targetSection === 'gbp_guide' || targetSection === 'google_business' || targetSection === 'local_seo') targetSection = 'explore';
 
       if (validSections.includes(targetSection)) {
         setActiveSection(targetSection);
@@ -481,12 +497,19 @@ export default function App() {
     if (normalized === 'privacy_policy') normalized = 'privacy';
     if (normalized === 'support') normalized = 'contact';
     if (normalized === 'clinical_suite' || normalized === 'calculators' || normalized === 'calculator' || normalized === 'tools') normalized = 'clinical_tools';
+    if (normalized === 'near_me' || normalized === 'smart_radar') normalized = 'radar';
+    if (normalized === 'city_portal' || normalized === 'local_vets' || normalized === 'cities') normalized = 'radar';
+    if (normalized === 'google_business' || normalized === 'local_seo' || normalized === 'gbp_guide') normalized = 'explore';
 
     const PRIVATE_SECTIONS = ['messenger', 'profile', 'admin'];
     if (!currentUser && PRIVATE_SECTIONS.includes(normalized)) {
       triggerAuthWall(`sign in to access ${normalized.replace('_', ' ')}`);
       return;
     }
+
+    if (normalized === activeSection) return;
+
+    backButtonManager.pushSection(normalized);
 
     triggerLoading(`Opening ${normalized.replace('_', ' ').toUpperCase()}...`, 400);
     setActiveSection(normalized);
@@ -495,15 +518,38 @@ export default function App() {
     setHighlightJobId(null);
     setHighlightApplicationId(null);
 
-    // Sync URL without full page reload for Google Search and external deep-linking
+    // Sync URL and browser history for Android back button and deep-linking
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('tab', normalized);
-      window.history.pushState({}, '', url.toString());
+      window.history.pushState({ section: normalized, timestamp: Date.now() }, '', url.toString());
     } catch (e) {
       console.warn('Could not update browser history:', e);
     }
   };
+
+  // Connect Android hardware and browser back button navigation
+  useEffect(() => {
+    backButtonManager.init(activeSection, (targetSection) => {
+      setActiveSection(targetSection);
+      setHighlightPostId(null);
+      setHighlightJobId(null);
+      setHighlightApplicationId(null);
+    });
+  }, []);
+
+  // Register modal dismissals for Android back button
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      return backButtonManager.registerModal('auth_modal', () => setIsAuthModalOpen(false));
+    }
+  }, [isAuthModalOpen]);
+
+  useEffect(() => {
+    if (isAboutUsOpen) {
+      return backButtonManager.registerModal('about_modal', () => setIsAboutUsOpen(false));
+    }
+  }, [isAboutUsOpen]);
 
   // Real-time Auth connection tracker to prevent race conditions on startup
   useEffect(() => {
@@ -512,18 +558,33 @@ export default function App() {
         try {
           if (firebaseUser) {
             const stored = getLocalSession();
+            const now = Date.now();
             if (stored && stored.uid === firebaseUser.uid) {
-              setCurrentUser(stored);
+              const refreshed = { ...stored, lastSeen: now, isOnline: true };
+              setCurrentUser(refreshed);
+              secureSetItem('va_session', JSON.stringify(refreshed));
+              try {
+                updateDoc(doc(db, 'users', firebaseUser.uid), { lastSeen: now, isOnline: true });
+              } catch {}
             } else {
               // Fetch fresh user profile from DB to prevent out-of-sync or missing records
               const userRef = doc(db, 'users', firebaseUser.uid);
               const userSnap = await getDoc(userRef);
               if (userSnap.exists()) {
                 const data = userSnap.data() as UserProfile;
-                const profile: UserProfile = { ...data, uid: data.uid || firebaseUser.uid };
+                const profile: UserProfile = { 
+                  ...data, 
+                  uid: data.uid || firebaseUser.uid,
+                  lastSeen: now,
+                  lastLoginAt: data.lastLoginAt || now,
+                  isOnline: true
+                };
                 const finalized = injectTemporaryPlatinum(profile);
                 setCurrentUser(finalized);
                 secureSetItem('va_session', JSON.stringify(finalized));
+                try {
+                  updateDoc(userRef, { lastSeen: now, isOnline: true });
+                } catch {}
               } else {
                 setCurrentUser(null);
                 localStorage.removeItem('va_session');
@@ -1032,7 +1093,19 @@ export default function App() {
               />
             )}
 
-            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'profile', 'subscription', 'admin', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'directory', 'search_hub', 'seo', 'search_portal'].includes(activeSection) && (
+            {(activeSection === 'radar' || activeSection === 'near_me' || activeSection === 'smart_radar') && (
+              <SmartVetRadar
+                currentUser={currentUser}
+                initialCity={initialCity}
+                onNavigate={handleNavigate}
+                onSelectClinic={(clinic) => {
+                  setHighlightClinicId(clinic.uid);
+                  setActiveSection('explore');
+                }}
+              />
+            )}
+
+            {!['explore', 'messenger', 'community', 'marketplace', 'pet_ads', 'jobs', 'profile', 'subscription', 'admin', 'news', 'clinical_tools', 'clinical_suite', 'about', 'terms', 'privacy', 'contact', 'directory', 'search_hub', 'seo', 'search_portal', 'radar', 'near_me', 'smart_radar'].includes(activeSection) && (
               <PageNotFound onBackHome={() => setActiveSection('explore')} onNavigate={(sect) => setActiveSection(sect)} />
             )}
           </motion.div>

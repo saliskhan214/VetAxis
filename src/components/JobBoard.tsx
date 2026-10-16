@@ -49,7 +49,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
   // Job post inputs
   const [title, setTitle] = useState<string>('');
   const [employerType, setEmployerType] = useState<JobPost['employerType']>(
-    currentUser?.role === 'clinic' ? 'clinic' : currentUser?.role === 'user' ? 'farm' : 'individual'
+    currentUser?.role === 'clinic' ? 'clinic' : currentUser?.role === 'doctor' ? 'hospital' : currentUser?.role === 'vendor' ? 'vendor' : 'clinic'
   );
   const [jobType, setJobType] = useState<JobPost['jobType']>('Full-time');
   const [location, setLocation] = useState<string>(currentUser?.address || '');
@@ -123,8 +123,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
     if (localHighlightJobId && jobs.length > 0) {
       const targetJob = jobs.find(j => j.id === localHighlightJobId);
       if (targetJob) {
-        const isMyOwn = currentUser?.role === 'clinic' && 
-          (targetJob.clinicId === currentUser.uid || targetJob.clinicEmail === currentUser.email);
+        const isMyOwn = Boolean(
+          currentUser && 
+          (targetJob.clinicId === currentUser.uid || (currentUser.email && targetJob.clinicEmail?.toLowerCase() === currentUser.email.toLowerCase()))
+        );
         
         if (isMyOwn) {
           setActiveTab('my_postings');
@@ -193,8 +195,8 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
     setLoadingAllApps(true);
     try {
       let apps: JobApplication[] = [];
-      if (currentUser.role === 'clinic') {
-        // Query both clinicId and clinicEmail with independent guards to prevent minor role clashes from clearing entries
+      if (currentUser.role !== 'user') {
+        // Query both clinicId and clinicEmail for hiring roles (clinics, doctors, assistants, vendors)
         let appsById: JobApplication[] = [];
         try {
           appsById = await JobBoardService.fetchApplications({ clinicId: currentUser.uid });
@@ -217,6 +219,17 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
             merged.push(item);
           }
         });
+
+        // Also fetch candidate applications if the practitioner applied to any other positions
+        try {
+          const mySubmissions = await JobBoardService.fetchApplications({ applicantId: currentUser.uid });
+          mySubmissions.forEach(sub => {
+            if (!merged.some(m => m.id === sub.id)) {
+              merged.push(sub);
+            }
+          });
+        } catch {}
+
         apps = merged;
       } else {
         try {
@@ -269,6 +282,12 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
     e.preventDefault();
     setFormError(null);
 
+    if (!currentUser) return;
+    if (currentUser.role === 'user' && !currentUser.isAdmin) {
+      setFormError('Individual and pet owner accounts are not permitted to publish jobs. Only clinics, veterinarians, assistants, and vendors may post vacancies.');
+      return;
+    }
+
     if (!title.trim() || !location.trim() || !salaryMin || !salaryMax || !experience.trim() || !workingHours.trim() || !deadline) {
       setFormError('Please fill in all required job fields.');
       return;
@@ -311,18 +330,14 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
         clinicWebsite: clinicWebsite.trim() || undefined,
         clinicContactPhone: clinicContactPhone.trim() || undefined,
         clinicFacilities: clinicFacilities.trim() || undefined,
-        employerType: employerType || (currentUser.role === 'clinic' ? 'clinic' : currentUser.role === 'user' ? 'farm' : 'individual'),
+        employerType: employerType || (currentUser.role === 'clinic' ? 'clinic' : currentUser.role === 'doctor' ? 'hospital' : 'clinic'),
         posterRole: currentUser.role
       };
 
       const created = await JobBoardService.createJob(payload, currentUser);
       setJobs(prev => [created, ...prev]);
       setIsPostModalOpen(false);
-      triggerToast(
-        currentUser.role === 'clinic'
-          ? '✓ Job listing submitted! It will appear live once verified by Admin.'
-          : '✓ Farm Helper vacancy submitted! It will appear live once approved by Admin.'
-      );
+      triggerToast('✓ Job listing submitted! It will appear live once verified by Admin.');
 
       // Reset
       setTitle('');
@@ -580,6 +595,13 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
   // Filter lists & permissions
   const isSystemAdmin = currentUser ? (currentUser.email?.toLowerCase() === 'vetaxis360@gmail.com' || currentUser.email === 'saliskhan214@gmail.com' || currentUser.isAdmin) : false;
 
+  // Rule: In the job board, all roles except the individual / pet owner ('user') are granted permission to publish jobs
+  const canPublishJob = Boolean(
+    currentUser &&
+    (currentUser.isAdmin || currentUser.role === 'doctor' || currentUser.role === 'clinic' || currentUser.role === 'assistant' || currentUser.role === 'vendor') &&
+    currentUser.role !== 'user'
+  );
+
   const myJobPostings = currentUser ? jobs.filter(j => 
     (j.clinicId && j.clinicId === currentUser.uid) || 
     (currentUser.email && j.clinicEmail && j.clinicEmail.toLowerCase() === currentUser.email.toLowerCase())
@@ -660,7 +682,17 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
           whileTap={{ scale: 0.97 }}
           onClick={() => {
             if (!currentUser) {
-              if (onRequireAuth) onRequireAuth('sign in to post a veterinary vacancy or job ad');
+              if (onRequireAuth) onRequireAuth('sign in to publish a job vacancy');
+              return;
+            }
+            if (!canPublishJob) {
+              setConfirmDialog({
+                title: '⚠️ Job Publishing Restricted',
+                description: 'Job postings can only be published by veterinary clinics, doctors, vet assistants, vendors, and agricultural/medical organizations. Individual pet owner accounts are not permitted to publish jobs on the board.',
+                confirmText: 'Understood',
+                isAlertOnly: true,
+                onConfirm: () => {}
+              });
               return;
             }
             setIsPostModalOpen(true);
@@ -669,7 +701,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
           id="publish_job_btn"
         >
           <Plus className="w-5 h-5" />
-          <span>{currentUser?.role === 'user' ? '🌾 Post Farm Helper / Job Ad' : 'Publish Job Listing'}</span>
+          <span>Publish Job Listing</span>
         </motion.button>
       </div>
 
@@ -691,7 +723,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
       )}
 
       {/* TABS SELECTOR */}
-      {(myJobPostings.length > 0 || currentUser?.role === 'clinic' || currentUser?.role === 'user') && (
+      {(myJobPostings.length > 0 || canPublishJob) && (
         <div className="flex border-b border-[#e3dec9] gap-4" id="clinic_job_tabs">
           <button
             onClick={() => setActiveTab('browse')}
@@ -1035,7 +1067,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
               </button>
 
               <h2 className="text-xl font-serif font-bold text-[#3c3c3b] mb-2 flex items-center gap-2">
-                💼 {currentUser?.role === 'user' ? '🌾 Post Farm Helper / Livestock Vacancy' : 'Publish New Job / Clinic Vacancy'}
+                💼 Publish Professional Veterinary & Animal Health Vacancy
               </h2>
               <p className="text-xs text-[#7a766f] mb-4">
                 Reach thousands of veterinarians, paravets, farm workers, and assistants across Pakistan.
@@ -1047,7 +1079,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
                 <div>
                   <span className="font-black block">Admin Verification Protocol</span>
                   <span className="text-[11px] text-amber-800 leading-relaxed">
-                    To maintain strict safety and verify authentic employment across Pakistan, all job advertisements and farm helper listings are reviewed by the VetAxis Admin team before going live to candidates.
+                    To maintain strict safety and verify authentic employment across Pakistan, all job advertisements are reviewed by the VetAxis Admin team before going live to candidates.
                   </span>
                 </div>
               </div>
@@ -1067,10 +1099,10 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
-                      { id: 'farm', label: '🌾 Dairy/Livestock Farm', desc: 'Dairy, Cattle & Horse Stables' },
                       { id: 'clinic', label: '🏥 Veterinary Clinic', desc: 'Animal Hospital & Surgery' },
-                      { id: 'shelter', label: '🏠 Shelter / NGO', desc: 'Pet Rescue & Welfare' },
-                      { id: 'individual', label: '👤 Individual / Pet Owner', desc: 'Private Farm / Helper' }
+                      { id: 'hospital', label: '🩺 Vet Practice / Doctor', desc: 'Specialist, On-Call & Clinical' },
+                      { id: 'farm', label: '🌾 Dairy & Livestock Farm', desc: 'Dairy, Cattle & Horse Stables' },
+                      { id: 'vendor', label: '🏪 Vendor / Pharma / Store', desc: 'Supplies, Sales & Lab Equipment' }
                     ].map(type => (
                       <button
                         type="button"

@@ -42,9 +42,16 @@ export interface UserProfile {
   reviews?: Review[]; // For local schema backward compatibility
   isOnline?: boolean;
   lastSeen?: number; // timestamp in milliseconds
+  lastLoginAt?: number; // timestamp of last login session
   isAdmin?: boolean;
   offersHomeVisit?: boolean; // Doctors & Clinics can offer home visit / farm call services
   homeVisitCharges?: string; // Optional rate or coverage details (e.g. 'Available on-call / Doorstep vaccinations')
+  googleMapsUri?: string;    // Direct Google Maps URI for directions & reviews
+  isGoogleMapsVerified?: boolean; // Indicates clinic is registered on Google Maps & Google Business Profile
+  source?: 'vetaxis' | 'google_maps'; // Distinguishes platform partners from live Google Maps listings
+  isOpenNow?: boolean;
+  isEmergency247?: boolean;
+  city?: string;
 }
 
 export interface ManualPayment {
@@ -149,7 +156,7 @@ export interface JobPost {
   clinicName: string; // hiring entity / clinic / farm name
   clinicEmail: string;
   posterRole?: UserRole;
-  employerType?: 'clinic' | 'farm' | 'individual' | 'hospital';
+  employerType?: 'clinic' | 'farm' | 'individual' | 'hospital' | 'vendor' | 'enterprise';
   title: string;
   jobType: 'Full-time' | 'Part-time' | 'Freelance' | 'Internship';
   location: string;
