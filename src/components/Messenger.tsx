@@ -18,6 +18,7 @@ import {
 import { UserProfile, ChatMessage, Conversation, ConversationParticipant, UserRole } from '../types';
 import { MessengerService, FIFTEEN_DAYS_MS } from '../lib/messengerService';
 import { AuthService } from '../lib/storage';
+import { backButtonManager } from '../lib/backButtonManager';
 
 interface MessengerProps {
   currentUser: UserProfile;
@@ -43,6 +44,19 @@ export const Messenger: React.FC<MessengerProps> = ({
   const [directoryProfessionals, setDirectoryProfessionals] = useState<UserProfile[]>([]);
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [showMobileList, setShowMobileList] = useState(true);
+
+  // Android hardware / gesture back button integration
+  useEffect(() => {
+    if (newChatModalOpen) {
+      return backButtonManager.registerModal('messenger_new_chat', () => setNewChatModalOpen(false));
+    }
+  }, [newChatModalOpen]);
+
+  useEffect(() => {
+    if (!showMobileList && activeConvId) {
+      return backButtonManager.registerModal('messenger_active_convo', () => setShowMobileList(true));
+    }
+  }, [showMobileList, activeConvId]);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);

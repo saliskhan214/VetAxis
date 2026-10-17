@@ -22,6 +22,7 @@ import {
 import { BlogArticle, UserProfile } from '../types';
 import { BlogService } from '../lib/blogService';
 import { AdContainer } from './AdContainer';
+import { backButtonManager } from '../lib/backButtonManager';
 
 interface BlogSectionProps {
   currentUser: UserProfile | null;
@@ -62,6 +63,19 @@ export function BlogSection({ currentUser, onRequireAuth }: BlogSectionProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Android hardware / gesture back button integration
+  useEffect(() => {
+    if (activeArticle) {
+      return backButtonManager.registerModal('blog_active_article', () => handleBackToList());
+    }
+  }, [activeArticle]);
+
+  useEffect(() => {
+    if (isEditorOpen) {
+      return backButtonManager.registerModal('blog_editor_modal', () => setIsEditorOpen(false));
+    }
+  }, [isEditorOpen]);
 
   // Form Fields
   const [formData, setFormData] = useState({

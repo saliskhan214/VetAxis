@@ -1079,21 +1079,48 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
         })
       });
 
-      if (!response.ok) {
+      let rawPlaces: any[] = [];
+      if (response.ok) {
+        const result: any = await response.json();
+        rawPlaces = result.places || [];
+      } else {
         const errorText = await response.text();
-        console.warn("[Places API] searchNearby warning:", response.status, errorText);
-        return res.json({
-          success: true,
-          count: 0,
-          clinics: [],
-          warning: "No direct nearby results from Google Places"
-        });
+        console.warn("[Places API] searchNearby non-ok status:", response.status, errorText);
       }
 
-      const result: any = await response.json();
-      const rawPlaces = result.places || [];
-      const normalized = rawPlaces.map((p: any) => normalizeGooglePlace(p));
+      // If searchNearby returned 0 places, run location-biased searchText for comprehensive results
+      if (rawPlaces.length === 0) {
+        try {
+          const searchFallbackRes = await fetch("https://places.googleapis.com/v1/places:searchText", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+              "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.googleMapsUri,places.regularOpeningHours,places.nationalPhoneNumber,places.primaryType",
+              "X-Goog-Maps-Solution-ID": "gmp_git_agentskills_v1"
+            },
+            body: JSON.stringify({
+              textQuery: "veterinary clinic",
+              languageCode: "en",
+              maxResultCount,
+              locationBias: {
+                circle: {
+                  center: { latitude: lat, longitude: lng },
+                  radius: Math.max(radius, 35000.0)
+                }
+              }
+            })
+          });
+          if (searchFallbackRes.ok) {
+            const fallbackResult: any = await searchFallbackRes.json();
+            rawPlaces = fallbackResult.places || [];
+          }
+        } catch (fallbackErr) {
+          console.warn("[Places API] searchNearby text fallback error:", fallbackErr);
+        }
+      }
 
+      const normalized = rawPlaces.map((p: any) => normalizeGooglePlace(p));
       placesCache[cacheKey] = { data: normalized, timestamp: Date.now() };
 
       res.json({

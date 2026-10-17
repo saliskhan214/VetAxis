@@ -133,6 +133,10 @@ export function isPractitionerOffline30Days(profile: UserProfile): boolean {
   if (profile.role !== 'doctor' && profile.role !== 'clinic') {
     return false;
   }
+  // Base directory partner clinics and doctors should remain listed
+  if (profile.uid && profile.uid.startsWith('seed_')) {
+    return false;
+  }
   if (profile.isOnline) return false;
   const lastActive = profile.lastSeen || (profile as any).lastLoginAt || profile.createdAt;
   if (!lastActive) return false;
@@ -303,11 +307,8 @@ function cleanUndefined<T>(obj: T): T {
   return result;
 }
 
-// Ensure first-time boot has some default demo professionals populated so the preview isn't blank
-function populateInitialSeeds() {
-  const users = getLocalUsers();
-  if (users.length === 0) {
-    const seeds: UserProfile[] = [
+// Ensure first-time boot has default demo professionals populated so the preview isn't blank
+export const BASE_PLATFORM_USERS: UserProfile[] = [
       {
         uid: 'seed_doc_1',
         name: 'Dr. Sarah Alizai, DVM',
@@ -366,7 +367,7 @@ function populateInitialSeeds() {
         role: 'clinic',
         facilities: 'Digital X-Ray, In-House Blood Lab, Ultrasound, 24/7 Emergency Open Now, Walk-in (No Appt Required), CareCredit / Payment Plans Accepted, Oxygen ICU, Isolation Ward',
         address: 'DHA Phase 5 / Gulberg, Lahore',
-        createdAt: Date.now() - 30 * 24 * 3600000,
+        createdAt: Date.now() - 5 * 24 * 3600000,
         isVerified: true,
         offersHomeVisit: true,
         homeVisitCharges: 'Mobile vet van & 24hr after-hours home emergency visit unit',
@@ -600,10 +601,21 @@ function populateInitialSeeds() {
         isVerified: true,
         avgRating: 4.8,
         totalReviews: 8,
-        reviews: []
-      }
-    ];
-    saveLocalUsers(seeds);
+    reviews: []
+  }
+];
+
+function populateInitialSeeds() {
+  const users = getLocalUsers();
+  if (users.length === 0) {
+    saveLocalUsers(BASE_PLATFORM_USERS);
+  } else {
+    // If users exist but seed partner clinics are missing, guarantee partner directory clinics are present
+    const existingUids = new Set(users.map(u => u.uid));
+    const missing = BASE_PLATFORM_USERS.filter(s => !existingUids.has(s.uid));
+    if (missing.length > 0) {
+      saveLocalUsers([...users, ...missing]);
+    }
   }
 
   // Seed default marketplace items (Matching Categories 4 & 6)
@@ -1865,7 +1877,10 @@ export const ExploreService = {
           }
           list.push(finalProfile);
         }
-        return list;
+        if (list.length > 0) {
+          return list;
+        }
+        console.info(`[VetAxis] Firestore returned 0 ${role}s, falling back to local directory.`);
       } catch (err) {
         try {
           handleFirestoreError(err, OperationType.LIST, 'users');
@@ -1877,7 +1892,7 @@ export const ExploreService = {
 
     // Local Fallback list
     const users = getLocalUsers();
-    return users.filter(u => {
+    const localFiltered = users.filter(u => {
       if (u.role !== role) return false;
       if (role === 'doctor' || role === 'clinic') {
         if (isPractitionerOffline30Days(u)) {
@@ -1885,23 +1900,33 @@ export const ExploreService = {
         }
       }
       return true;
-    }).map(u => {
-        const reviews = u.reviews || [];
-        const filteredReviews = reviews.filter(rev => {
-          const email = (rev.reviewerEmail || '').toLowerCase().trim();
-          return !email || validEmails.has(email);
-        });
-        u.reviews = filteredReviews;
-        if (filteredReviews.length > 0) {
-          const sum = filteredReviews.reduce((acc, r) => acc + r.rating, 0);
-          u.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
-          u.totalReviews = filteredReviews.length;
-        } else {
-          u.avgRating = 0;
-          u.totalReviews = 0;
-        }
-        return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
+    });
+
+    const candidateList = localFiltered.length > 0
+      ? localFiltered
+      : BASE_PLATFORM_USERS.filter(u => u.role === role);
+
+    return candidateList.map(u => {
+      const reviews = u.reviews || [];
+      const filteredReviews = reviews.filter(rev => {
+        const email = (rev.reviewerEmail || '').toLowerCase().trim();
+        return !email || validEmails.has(email);
       });
+      u.reviews = filteredReviews;
+      if (filteredReviews.length > 0) {
+        const sum = filteredReviews.reduce((acc, r) => acc + r.rating, 0);
+        u.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
+        u.totalReviews = filteredReviews.length;
+      } else {
+        u.avgRating = u.avgRating || 4.8;
+        u.totalReviews = u.totalReviews || 10;
+      }
+      return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
+    });
+  },
+
+  getBaseSeedClinics(): UserProfile[] {
+    return BASE_PLATFORM_USERS.filter(u => u.role === 'clinic');
   },
 
   sortUsers(list: UserProfile[], sortType: SORT_TYPES, userLoc: GeoLocation | null): UserProfile[] {

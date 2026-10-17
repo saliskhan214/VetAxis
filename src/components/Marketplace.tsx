@@ -5,6 +5,7 @@ import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Search, Tag, MessageCircle, Trash2, Package, Plus, Sparkles, CheckCircle2, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { AdContainer } from './AdContainer';
+import { backButtonManager } from '../lib/backButtonManager';
 
 interface MarketplaceProps {
   currentUser: UserProfile | null;
@@ -59,6 +60,19 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
   const [formError, setFormError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Android hardware back button integration
+  useEffect(() => {
+    if (formOpen) {
+      return backButtonManager.registerModal('marketplace_form_modal', () => setFormOpen(false));
+    }
+  }, [formOpen]);
+
+  useEffect(() => {
+    if (showUpgradeModal) {
+      return backButtonManager.registerModal('marketplace_upgrade_modal', () => setShowUpgradeModal(false));
+    }
+  }, [showUpgradeModal]);
 
   const loadProducts = async () => {
     const cached = PrefetchService.getCachedProducts();

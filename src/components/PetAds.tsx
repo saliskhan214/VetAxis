@@ -5,6 +5,7 @@ import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Search, MapPin, Tag, Plus, MessageCircle, Trash2, Calendar, Sparkles, AlertCircle, ChevronLeft, ChevronRight, Megaphone, X, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { AdContainer } from './AdContainer';
+import { backButtonManager } from '../lib/backButtonManager';
 
 interface PetAdsProps {
   currentUser: UserProfile | null;
@@ -69,6 +70,19 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [toast, setToast] = useState<string | null>(null);
   const [boostedPosts, setBoostedPosts] = useState<any[]>([]);
+
+  // Android hardware back button integration
+  useEffect(() => {
+    if (formOpen) {
+      return backButtonManager.registerModal('pet_ads_form_modal', () => setFormOpen(false));
+    }
+  }, [formOpen]);
+
+  useEffect(() => {
+    if (showUpgradeModal) {
+      return backButtonManager.registerModal('pet_ads_upgrade_modal', () => setShowUpgradeModal(false));
+    }
+  }, [showUpgradeModal]);
 
   const [dismissedAlertIds, setDismissedAlertIds] = useState<string[]>(() => {
     try {

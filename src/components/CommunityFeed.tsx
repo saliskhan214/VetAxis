@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import VeterinaryNewsBrief from './VeterinaryNewsBrief';
 import { BlogSection } from './BlogSection';
 import { AdContainer } from './AdContainer';
+import { backButtonManager } from '../lib/backButtonManager';
 import { 
   Sparkles, MessageCircle, AlertCircle, Heart, ThumbsUp, AlertTriangle, 
   ShieldCheck, TrendingUp, Users, Megaphone, Navigation, CreditCard, 
@@ -121,6 +122,37 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
   const maxFreeAlerts = userTier === 'Silver' ? 15 : userTier === 'Gold' ? 30 : userTier === 'Platinum' ? Infinity : 0;
   const myAlertsCount = currentUser?.email ? posts.filter(p => p.isBoosted && p.authorEmail === currentUser.email).length : 0;
   const isAlertFree = userTier ? (myAlertsCount < maxFreeAlerts) : false;
+
+  // Android hardware / gesture back button integration
+  useEffect(() => {
+    if (selectedStoryPost) {
+      return backButtonManager.registerModal('community_story_modal', () => setSelectedStoryPost(null));
+    }
+  }, [selectedStoryPost]);
+
+  useEffect(() => {
+    if (isPremiumModalOpen) {
+      return backButtonManager.registerModal('community_premium_modal', () => setIsPremiumModalOpen(false));
+    }
+  }, [isPremiumModalOpen]);
+
+  useEffect(() => {
+    if (activeBoostPost) {
+      return backButtonManager.registerModal('community_boost_modal', () => setActiveBoostPost(null));
+    }
+  }, [activeBoostPost]);
+
+  useEffect(() => {
+    if (postToDelete) {
+      return backButtonManager.registerModal('community_delete_modal', () => setPostToDelete(null));
+    }
+  }, [postToDelete]);
+
+  useEffect(() => {
+    if (isNewsModalOpen) {
+      return backButtonManager.registerModal('community_news_modal', () => setIsNewsModalOpen(false));
+    }
+  }, [isNewsModalOpen]);
 
   const isVerifiedPractitioner = currentUser ? (currentUser.role === 'doctor' || currentUser.role === 'clinic') &&
     (currentUser.subscriptionTier === 'Silver' || currentUser.subscriptionTier === 'Gold' || currentUser.subscriptionTier === 'Platinum') : false;

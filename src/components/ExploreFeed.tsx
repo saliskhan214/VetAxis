@@ -436,6 +436,23 @@ export function ExploreFeed({
     notes: ''
   });
 
+  // Android hardware / gesture back button integration for modals and detail sheets
+  useEffect(() => {
+    if (selectedProfile) {
+      return backButtonManager.registerModal('explore_practitioner_sheet', () => {
+        setSelectedProfile(null);
+      });
+    }
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    if (isBookingModeOpen) {
+      return backButtonManager.registerModal('explore_booking_sheet', () => {
+        setIsBookingModeOpen(false);
+      });
+    }
+  }, [isBookingModeOpen]);
+
   const handleClinicBookingSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedProfile) return;

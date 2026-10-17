@@ -19,6 +19,7 @@ class BackButtonManager {
   private sectionHistory: string[] = [];
   private onNavigateCallback: ((section: string) => void) | null = null;
   private isProcessingPopState = false;
+  private ignoreNextPopState = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -79,10 +80,11 @@ class BackButtonManager {
     const idx = this.modalStack.findIndex(m => m.id === id);
     if (idx !== -1) {
       this.modalStack.splice(idx, 1);
-      // If closed by in-app button (not by popstate), pop the virtual history entry
+      // If closed by in-app button (not by popstate), pop the virtual history entry cleanly
       if (triggerHistoryBack && !this.isProcessingPopState && typeof window !== 'undefined') {
         try {
           if (window.history.state && window.history.state.isModal) {
+            this.ignoreNextPopState = true;
             window.history.back();
           }
         } catch {}
@@ -103,6 +105,11 @@ class BackButtonManager {
    * Handles popstate event emitted when Android back button or browser back is pressed
    */
   private handlePopState = (e: PopStateEvent) => {
+    if (this.ignoreNextPopState) {
+      this.ignoreNextPopState = false;
+      return;
+    }
+
     this.isProcessingPopState = true;
 
     try {
@@ -122,11 +129,6 @@ class BackButtonManager {
       // 2. Otherwise, navigate back in the section history stack
       const state = e.state;
       let targetSection = state?.section;
-
-      if (!targetSection) {
-        const params = new URLSearchParams(window.location.search);
-        targetSection = params.get('tab') || 'explore';
-      }
 
       // Pop current from internal history
       if (this.sectionHistory.length > 1) {

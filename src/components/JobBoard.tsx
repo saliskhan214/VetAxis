@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { UserProfile, JobPost, JobApplication, UserRole } from '../types';
 import { JobBoardService, NotificationService } from '../lib/storage';
 import { PrefetchService } from '../lib/prefetchService';
+import { backButtonManager } from '../lib/backButtonManager';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Briefcase, Search, MapPin, DollarSign, Calendar, Clock, UserCheck, 
@@ -100,6 +101,25 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
 
   // Toast alert
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Android hardware / gesture back button integration
+  useEffect(() => {
+    if (isPostModalOpen) {
+      return backButtonManager.registerModal('job_post_modal', () => setIsPostModalOpen(false));
+    }
+  }, [isPostModalOpen]);
+
+  useEffect(() => {
+    if (selectedJobToApply) {
+      return backButtonManager.registerModal('job_apply_modal', () => setSelectedJobToApply(null));
+    }
+  }, [selectedJobToApply]);
+
+  useEffect(() => {
+    if (viewingJobApplicants) {
+      return backButtonManager.registerModal('job_applicants_modal', () => setViewingJobApplicants(null));
+    }
+  }, [viewingJobApplicants]);
 
   // Local resolved highlight job ID
   const [localHighlightJobId, setLocalHighlightJobId] = useState<string | null>(null);
