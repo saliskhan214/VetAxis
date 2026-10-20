@@ -4,7 +4,7 @@ export const GOOGLE_MAPS_API_KEY =
   (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
   (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
+  'AIzaSyBU_bLKFY_15jzckXVanJdBF50jPpOxdWM';
 
 export const MAPS_ATTRIBUTION_IDS = ['gmp_mcp_codeassist_v1_aistudio'] as const;
 

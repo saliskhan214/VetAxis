@@ -53,7 +53,7 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
   });
   const [loading, setLoading] = useState<boolean>(() => {
     const cached = PrefetchService.getCachedCommunityPosts();
-    return !cached || cached.length === 0;
+    return !cached;
   });
   const [activeFilter, setActiveFilter] = useState<string>('all');
   
@@ -177,9 +177,9 @@ export function CommunityFeed({ currentUser, highlightPostId, onRequireAuth }: C
   };
 
   useEffect(() => {
-    // Subscribe to live predictive cache updates
+    // Subscribe to live synchronized updates
     const unsub = PrefetchService.subscribe('community', (data) => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setPosts(data);
         setLoading(false);
       }

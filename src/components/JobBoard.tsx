@@ -24,7 +24,7 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [loading, setLoading] = useState<boolean>(() => {
     const cached = PrefetchService.getCachedJobs();
-    return !cached || cached.length === 0;
+    return !cached;
   });
   const [loadingApps, setLoadingApps] = useState<boolean>(false);
   const [loadingAllApps, setLoadingAllApps] = useState<boolean>(false);
@@ -196,9 +196,9 @@ export function JobBoard({ currentUser, highlightJobId, highlightApplicationId, 
   };
 
   useEffect(() => {
-    // Subscribe to live predictive updates
+    // Subscribe to live synchronized updates
     const unsub = PrefetchService.subscribe('jobs', (data) => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setJobs(data);
         setLoading(false);
       }

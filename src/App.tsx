@@ -230,9 +230,14 @@ export default function App() {
     });
   }, [activeSection, initialCity]);
 
-  // Predictive Movement & Pre-fetching Engine initialization
+  // Live Data Synchronization & Universal Pre-fetching Engine initialization
   useEffect(() => {
+    PrefetchService.startLiveSync(currentUser);
     PrefetchService.warmupIdle(currentUser?.uid);
+
+    return () => {
+      PrefetchService.stopLiveSync();
+    };
   }, [currentUser?.uid]);
 
   // Predictive prefetch on active section transition
@@ -501,13 +506,22 @@ export default function App() {
     if (normalized === 'city_portal' || normalized === 'local_vets' || normalized === 'cities') normalized = 'radar';
     if (normalized === 'google_business' || normalized === 'local_seo' || normalized === 'gbp_guide') normalized = 'explore';
 
+    if (normalized === 'radar') {
+      setInitialCity(null);
+    }
+
     const PRIVATE_SECTIONS = ['messenger', 'profile', 'admin'];
     if (!currentUser && PRIVATE_SECTIONS.includes(normalized)) {
       triggerAuthWall(`sign in to access ${normalized.replace('_', ' ')}`);
       return;
     }
 
-    if (normalized === activeSection) return;
+    if (normalized === activeSection) {
+      if (normalized === 'radar') {
+        window.dispatchEvent(new CustomEvent('vetaxis:refresh_radar'));
+      }
+      return;
+    }
 
     backButtonManager.pushSection(normalized);
 
@@ -517,6 +531,13 @@ export default function App() {
     setHighlightPostId(null);
     setHighlightJobId(null);
     setHighlightApplicationId(null);
+
+    // Scroll to top immediately for mobile / Android devices so users land at top of view
+    try {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
 
     // Sync URL and browser history for Android back button and deep-linking
     try {
@@ -535,6 +556,9 @@ export default function App() {
       setHighlightPostId(null);
       setHighlightJobId(null);
       setHighlightApplicationId(null);
+      try {
+        window.scrollTo(0, 0);
+      } catch {}
     });
   }, []);
 
@@ -560,11 +584,23 @@ export default function App() {
             const stored = getLocalSession();
             const now = Date.now();
             if (stored && stored.uid === firebaseUser.uid) {
-              const refreshed = { ...stored, lastSeen: now, isOnline: true };
+              const refreshed = { 
+                ...stored, 
+                lastSeen: now, 
+                lastLoginAt: stored.lastLoginAt || now, 
+                isOnline: true 
+              };
               setCurrentUser(refreshed);
               secureSetItem('va_session', JSON.stringify(refreshed));
+              if (refreshed.role === 'doctor' || refreshed.role === 'clinic') {
+                PrefetchService.refreshProfessionals(refreshed.role).catch(() => {});
+              }
               try {
-                updateDoc(doc(db, 'users', firebaseUser.uid), { lastSeen: now, isOnline: true });
+                updateDoc(doc(db, 'users', firebaseUser.uid), { 
+                  lastSeen: now, 
+                  lastLoginAt: refreshed.lastLoginAt, 
+                  isOnline: true 
+                });
               } catch {}
             } else {
               // Fetch fresh user profile from DB to prevent out-of-sync or missing records
@@ -582,8 +618,15 @@ export default function App() {
                 const finalized = injectTemporaryPlatinum(profile);
                 setCurrentUser(finalized);
                 secureSetItem('va_session', JSON.stringify(finalized));
+                if (finalized.role === 'doctor' || finalized.role === 'clinic') {
+                  PrefetchService.refreshProfessionals(finalized.role).catch(() => {});
+                }
                 try {
-                  updateDoc(userRef, { lastSeen: now, isOnline: true });
+                  updateDoc(userRef, { 
+                    lastSeen: now, 
+                    lastLoginAt: profile.lastLoginAt, 
+                    isOnline: true 
+                  });
                 } catch {}
               } else {
                 setCurrentUser(null);
@@ -824,12 +867,19 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
     setAuthModalContext(null);
+    if (user.role === 'doctor' || user.role === 'clinic') {
+      PrefetchService.refreshProfessionals(user.role).catch(() => {});
+    }
   };
 
   const handleLogout = async () => {
+    const prevRole = currentUser?.role;
     await AuthService.signOut();
     setCurrentUser(null);
     setActiveSection('explore');
+    if (prevRole === 'doctor' || prevRole === 'clinic') {
+      PrefetchService.refreshProfessionals(prevRole).catch(() => {});
+    }
   };
 
   const handleUpdateUserProfile = (updated: UserProfile) => {

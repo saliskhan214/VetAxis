@@ -119,9 +119,9 @@ export function injectPresence(profile: UserProfile | null): UserProfile | null 
     profile.isOnline = false;
   }
 
-  // If lastSeen is missing, use real lastLoginAt or createdAt
-  if (!profile.lastSeen) {
-    profile.lastSeen = (profile as any).lastLoginAt || profile.createdAt || Date.now();
+  // Maintain authentic presence: do not synthesize Date.now() for offline users
+  if (!profile.lastSeen && (profile as any).lastLoginAt) {
+    profile.lastSeen = (profile as any).lastLoginAt;
   }
 
   return profile;
@@ -133,21 +133,34 @@ export function isPractitionerOffline30Days(profile: UserProfile): boolean {
   if (profile.role !== 'doctor' && profile.role !== 'clinic') {
     return false;
   }
+  // Online practitioners are active right now and should not disappear
+  if (profile.isOnline) return false;
+
   // Base directory partner clinics and doctors should remain listed
   if (profile.uid && profile.uid.startsWith('seed_')) {
     return false;
   }
-  if (profile.isOnline) return false;
-  const lastActive = profile.lastSeen || (profile as any).lastLoginAt || profile.createdAt;
-  if (!lastActive) return false;
-  return (Date.now() - lastActive) > THIRTY_DAYS_MS;
+
+  // Inactivity is strictly calculated from confirmed login session timestamps
+  const confirmedLogin = profile.lastLoginAt || (profile as any).lastLoginTime;
+  if (!confirmedLogin || typeof confirmedLogin !== 'number') {
+    // If the practitioner has never logged in since sign-up, do not disappear them prematurely
+    return false;
+  }
+
+  return (Date.now() - confirmedLogin) > THIRTY_DAYS_MS;
 }
 
 function getLocalUsers(): UserProfile[] {
   try {
     const raw = secureGetItem(LOCAL_USERS_KEY);
     const list = JSON.parse(raw || '[]');
-    return list.map((u: any) => injectPresence(injectTemporaryPlatinum(u)) as UserProfile);
+    // Filter out any legacy dummy/seed users so only real registered accounts are returned
+    const realUsers = list.filter((u: any) => u && u.uid && !u.uid.startsWith('seed_') && !u.uid.startsWith('demo_'));
+    if (realUsers.length !== list.length) {
+      saveLocalUsers(realUsers);
+    }
+    return realUsers.map((u: any) => injectPresence(injectTemporaryPlatinum(u)) as UserProfile);
   } catch {
     return [];
   }
@@ -308,315 +321,21 @@ function cleanUndefined<T>(obj: T): T {
 }
 
 // Ensure first-time boot has default demo professionals populated so the preview isn't blank
-export const BASE_PLATFORM_USERS: UserProfile[] = [
-      {
-        uid: 'seed_doc_1',
-        name: 'Dr. Sarah Alizai, DVM',
-        email: 'sarah.alizai@vetaxis.pk',
-        phone: '03001234567',
-        role: 'doctor',
-        expertise: 'Feline Specialist, Cat-Only Fear Free Certified, Soft Tissue Surgery',
-        createdAt: Date.now() - 5 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Available on-call for doorstep emergency & routine vaccinations',
-        address: 'Islamabad Capital Territory',
-        location: {
-          lat: 33.6844,
-          lng: 73.0479,
-          address: 'F-7 / F-8 Markaz, Islamabad'
-        },
-        avgRating: 4.9,
-        totalReviews: 24,
-        reviews: [
-          {
-            id: 'rev_1',
-            reviewerEmail: 'user1@test.com',
-            reviewerName: 'Ali Khan',
-            reviewerRole: 'user',
-            rating: 5,
-            comment: 'Dr. Sarah saved my Persian cat during late-night emergency triage. Fear-free gentle handling and pristine diagnosis.',
-            date: Date.now() - 2 * 24 * 3600000
-          }
-        ]
-      },
-      {
-        uid: 'seed_doc_2',
-        name: 'Dr. Faisal Shah, DVM, MSc (Surgery)',
-        email: 'faisal.shah@vetaxis.pk',
-        phone: '03217654321',
-        role: 'doctor',
-        expertise: 'Avian Medicine, Exotic Pets (Rabbits, Reptiles, Birds), Orthopedics & GDV Bloat Surgery',
-        createdAt: Date.now() - 15 * 24 * 3600000,
-        isVerified: true,
-        address: 'Gulberg III, Lahore',
-        location: {
-          lat: 31.5204,
-          lng: 74.3587,
-          address: 'Main Boulevard, Gulberg III, Lahore'
-        },
-        avgRating: 4.9,
-        totalReviews: 18,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_1',
-        name: '24/7 Companion Animal Hospital & Emergency Trauma Center',
-        email: 'emergency.lahore@clinic.pk',
-        phone: '04235889900',
-        role: 'clinic',
-        facilities: 'Digital X-Ray, In-House Blood Lab, Ultrasound, 24/7 Emergency Open Now, Walk-in (No Appt Required), CareCredit / Payment Plans Accepted, Oxygen ICU, Isolation Ward',
-        address: 'DHA Phase 5 / Gulberg, Lahore',
-        createdAt: Date.now() - 5 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Mobile vet van & 24hr after-hours home emergency visit unit',
-        location: {
-          lat: 31.4697,
-          lng: 74.4101,
-          address: 'Sector CCA, Phase 5 DHA, Lahore'
-        },
-        avgRating: 4.9,
-        totalReviews: 42,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_2',
-        name: 'Metro Pet Dental, Dermatology & Spay-Neuter Surgical Clinic',
-        email: 'metropet.isb@clinic.pk',
-        phone: '0512877665',
-        role: 'clinic',
-        facilities: 'Puppy Vaccinations and Deworming, Low Cost Cat Spay Neuter Clinic, Ultrasonic Pet Dental Scaling, Skin Allergy Testing, Microchipping (ISO 11784), Digital X-Ray Sensor',
-        address: 'Blue Area / G-9 Markaz, Islamabad',
-        createdAt: Date.now() - 25 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Doorstep puppy vaccine boosters & routine microchipping',
-        location: {
-          lat: 33.7087,
-          lng: 73.0560,
-          address: 'Jinnah Avenue, Blue Area, Islamabad'
-        },
-        avgRating: 4.8,
-        totalReviews: 31,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_3',
-        name: 'Equine, Livestock & Companion Veterinary Surgical Center',
-        email: 'equine.peshawar@clinic.pk',
-        phone: '0915222222',
-        role: 'clinic',
-        facilities: 'Equine Horse Care, Colic Management, Digital Radiography, High-Frequency Ultrasound, Mobile Farm Ambulatory Unit, Livestock Herd Health',
-        address: 'Khyber Road, Peshawar Cantonment',
-        createdAt: Date.now() - 20 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Mobile vet van with portable ultrasound for horse and farm calls',
-        location: {
-          lat: 34.0151,
-          lng: 71.5249,
-          address: 'Khyber Road, Peshawar Cantonment'
-        },
-        avgRating: 4.9,
-        totalReviews: 19,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_4',
-        name: 'Clifton 24/7 Emergency Pet Hospital & Feline Critical Care',
-        email: 'emergency.karachi@clinic.pk',
-        phone: '02135832100',
-        role: 'clinic',
-        facilities: '24/7 Trauma Emergency, Feline Viral Isolation ICU, Digital Radiography, Gas Anesthesia, Doppler Ultrasound, Walk-in Triage',
-        address: 'Block 4, Clifton, Marine Drive, Karachi',
-        createdAt: Date.now() - 28 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Emergency night van with portable oxygen and feline triage unit',
-        location: {
-          lat: 24.8236,
-          lng: 67.0345,
-          address: 'Block 4, Clifton, Karachi'
-        },
-        avgRating: 4.9,
-        totalReviews: 54,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_5',
-        name: 'Rawalpindi Cantonment Companion Animal & Orthopedic Surgery Center',
-        email: 'rawalpindi.vet@clinic.pk',
-        phone: '0515564433',
-        role: 'clinic',
-        facilities: 'Orthopedic Bone Pinning, Parvovirus Isolation Ward, Puppy Vaccinations, In-house Blood Analyzer, Walk-ins Welcome',
-        address: 'The Mall, Saddar Cantt, Rawalpindi',
-        createdAt: Date.now() - 24 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Doorstep vaccination booster rounds across Rawalpindi Cantt & Westridge',
-        location: {
-          lat: 33.5932,
-          lng: 73.0531,
-          address: 'Saddar, Rawalpindi Cantt'
-        },
-        avgRating: 4.8,
-        totalReviews: 38,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_6',
-        name: 'Faisalabad Veterinary Diagnostic Hospital & Dairy Herd Care',
-        email: 'faisalabad.vet@clinic.pk',
-        phone: '0418721155',
-        role: 'clinic',
-        facilities: 'Small Animal Soft Tissue Surgery, Dairy Bovine Health, Ultrasonic Dental Scaling, Hematology & Biochemistry Lab',
-        address: 'D-Ground, Peoples Colony No. 1, Faisalabad',
-        createdAt: Date.now() - 22 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Mobile ambulatory clinic van for companion pets and dairy farms',
-        location: {
-          lat: 31.4187,
-          lng: 73.0791,
-          address: 'D-Ground, Peoples Colony, Faisalabad'
-        },
-        avgRating: 4.9,
-        totalReviews: 29,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_7',
-        name: 'Multan Trauma Animal Hospital & Heatstroke Emergency Unit',
-        email: 'multan.vet@clinic.pk',
-        phone: '0616523311',
-        role: 'clinic',
-        facilities: 'Heatstroke Emergency Cooling Triage, Mobile Farm Call Van, Digital X-Ray, Pet Microchipping, Core Vaccinations',
-        address: 'Bosan Road / Officers Colony, Multan',
-        createdAt: Date.now() - 19 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Emergency heatstroke triage response & doorstep puppy vaccinations',
-        location: {
-          lat: 30.1984,
-          lng: 71.4687,
-          address: 'Bosan Road, Officers Colony, Multan'
-        },
-        avgRating: 4.8,
-        totalReviews: 23,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_8',
-        name: 'Quetta Central Veterinary Hospital & Livestock Health Center',
-        email: 'quetta.vet@clinic.pk',
-        phone: '0812834400',
-        role: 'clinic',
-        facilities: 'Emergency Animal Trauma, Livestock & Ruminant Medicine, Rabies Prevention, Surgical Suite',
-        address: 'Zarghoon Road, Cantonment, Quetta',
-        createdAt: Date.now() - 16 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Mobile vet team for livestock disease control and pet house calls',
-        location: {
-          lat: 30.1924,
-          lng: 66.9987,
-          address: 'Zarghoon Road, Cantonment, Quetta'
-        },
-        avgRating: 4.9,
-        totalReviews: 17,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_9',
-        name: 'Gujranwala Companion Care & Surgical Pet Clinic',
-        email: 'gujranwala.vet@clinic.pk',
-        phone: '0553841122',
-        role: 'clinic',
-        facilities: 'Walk-in Puppy & Kitten Vaccinations, Spay/Neuter Laser Surgery, Diagnostic Ultrasound, Pet Boarding ICU',
-        address: 'DC Colony, Main Commercial Boulevard, Gujranwala',
-        createdAt: Date.now() - 14 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'Routine doorstep wellness exams & deworming protocol',
-        location: {
-          lat: 32.1617,
-          lng: 74.1883,
-          address: 'DC Colony, Gujranwala'
-        },
-        avgRating: 4.7,
-        totalReviews: 21,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_10',
-        name: 'Sialkot Surgical Precision Veterinary Care & Pet Hospital',
-        email: 'sialkot.vet@clinic.pk',
-        phone: '0524263300',
-        role: 'clinic',
-        facilities: 'Veterinary Surgical Specialty, International Pet Travel Health Certification, ISO Microchipping, Emergency Care',
-        address: 'Paris Road / Cantt, Sialkot',
-        createdAt: Date.now() - 12 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'USDA & APHIS travel health certificate home inspections',
-        location: {
-          lat: 32.5022,
-          lng: 74.5371,
-          address: 'Paris Road, Cantt, Sialkot'
-        },
-        avgRating: 4.9,
-        totalReviews: 26,
-        reviews: []
-      },
-      {
-        uid: 'seed_clinic_11',
-        name: 'Hyderabad Animal Healthcare & 24hr Emergency Clinic',
-        email: 'hyderabad.vet@clinic.pk',
-        phone: '0223812299',
-        role: 'clinic',
-        facilities: '24/7 Emergency Pet Triage, Companion Animal Vaccinations, Orthopedic Splinting, In-House Diagnostic Lab',
-        address: 'Auto Bhan Road, Latifabad Unit 3, Hyderabad',
-        createdAt: Date.now() - 10 * 24 * 3600000,
-        isVerified: true,
-        offersHomeVisit: true,
-        homeVisitCharges: 'On-call emergency triage & doorstep puppy vaccination booster pack',
-        location: {
-          lat: 25.3789,
-          lng: 68.3541,
-          address: 'Auto Bhan Road, Latifabad, Hyderabad'
-        },
-        avgRating: 4.8,
-        totalReviews: 19,
-        reviews: []
-      },
-      {
-        uid: 'seed_assistant_1',
-        name: 'Haris Qureshi, Licensed Vet Tech',
-        email: 'haris.q@vetaxis.pk',
-        phone: '03339090901',
-        role: 'assistant',
-        expertise: 'Wound dressing, AAHA puppy vaccination schedules, catheterization, post-op ICU monitoring',
-        createdAt: Date.now() - 2 * 24 * 3600000,
-        isVerified: true,
-        avgRating: 4.8,
-        totalReviews: 8,
-    reviews: []
-  }
-];
+// Only real registered accounts who signed up with VetAxis web app are displayed.
+export const BASE_PLATFORM_USERS: UserProfile[] = [];
 
 function populateInitialSeeds() {
-  const users = getLocalUsers();
-  if (users.length === 0) {
-    saveLocalUsers(BASE_PLATFORM_USERS);
-  } else {
-    // If users exist but seed partner clinics are missing, guarantee partner directory clinics are present
-    const existingUids = new Set(users.map(u => u.uid));
-    const missing = BASE_PLATFORM_USERS.filter(s => !existingUids.has(s.uid));
-    if (missing.length > 0) {
-      saveLocalUsers([...users, ...missing]);
+  // Purge any legacy dummy/seed users from local storage
+  try {
+    const raw = secureGetItem(LOCAL_USERS_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      const clean = list.filter((u: any) => u && u.uid && !u.uid.startsWith('seed_') && !u.uid.startsWith('demo_'));
+      if (clean.length !== list.length) {
+        saveLocalUsers(clean);
+      }
     }
-  }
+  } catch {}
 
   // Seed default marketplace items (Matching Categories 4 & 6)
   if (!localStorage.getItem(LOCAL_ACC_KEY)) {
@@ -1827,7 +1546,7 @@ export const LocationService = {
 };
 
 export const ExploreService = {
-  async fetchProfessionals(role: 'doctor' | 'clinic' | 'assistant'): Promise<UserProfile[]> {
+  async fetchProfessionals(role: 'doctor' | 'clinic' | 'assistant', options?: { excludeOffline30Days?: boolean }): Promise<UserProfile[]> {
     const validEmails = await getValidUserEmails();
     if (isFirebaseConfigured && db) {
       try {
@@ -1838,6 +1557,17 @@ export const ExploreService = {
         for (const userDoc of snapshots.docs) {
           const rawData = userDoc.data() as UserProfile;
           const userUid = rawData.uid || userDoc.id;
+          // Filter out dummy/seed/scraped profiles - strictly show registered users
+          if (
+            userUid.startsWith('seed_') ||
+            userUid.startsWith('demo_') ||
+            userUid.startsWith('gmap_') ||
+            userDoc.id.startsWith('seed_') ||
+            userDoc.id.startsWith('demo_') ||
+            userDoc.id.startsWith('gmap_')
+          ) {
+            continue;
+          }
           const profile: UserProfile = {
             ...rawData,
             uid: userUid
@@ -1869,18 +1599,15 @@ export const ExploreService = {
             profile.totalReviews = 0;
           }
           const finalProfile = injectPresence(injectTemporaryPlatinum(profile)) as UserProfile;
-          if (role === 'doctor' || role === 'clinic') {
+          if (options?.excludeOffline30Days && (role === 'doctor' || role === 'clinic')) {
             if (isPractitionerOffline30Days(finalProfile)) {
-              // Disappear card from home page if offline > 30 days
               continue;
             }
           }
           list.push(finalProfile);
         }
-        if (list.length > 0) {
-          return list;
-        }
-        console.info(`[VetAxis] Firestore returned 0 ${role}s, falling back to local directory.`);
+        // Return only real registered practitioners from Firestore
+        return list;
       } catch (err) {
         try {
           handleFirestoreError(err, OperationType.LIST, 'users');
@@ -1890,11 +1617,12 @@ export const ExploreService = {
       }
     }
 
-    // Local Fallback list
+    // Local Fallback list (strictly real users who signed up on web app)
     const users = getLocalUsers();
     const localFiltered = users.filter(u => {
       if (u.role !== role) return false;
-      if (role === 'doctor' || role === 'clinic') {
+      if (u.uid.startsWith('seed_') || u.uid.startsWith('demo_') || u.uid.startsWith('gmap_')) return false;
+      if (options?.excludeOffline30Days && (role === 'doctor' || role === 'clinic')) {
         if (isPractitionerOffline30Days(u)) {
           return false;
         }
@@ -1902,11 +1630,7 @@ export const ExploreService = {
       return true;
     });
 
-    const candidateList = localFiltered.length > 0
-      ? localFiltered
-      : BASE_PLATFORM_USERS.filter(u => u.role === role);
-
-    return candidateList.map(u => {
+    return localFiltered.map(u => {
       const reviews = u.reviews || [];
       const filteredReviews = reviews.filter(rev => {
         const email = (rev.reviewerEmail || '').toLowerCase().trim();
@@ -1918,15 +1642,15 @@ export const ExploreService = {
         u.avgRating = parseFloat((sum / filteredReviews.length).toFixed(1));
         u.totalReviews = filteredReviews.length;
       } else {
-        u.avgRating = u.avgRating || 4.8;
-        u.totalReviews = u.totalReviews || 10;
+        u.avgRating = 0;
+        u.totalReviews = 0;
       }
       return injectPresence(injectTemporaryPlatinum(u)) as UserProfile;
     });
   },
 
   getBaseSeedClinics(): UserProfile[] {
-    return BASE_PLATFORM_USERS.filter(u => u.role === 'clinic');
+    return [];
   },
 
   sortUsers(list: UserProfile[], sortType: SORT_TYPES, userLoc: GeoLocation | null): UserProfile[] {

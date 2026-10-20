@@ -1048,8 +1048,9 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
         return res.status(400).json({ success: false, error: "Valid 'lat' and 'lng' query parameters are required." });
       }
 
+      const isFresh = req.query.fresh === "1" || req.query.fresh === "true";
       const cacheKey = `nearby_${lat.toFixed(2)}_${lng.toFixed(2)}_${radius}`;
-      if (placesCache[cacheKey] && (Date.now() - placesCache[cacheKey].timestamp < PLACES_CACHE_TTL)) {
+      if (!isFresh && placesCache[cacheKey] && (Date.now() - placesCache[cacheKey].timestamp < PLACES_CACHE_TTL)) {
         return res.json({
           success: true,
           source: "cache",
@@ -1147,8 +1148,9 @@ For the sourceUrl, try to find or construct a valid URL related to the source or
         return res.status(400).json({ success: false, error: "'query' or 'city' parameter is required." });
       }
 
+      const isFresh = req.query.fresh === "1" || req.query.fresh === "true";
       const cacheKey = `search_${query.toLowerCase()}_${lat?.toFixed(2) || 'any'}_${lng?.toFixed(2) || 'any'}`;
-      if (placesCache[cacheKey] && (Date.now() - placesCache[cacheKey].timestamp < PLACES_CACHE_TTL)) {
+      if (!isFresh && placesCache[cacheKey] && (Date.now() - placesCache[cacheKey].timestamp < PLACES_CACHE_TTL)) {
         return res.json({
           success: true,
           source: "cache",

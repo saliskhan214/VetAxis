@@ -22,7 +22,7 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(() => {
     const cached = PrefetchService.getCachedPetAds();
-    return !cached || cached.length === 0;
+    return !cached;
   });
   const [speciesFilter, setSpeciesFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>(() => {
@@ -176,9 +176,9 @@ export function PetAds({ currentUser, onNavigate, highlightAdId, initialType, on
   };
 
   useEffect(() => {
-    // Subscribe to live predictive updates
+    // Subscribe to live synchronized updates
     const unsub = PrefetchService.subscribe('pet_ads', (data) => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setAds(data);
         setLoading(false);
       }

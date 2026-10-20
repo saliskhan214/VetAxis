@@ -19,16 +19,19 @@ class GooglePlacesService {
   async fetchNearbyGoogleClinics(
     lat: number,
     lng: number,
-    radiusMeters: number = 25000
+    radiusMeters: number = 25000,
+    forceFresh: boolean = true
   ): Promise<UserProfile[]> {
     const cacheKey = `nearby_${lat.toFixed(3)}_${lng.toFixed(3)}_${radiusMeters}`;
-    const cached = this.clientCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.data;
+    if (!forceFresh) {
+      const cached = this.clientCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        return cached.data;
+      }
     }
 
     try {
-      const url = `/api/places/nearby-vets?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&radius=${encodeURIComponent(radiusMeters)}`;
+      const url = `/api/places/nearby-vets?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&radius=${encodeURIComponent(radiusMeters)}${forceFresh ? '&fresh=1' : ''}`;
       const res = await fetch(url);
       if (!res.ok) {
         throw new Error(`Google Places API returned ${res.status}`);
@@ -52,19 +55,22 @@ class GooglePlacesService {
   async fetchCityGoogleClinics(
     cityOrQuery: string,
     lat?: number,
-    lng?: number
+    lng?: number,
+    forceFresh: boolean = true
   ): Promise<UserProfile[]> {
     const trimmed = cityOrQuery.trim();
     if (!trimmed) return [];
 
     const cacheKey = `search_${trimmed.toLowerCase()}_${lat?.toFixed(2) || '0'}_${lng?.toFixed(2) || '0'}`;
-    const cached = this.clientCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.data;
+    if (!forceFresh) {
+      const cached = this.clientCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        return cached.data;
+      }
     }
 
     try {
-      let url = `/api/places/search-vets?query=${encodeURIComponent(trimmed)}`;
+      let url = `/api/places/search-vets?query=${encodeURIComponent(trimmed)}${forceFresh ? '&fresh=1' : ''}`;
       if (lat !== undefined && lng !== undefined) {
         url += `&lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
       }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { UserProfile, Review, SORT_TYPES, UserRole, canUserReview, PromotionalAd } from '../types';
-import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem } from '../lib/storage';
+import { ExploreService, LocationService, PromotionalAdsService, NotificationService, AuthService, secureGetItem, secureSetItem, isPractitionerOffline30Days } from '../lib/storage';
 import { ClinicService } from '../lib/clinicService';
 import { PrefetchService } from '../lib/prefetchService';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'motion/react';
@@ -80,7 +80,7 @@ export function ExploreFeed({
     const cached = PrefetchService.getCachedProfessionals(
       highlightClinicId ? 'clinic' : highlightDoctorId ? 'doctor' : 'doctor'
     );
-    return !cached || cached.length === 0;
+    return !cached;
   });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [homeVisitOnly, setHomeVisitOnly] = useState<boolean>(false);
@@ -643,7 +643,7 @@ export function ExploreFeed({
 
     // Subscribe to live predictive cache updates for real-time reactivity
     const unsub = PrefetchService.subscribe(`professionals_${activeTab}`, (data) => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setProfessionals(data);
         setLoading(false);
       }
@@ -834,8 +834,7 @@ export function ExploreFeed({
       if (p.role === 'doctor' || p.role === 'clinic') {
         const isSelf = currentUser?.uid && currentUser.uid === p.uid;
         if (!isSelf && !p.isOnline) {
-          const lastActive = p.lastSeen || (p as any).lastLoginAt || p.createdAt;
-          if (lastActive && (Date.now() - lastActive > 30 * 24 * 60 * 60 * 1000)) {
+          if (isPractitionerOffline30Days(p)) {
             return false;
           }
         }
@@ -1139,11 +1138,15 @@ export function ExploreFeed({
         <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0">
           <button
             type="button"
-            onClick={() => onNavigate?.('radar')}
-            className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onNavigate?.('radar');
+            }}
+            className="w-full md:w-auto px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-slate-950 font-extrabold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md select-none touch-manipulation"
           >
             <span>Launch Smart Radar</span>
-            <Navigation className="w-3.5 h-3.5" />
+            <Navigation className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -1947,18 +1950,34 @@ export function ExploreFeed({
           ))}
         </div>
       ) : filteredProfessionals.length === 0 ? (
-        <div className="text-center p-16 bg-white rounded-3xl border-2 border-dashed border-[#e3dec9] shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
-          <div className="text-5xl animate-bounce">🔍</div>
-          <h3 className="font-serif text-xl font-black text-[#373735]">No Directory Profiles Found</h3>
+        <div className="text-center p-12 sm:p-16 bg-white rounded-3xl border-2 border-dashed border-[#e3dec9] shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
+          <div className="text-5xl animate-bounce">
+            {activeTab === 'clinic' ? '🏥' : '🩺'}
+          </div>
+          <h3 className="font-serif text-xl font-black text-[#373735]">
+            {activeTab === 'clinic' ? 'No Registered Clinics Yet' : 'No Registered Doctors Yet'}
+          </h3>
           <p className="text-xs text-[#7a766f] font-semibold leading-relaxed max-w-md">
-            No medical centers or registered vet doctors were found matching your current filter set. Reset your query parameters to see all active practitioners.
+            {activeTab === 'clinic'
+              ? 'Only real, verified veterinary clinics and companion animal hospitals signed up with VetAxis 360 appear in this section. Dummy listings have been completely removed.'
+              : 'Only real, licensed veterinary doctors registered with VetAxis 360 appear in this directory.'}
           </p>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap gap-2.5 justify-center">
+            {onRequireAuth && (
+              <button
+                type="button"
+                onClick={() => onRequireAuth(activeTab === 'clinic' ? 'register clinic' : 'register doctor')}
+                className="btn-tactile-3d-secondary bg-[#5a5a40] text-white border-[#3c3c2b] hover:bg-[#4a4a34] px-5 py-2.5 text-xs font-black cursor-pointer transition-colors"
+              >
+                {activeTab === 'clinic' ? 'Register Your Clinic 🏥' : 'Register as a Vet 🩺'}
+              </button>
+            )}
             <button
+              type="button"
               onClick={handleResetAllFilters}
-              className="btn-tactile-3d-secondary bg-[#5a5a40] text-white border-[#3c3c2b] hover:bg-[#4a4a34] px-6 py-2.5 text-xs font-black cursor-pointer transition-colors"
+              className="btn-tactile-3d-secondary bg-stone-100 text-[#5a5a40] border-stone-300 hover:bg-stone-200 px-5 py-2.5 text-xs font-black cursor-pointer transition-colors"
             >
-              Reset All Filters & View All Cards 🔄
+              Reset Filters 🔄
             </button>
           </div>
         </div>

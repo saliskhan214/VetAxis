@@ -21,7 +21,7 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(() => {
     const cached = PrefetchService.getCachedProducts();
-    return !cached || cached.length === 0;
+    return !cached;
   });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -99,9 +99,9 @@ export function Marketplace({ currentUser, onNavigate, highlightProductId, onReq
       setProdWhatsapp(currentUser.phone);
     }
 
-    // Subscribe to live predictive updates
+    // Subscribe to live synchronized updates
     const unsub = PrefetchService.subscribe('marketplace', (data) => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setProducts(data);
         setLoading(false);
       }

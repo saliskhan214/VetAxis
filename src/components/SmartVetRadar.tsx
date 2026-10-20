@@ -1,11 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Navigation, 
   MapPin, 
   Phone, 
   MessageCircle, 
-  ExternalLink, 
   ShieldAlert, 
   Search, 
   CheckCircle2, 
@@ -13,15 +12,44 @@ import {
   Compass, 
   Star, 
   Clock,
-  Radio,
   AlertCircle,
-  Map,
+  Map as MapIcon,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  ExternalLink,
+  Layers,
+  Crosshair,
+  Maximize2,
+  Minimize2,
+  Building2,
+  Stethoscope,
+  Radio,
+  SlidersHorizontal,
+  ChevronDown,
+  X
 } from 'lucide-react';
+import { 
+  APIProvider, 
+  Map as GoogleMapComponent, 
+  AdvancedMarker, 
+  Pin, 
+  InfoWindow, 
+  useMap,
+  useMapsLibrary
+} from '@vis.gl/react-google-maps';
 import { UserProfile } from '../types';
 import { LocationService, ExploreService } from '../lib/storage';
 import { PAKISTAN_CITIES_SEO } from '../lib/seoService';
+import { PrefetchService } from '../lib/prefetchService';
+import { 
+  GOOGLE_MAPS_API_KEY, 
+  DEFAULT_MAP_ID, 
+  MAPS_ATTRIBUTION_IDS, 
+  DEFAULT_CENTER,
+  hasGoogleMapsKey,
+  getDirectionsUrl,
+  calculateHaversineDistanceKm
+} from '../lib/googleMaps';
 import { googlePlacesService } from '../lib/googlePlacesService';
 
 interface SmartVetRadarProps {
@@ -31,106 +59,215 @@ interface SmartVetRadarProps {
   onSelectClinic?: (clinic: UserProfile) => void;
 }
 
-interface ClinicWithDistance extends UserProfile {
+export interface RadarClinicItem extends UserProfile {
   distanceKm: number;
   isOpenNow: boolean;
   isEmergency247: boolean;
+  lat: number;
+  lng: number;
+  formattedAddress: string;
 }
 
-type ClinicSourceFilter = 'all' | 'google' | 'vetaxis';
+/**
+ * Inner Map Controller that manages Google Maps instance synchronization,
+ * panning, zoom adjustments, radar circle overlays, and bounds fitting.
+ */
+function RadarMapController({
+  userCoords,
+  radarRadiusKm,
+  selectedClinic,
+  onMapClick,
+  clinics
+}: {
+  userCoords: { lat: number; lng: number };
+  radarRadiusKm: number;
+  selectedClinic: RadarClinicItem | null;
+  onMapClick: () => void;
+  clinics: RadarClinicItem[];
+}) {
+  const map = useMap();
+  const mapsLib = useMapsLibrary('maps');
+  const circleRef = useRef<google.maps.Circle | null>(null);
 
-export function SmartVetRadar({ currentUser, initialCity, onNavigate, onSelectClinic }: SmartVetRadarProps) {
-  // Geolocation & Scan states
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [userCityLabel, setUserCityLabel] = useState<string>('Detecting location...');
+  // Pan to selected clinic or user location
+  useEffect(() => {
+    if (!map) return;
+    if (selectedClinic) {
+      map.panTo({ lat: selectedClinic.lat, lng: selectedClinic.lng });
+      const currentZoom = map.getZoom() || 13;
+      if (currentZoom < 14) {
+        map.setZoom(15);
+      }
+    }
+  }, [map, selectedClinic]);
+
+  // Recenter when user coordinates change (if no clinic is currently selected)
+  useEffect(() => {
+    if (!map || selectedClinic) return;
+    map.panTo(userCoords);
+  }, [map, userCoords, selectedClinic]);
+
+  // Draw interactive geographical radar coverage perimeter on the Google Map
+  useEffect(() => {
+    if (!map || !mapsLib || !userCoords) return;
+
+    const radiusMeters = radarRadiusKm > 0 ? radarRadiusKm * 1000 : 35000;
+
+    if (!circleRef.current) {
+      circleRef.current = new mapsLib.Circle({
+        map,
+        center: userCoords,
+        radius: radiusMeters,
+        fillColor: '#0284c7',
+        fillOpacity: 0.10,
+        strokeColor: '#38bdf8',
+        strokeOpacity: 0.65,
+        strokeWeight: 1.5,
+        clickable: false
+      });
+    } else {
+      circleRef.current.setMap(map);
+      circleRef.current.setCenter(userCoords);
+      circleRef.current.setRadius(radiusMeters);
+    }
+
+    return () => {
+      if (circleRef.current) {
+        circleRef.current.setMap(null);
+      }
+    };
+  }, [map, mapsLib, userCoords, radarRadiusKm]);
+
+  // Setup click listener to deselect marker
+  useEffect(() => {
+    if (!map) return;
+    const listener = map.addListener('click', () => {
+      onMapClick();
+    });
+    return () => {
+      google.maps.event.removeListener(listener);
+    };
+  }, [map, onMapClick]);
+
+  return null;
+}
+
+export function SmartVetRadar({ initialCity, onNavigate, onSelectClinic }: SmartVetRadarProps) {
+  const defaultCity = initialCity || 'Islamabad';
+  const defCoords = LocationService.resolveCoordinates(defaultCity);
+
+  // Geolocation & Radar telemetry state
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>(() => ({
+    lat: defCoords.lat,
+    lng: defCoords.lng
+  }));
+  const [userCityLabel, setUserCityLabel] = useState<string>(() => defaultCity);
+  const [gpsSource, setGpsSource] = useState<'device' | 'city'>('city');
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [isFetchingGooglePlaces, setIsFetchingGooglePlaces] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
-  
-  // Filtering & Proximity controls - default to 50km for generous mobile coverage
-  const [maxRadiusKm, setMaxRadiusKm] = useState<number>(50);
-  const [sourceFilter, setSourceFilter] = useState<ClinicSourceFilter>('all');
+  const isScanningRef = useRef<boolean>(false);
+
+  // View & UI controls
+  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split');
+  const [maxRadiusKm, setMaxRadiusKm] = useState<number>(30);
   const [emergencyOnly, setEmergencyOnly] = useState<boolean>(false);
   const [homeVisitOnly, setHomeVisitOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  
-  // Datasets - pre-populate with base directory clinics so mobile never displays 0 clinics on startup
+  const [selectedClinic, setSelectedClinic] = useState<RadarClinicItem | null>(null);
+
+  // Datasets: Registered clinics on platform + Google Maps Places API clinics
   const [platformClinics, setPlatformClinics] = useState<UserProfile[]>(() => {
-    return ExploreService.getBaseSeedClinics();
+    return PrefetchService.getCachedProfessionals('clinic') || [];
   });
   const [googleClinics, setGoogleClinics] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [isLoadingClinics, setIsLoadingClinics] = useState<boolean>(true);
+  const [isFetchingGooglePlaces, setIsFetchingGooglePlaces] = useState<boolean>(false);
 
-  // Load platform verified clinics from storage
+  // Track map zoom
+  const [zoomLevel, setZoomLevel] = useState<number>(12);
+
+  // 1. Load registered platform clinics from storage and listen to updates
   useEffect(() => {
     let isMounted = true;
-    async function loadData() {
+    async function loadPlatformClinics() {
       try {
         const clinics = await ExploreService.fetchProfessionals('clinic');
         if (isMounted) {
           setPlatformClinics(clinics);
-          setLoading(false);
         }
       } catch (err) {
-        console.error('Failed to load platform clinics for radar:', err);
-        if (isMounted) setLoading(false);
+        console.error('Failed to load registered clinics for radar:', err);
+      } finally {
+        if (isMounted) setIsLoadingClinics(false);
       }
     }
-    loadData();
-    return () => { isMounted = false; };
+    loadPlatformClinics();
+
+    const unsub = PrefetchService.subscribe('professionals_clinic', (clinics) => {
+      if (Array.isArray(clinics) && isMounted) {
+        setPlatformClinics(clinics);
+        setIsLoadingClinics(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsub();
+    };
   }, []);
 
-  // Fetch live Google Maps registered clinics around coordinates or city
-  const fetchGoogleClinicsForLocation = useCallback(async (lat: number, lng: number, cityLabel?: string) => {
-    setIsFetchingGooglePlaces(true);
-    try {
-      // 1. Fetch via GPS radius
-      let liveGoogleClinics = await googlePlacesService.fetchNearbyGoogleClinics(lat, lng, 35000);
-      
-      // 2. If nearby returned 0 (e.g. strict radius limit), fallback to city text search on Google
-      if (liveGoogleClinics.length === 0 && cityLabel) {
-        const cleanCity = cityLabel.replace(/^Near\s+/i, '');
-        liveGoogleClinics = await googlePlacesService.fetchCityGoogleClinics(`veterinary clinic in ${cleanCity}`, lat, lng);
-      }
-
-      // 3. Additional fallback search for animal hospital if still 0
-      if (liveGoogleClinics.length === 0 && cityLabel) {
-        const cleanCity = cityLabel.replace(/^Near\s+/i, '');
-        liveGoogleClinics = await googlePlacesService.fetchCityGoogleClinics(`animal hospital in ${cleanCity}`, lat, lng);
-      }
-
-      setGoogleClinics(liveGoogleClinics);
-    } catch (err) {
-      console.warn('Failed to load Google registered clinics:', err);
-    } finally {
-      setIsFetchingGooglePlaces(false);
-    }
+  // 2. Fallback to chosen Pakistani city without delay
+  const fallbackToCity = useCallback((cityName: string) => {
+    const coords = LocationService.resolveCoordinates(cityName);
+    setUserCoords({ lat: coords.lat, lng: coords.lng });
+    setUserCityLabel(cityName);
+    setGpsSource('city');
+    setGpsError(null);
+    setIsScanning(false);
+    isScanningRef.current = false;
+    setSelectedClinic(null);
   }, []);
 
-  // Mobile-first resilient two-stage Geolocation trigger
-  const requestLocation = () => {
+  // 3. Fast non-blocking GPS location detector
+  const requestLocation = useCallback((force = false) => {
+    if (isScanningRef.current && !force) return;
+    isScanningRef.current = true;
     setIsScanning(true);
     setGpsError(null);
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGpsError('Geolocation is not supported by your mobile browser. Showing clinics in Islamabad / all Pakistan:');
+      isScanningRef.current = false;
       setIsScanning(false);
-      fallbackToCity('Islamabad');
+      setGpsError('Device geolocation is not supported in this browser. Showing clinics in selected city.');
       return;
     }
 
     let hasResolved = false;
 
+    // Safety timeout: prevents infinite scanning indicator
+    const safetyTimer = setTimeout(() => {
+      if (!hasResolved) {
+        hasResolved = true;
+        isScanningRef.current = false;
+        setIsScanning(false);
+        // Do not block user; leave current city coordinates active
+      }
+    }, 2800);
+
     const onLocationSuccess = (pos: GeolocationPosition) => {
       if (hasResolved) return;
       hasResolved = true;
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      setUserCoords({ lat, lng });
+      clearTimeout(safetyTimer);
+      isScanningRef.current = false;
       setIsScanning(false);
       setGpsError(null);
 
-      // Find closest Pakistani city label
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      setUserCoords({ lat, lng });
+      setGpsSource('device');
+
+      // Identify closest major Pakistani city for friendly display
       let closestCity = 'Islamabad';
       let minDist = Infinity;
       for (const c of PAKISTAN_CITIES_SEO) {
@@ -141,83 +278,140 @@ export function SmartVetRadar({ currentUser, initialCity, onNavigate, onSelectCl
           closestCity = c.city;
         }
       }
-      const label = minDist < 70 ? `Near ${closestCity}` : `${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E`;
+      const label = minDist < 50 ? `${closestCity} (Device GPS)` : `Near ${closestCity} (${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E)`;
       setUserCityLabel(label);
-
-      // Fetch live Google Maps clinics for this exact GPS fix
-      fetchGoogleClinicsForLocation(lat, lng, closestCity);
     };
 
-    // Stage 1: Fast network/cell/Wi-Fi triangulation (~150ms on mobile phones)
-    navigator.geolocation.getCurrentPosition(
-      onLocationSuccess,
-      (networkErr) => {
-        console.warn('Network location unavailable, attempting hardware GPS:', networkErr);
-        // Stage 2: Hardware GPS with 8s timeout
-        navigator.geolocation.getCurrentPosition(
-          onLocationSuccess,
-          (gpsErr) => {
-            if (hasResolved) return;
-            hasResolved = true;
-            console.warn('GPS hardware location error:', gpsErr);
-            setIsScanning(false);
-            setGpsError('Could not acquire GPS fix indoors. Select your nearest city below:');
-            if (!userCoords) {
-              fallbackToCity('Islamabad');
-            }
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-        );
-      },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
-    );
-  };
+    const onLocationFail = (err: GeolocationPositionError) => {
+      if (hasResolved) return;
+      hasResolved = true;
+      clearTimeout(safetyTimer);
+      isScanningRef.current = false;
+      setIsScanning(false);
+      if (err.code === 1) {
+        setGpsError('Location access was denied. Showing clinics based on selected city below.');
+      } else {
+        setGpsError('Could not acquire precise GPS signal. Showing clinics based on city coordinates.');
+      }
+    };
 
-  // Run initial location scan or load initialCity
+    try {
+      navigator.geolocation.getCurrentPosition(
+        onLocationSuccess,
+        () => {
+          // Retry once with high accuracy
+          try {
+            navigator.geolocation.getCurrentPosition(
+              onLocationSuccess,
+              onLocationFail,
+              { enableHighAccuracy: true, timeout: 2500, maximumAge: 30000 }
+            );
+          } catch {
+            onLocationFail({ code: 2, message: 'Position unavailable' } as any);
+          }
+        },
+        { enableHighAccuracy: false, timeout: 2000, maximumAge: 60000 }
+      );
+    } catch {
+      if (!hasResolved) {
+        hasResolved = true;
+        clearTimeout(safetyTimer);
+        isScanningRef.current = false;
+        setIsScanning(false);
+      }
+    }
+  }, []);
+
+  // Trigger location acquisition on mount or initialCity change
   useEffect(() => {
     if (initialCity) {
       fallbackToCity(initialCity);
-    } else {
-      requestLocation();
     }
-  }, [initialCity]);
+    requestLocation();
+  }, [initialCity, fallbackToCity, requestLocation]);
 
-  // Quick fallback to chosen Pakistani city
-  const fallbackToCity = (cityName: string) => {
-    const coords = LocationService.resolveCoordinates(cityName);
-    setUserCoords({ lat: coords.lat, lng: coords.lng });
-    setUserCityLabel(cityName);
-    setGpsError(null);
-    fetchGoogleClinicsForLocation(coords.lat, coords.lng, cityName);
-  };
+  // 4. Fetch registered Google Maps clinics near coordinates
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchGoogleVets() {
+      if (!userCoords) return;
+      setIsFetchingGooglePlaces(true);
+      try {
+        const radiusMeters = maxRadiusKm > 0 ? maxRadiusKm * 1000 : 35000;
+        let gClinics = await googlePlacesService.fetchNearbyGoogleClinics(
+          userCoords.lat,
+          userCoords.lng,
+          radiusMeters,
+          false
+        );
 
-  // Unified deduplicated clinics list
+        // If nearby returned zero or very few clinics, augment with city text search
+        if (gClinics.length < 3 && userCityLabel) {
+          const cleanCity = userCityLabel.replace(/\s*\(.*?\)/g, '').replace('Near ', '').trim();
+          if (cleanCity) {
+            const cityClinics = await googlePlacesService.fetchCityGoogleClinics(
+              `veterinary clinic in ${cleanCity}`,
+              userCoords.lat,
+              userCoords.lng,
+              false
+            );
+            if (cityClinics.length > 0) {
+              const existingUids = new Set(gClinics.map(c => c.uid));
+              const extras = cityClinics.filter(c => !existingUids.has(c.uid));
+              gClinics = [...gClinics, ...extras];
+            }
+          }
+        }
+
+        if (isMounted) {
+          setGoogleClinics(gClinics);
+        }
+      } catch (err) {
+        console.warn('[SmartVetRadar] Could not fetch Google Maps registered clinics:', err);
+      } finally {
+        if (isMounted) {
+          setIsFetchingGooglePlaces(false);
+        }
+      }
+    }
+
+    fetchGoogleVets();
+    return () => {
+      isMounted = false;
+    };
+  }, [userCoords.lat, userCoords.lng, maxRadiusKm, userCityLabel]);
+
+  // 5. Unified list of registered clinics from web app + Google Maps
   const combinedClinics = useMemo(() => {
     const list: UserProfile[] = [];
     const seenNames = new Set<string>();
+    const seenUids = new Set<string>();
 
-    // Add platform clinics first
-    for (const c of platformClinics) {
-      const normalizedName = c.name.toLowerCase().trim();
-      seenNames.add(normalizedName);
-      list.push({ ...c, source: 'vetaxis' });
+    // Add Google Maps registered clinics first (ensures real verified Google Maps places)
+    for (const g of googleClinics) {
+      if (!g.uid || seenUids.has(g.uid)) continue;
+      seenUids.add(g.uid);
+      const nameKey = (g.name || '').toLowerCase().trim();
+      if (nameKey) seenNames.add(nameKey);
+      list.push({ ...g, source: 'google_maps', isGoogleMapsVerified: true });
     }
 
-    // Add Google Maps clinics, avoiding exact duplicates
-    for (const g of googleClinics) {
-      const normalizedName = g.name.toLowerCase().trim();
-      if (!seenNames.has(normalizedName)) {
-        seenNames.add(normalizedName);
-        list.push(g);
-      }
+    // Add platform registered clinics
+    for (const c of platformClinics) {
+      if (!c.uid || seenUids.has(c.uid)) continue;
+      if (c.uid.startsWith('seed_') || c.uid.startsWith('demo_')) continue;
+      const nameKey = (c.name || '').toLowerCase().trim();
+      if (nameKey && seenNames.has(nameKey)) continue; // Avoid duplicating if same clinic exists on Google Maps
+      seenUids.add(c.uid);
+      list.push({ ...c, source: 'vetaxis' });
     }
 
     return list;
   }, [platformClinics, googleClinics]);
 
-  // Compute live distances, open status, and sorting
-  const calculatedClinics: ClinicWithDistance[] = useMemo(() => {
-    const coords = userCoords || { lat: 33.6844, lng: 73.0479 }; // Default Islamabad center
+  // 6. Compute live distances and coordinates from user position
+  const calculatedClinics: RadarClinicItem[] = useMemo(() => {
+    const coords = userCoords || { lat: 33.6844, lng: 73.0479 };
 
     return combinedClinics.map((clinic) => {
       let clinicLat = clinic.location?.lat;
@@ -230,27 +424,26 @@ export function SmartVetRadar({ currentUser, initialCity, onNavigate, onSelectCl
       }
 
       const dist = LocationService.haversine(coords.lat, coords.lng, clinicLat, clinicLng);
-
       const facLower = (clinic.facilities || '').toLowerCase() + ' ' + (clinic.name || '').toLowerCase();
       const isEmergency247 = clinic.isEmergency247 || facLower.includes('24/7') || facLower.includes('emergency') || facLower.includes('trauma');
-      
+      const address = clinic.address || clinic.location?.address || `${clinic.city || 'Pakistan'}`;
+
       return {
         ...clinic,
+        lat: clinicLat,
+        lng: clinicLng,
         distanceKm: Math.round(dist * 10) / 10,
         isOpenNow: clinic.isOpenNow ?? true,
-        isEmergency247
+        isEmergency247,
+        formattedAddress: address
       };
     });
   }, [combinedClinics, userCoords]);
 
-  // Filtered and sorted list based on radius, source, and queries
+  // 7. Filtered and proximity-sorted list
   const filteredClinics = useMemo(() => {
     return calculatedClinics
       .filter((c) => {
-        // Source filter
-        if (sourceFilter === 'google' && c.source !== 'google_maps') return false;
-        if (sourceFilter === 'vetaxis' && c.source === 'google_maps') return false;
-
         // Radius filter
         if (maxRadiusKm > 0 && c.distanceKm > maxRadiusKm) return false;
         // Emergency toggle
@@ -260,366 +453,566 @@ export function SmartVetRadar({ currentUser, initialCity, onNavigate, onSelectCl
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
-          const matchesName = c.name.toLowerCase().includes(q);
-          const matchesAddress = (c.address || '').toLowerCase().includes(q);
+          const matchesName = (c.name || '').toLowerCase().includes(q);
+          const matchesAddress = (c.formattedAddress || '').toLowerCase().includes(q);
           const matchesFac = (c.facilities || '').toLowerCase().includes(q);
           if (!matchesName && !matchesAddress && !matchesFac) return false;
         }
         return true;
       })
       .sort((a, b) => a.distanceKm - b.distanceKm);
-  }, [calculatedClinics, sourceFilter, maxRadiusKm, emergencyOnly, homeVisitOnly, searchQuery]);
+  }, [calculatedClinics, maxRadiusKm, emergencyOnly, homeVisitOnly, searchQuery]);
 
-  // Active searching state: actively scanning GPS, fetching Google Places, or loading initial platform data
-  const isActivelySearching = isScanning || (isFetchingGooglePlaces && combinedClinics.length === 0) || (loading && combinedClinics.length === 0);
+  // Handle selecting a clinic
+  const handleClinicSelect = (clinic: RadarClinicItem) => {
+    setSelectedClinic(clinic);
+    if (viewMode === 'list') {
+      setViewMode('split');
+    }
+    // Scroll clinic card into view in list container
+    setTimeout(() => {
+      const el = document.getElementById(`clinic-card-${clinic.uid}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
+  };
 
-  // Proximity alternatives beyond user's current search radius (for empty state recommendations)
-  const nearestOutsideRadiusClinics = useMemo(() => {
-    if (filteredClinics.length > 0) return [];
-    return [...calculatedClinics]
-      .filter((c) => {
-        if (sourceFilter === 'google' && c.source !== 'google_maps') return false;
-        if (sourceFilter === 'vetaxis' && c.source === 'google_maps') return false;
-        if (emergencyOnly && !c.isEmergency247) return false;
-        if (homeVisitOnly && !c.offersHomeVisit) return false;
-        return true;
-      })
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, 6);
-  }, [calculatedClinics, filteredClinics.length, sourceFilter, emergencyOnly, homeVisitOnly]);
+  const handleRecenterOnUser = () => {
+    setSelectedClinic(null);
+    requestLocation(true);
+  };
 
-  const renderClinicCard = (clinic: ClinicWithDistance) => {
-    const clinicLat = clinic.location?.lat || LocationService.resolveCoordinates(clinic.address || clinic.name, clinic.uid).lat;
-    const clinicLng = clinic.location?.lng || LocationService.resolveCoordinates(clinic.address || clinic.name, clinic.uid).lng;
-    
-    // Use official Google Maps URI if available from Places API, else construct standard navigation URI
-    const googleMapsUrl = clinic.googleMapsUri || `https://www.google.com/maps/dir/?api=1&destination=${clinicLat},${clinicLng}`;
-    const cleanPhone = (clinic.phone || '03001216272').replace(/[^0-9]/g, '');
-    const waUrl = `https://wa.me/${cleanPhone.startsWith('92') ? cleanPhone : '92' + cleanPhone.replace(/^0/, '')}?text=Hello%20${encodeURIComponent(clinic.name)},%20I%20found%20you%20on%20VetAxis%20360%20Smart%20Radar%20and%20need%20veterinary%20assistance.`;
-    const isGoogle = clinic.source === 'google_maps';
-
-    return (
-      <motion.div
-        key={clinic.uid}
-        id={`clinic-${clinic.uid}`}
-        layout
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`p-5 rounded-2xl bg-[#181c22] border transition-all space-y-4 shadow-sm hover:shadow-md ${
-          isGoogle
-            ? 'border-amber-900/30 hover:border-amber-700/50'
-            : 'border-slate-800 hover:border-slate-700'
-        }`}
-      >
-        {/* Header Row: Name & Source Badge */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base sm:text-lg font-bold text-white hover:text-sky-300 transition-colors">
-                {clinic.name}
-              </h3>
-              {isGoogle ? (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1" title="Verified business listing registered on Google Maps">
-                  <MapPin className="w-3 h-3 text-amber-400" />
-                  <span>Google Maps Verified</span>
-                </span>
-              ) : (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold flex items-center gap-1" title="Verified VetAxis Platform Partner">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                  <span>VetAxis Verified</span>
-                </span>
-              )}
-            </div>
-
-            {/* Metadata Line */}
-            <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
-              <span className="flex items-center gap-1 text-slate-300">
-                <MapPin className="w-3 h-3 text-sky-400 shrink-0" />
-                <span className="line-clamp-1">{clinic.address || 'Pakistan'}</span>
-              </span>
-              <span aria-hidden="true">·</span>
-              <span className="text-amber-400 font-medium flex items-center gap-1">
-                <Star className="w-3 h-3 fill-amber-400" />
-                <span>★ {clinic.avgRating || '4.8'}</span>
-                <span className="text-slate-500 font-normal">({clinic.totalReviews || 24} reviews)</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Distance Indicator */}
-          <div className="text-right shrink-0">
-            <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-mono font-bold tabular-nums ${
-              clinic.distanceKm < 5
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                : clinic.distanceKm < 25
-                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-            }`}>
-              {clinic.distanceKm} km
-            </span>
-            <span className="block text-[10px] text-slate-500 mt-0.5">from you</span>
-          </div>
-        </div>
-
-        {/* Facilities / Details Line */}
-        {clinic.facilities && (
-          <p className="text-xs text-slate-300 line-clamp-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-            <span className="text-slate-400 font-medium">Details: </span>
-            {clinic.facilities}
-          </p>
-        )}
-
-        {/* Operational Status */}
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-          {clinic.isEmergency247 ? (
-            <span className="text-amber-400 font-semibold flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>24/7 Emergency Care Active</span>
-            </span>
-          ) : (
-            <span className="text-emerald-400 font-medium flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Open Regular Hours</span>
-            </span>
-          )}
-
-          {clinic.offersHomeVisit && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="text-sky-300">Home Visit Available</span>
-            </>
-          )}
-
-          {isGoogle && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="text-[11px] text-slate-500">Google Places API Live</span>
-            </>
-          )}
-        </div>
-
-        {/* Action Triggers Grid */}
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800">
-          {/* Google Maps Turn-by-Turn Navigation */}
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer text-center"
-          >
-            <Navigation className="w-3.5 h-3.5" />
-            <span>Directions</span>
-          </a>
-
-          {/* Phone Call Trigger */}
-          <a
-            href={`tel:${clinic.phone || '03001216272'}`}
-            className="py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
-          >
-            <Phone className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Call</span>
-          </a>
-
-          {/* Google Place or WhatsApp Action */}
-          {isGoogle ? (
-            <a
-              href={googleMapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2 px-3 rounded-lg bg-amber-600/90 hover:bg-amber-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center shadow-xs"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Google Place</span>
-            </a>
-          ) : (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2 px-3 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center shadow-xs"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
-            </a>
-          )}
-        </div>
-      </motion.div>
-    );
+  // Format phone number for WhatsApp
+  const formatWhatsAppUrl = (phone?: string, clinicName?: string) => {
+    if (!phone) return null;
+    const clean = phone.replace(/[^0-9]/g, '');
+    if (!clean) return null;
+    const intl = clean.startsWith('92') ? clean : '92' + clean.replace(/^0/, '');
+    return `https://wa.me/${intl}?text=Hello%20${encodeURIComponent(clinicName || 'Clinic')},%20I%20found%20your%20registered%20clinic%20on%20VetAxis%20Smart%20Radar%20and%20need%20veterinary%20assistance.`;
   };
 
   return (
-    <div className="min-h-screen bg-[#121417] text-slate-100 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* Top Header & Breadcrumb with Visible Back Button */}
-        <header className="space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <button 
-              onClick={() => onNavigate?.('explore')} 
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all cursor-pointer shadow-xs"
-              title="Return to Directory"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-sky-400" />
-              <span>Back to Directory</span>
-            </button>
-
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-              <button 
-                onClick={() => onNavigate?.('explore')} 
-                className="hover:text-slate-200 transition-colors cursor-pointer"
-              >
-                Explore
-              </button>
-              <span aria-hidden="true">·</span>
-              <span className="text-amber-400 font-medium">Smart Vet Radar</span>
-              <span aria-hidden="true">·</span>
-              <span className="text-sky-400 flex items-center gap-1">
-                <span>GPS Proximity Locator</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Google Maps Live Data Connected</span>
-                </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  {googleClinics.length > 0 ? `${googleClinics.length} Google places synced` : 'Syncing...'}
-                </span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-display text-wrap-balance">
-                Veterinary Clinics &amp; Emergency Care Near Me
-              </h1>
-              <p className="mt-1 text-sm sm:text-base text-slate-300 max-w-2xl">
-                Scan your live GPS coordinates to locate registered clinics on Google Maps alongside certified VetAxis partner hospitals across all Pakistani cities.
-              </p>
-            </div>
-          </div>
-        </header>
-
-        {/* Radar Scanner Visualizer & Proximity Status */}
-        <section className="relative overflow-hidden rounded-2xl border border-slate-800 bg-[#181c22] p-6 sm:p-8 shadow-xl">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+    <div className="min-h-screen bg-[#0d1117] text-slate-100 pb-20 selection:bg-sky-500 selection:text-white">
+      {/* ─────────────────────────────────────────────────────────────
+          1. HEADER & SATELLITE RADAR TELEMETRY BAR
+         ───────────────────────────────────────────────────────────── */}
+      <div className="border-b border-slate-800/80 bg-[#13171e]/90 backdrop-blur-md sticky top-0 z-30 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             
-            {/* Visual Radar Animation Display */}
-            <div className="relative flex items-center justify-center w-52 h-52 sm:w-60 sm:h-60 shrink-0">
-              {/* Concentric rings */}
-              <div className="absolute inset-0 rounded-full border border-sky-500/20" />
-              <div className="absolute inset-8 rounded-full border border-sky-500/30" />
-              <div className="absolute inset-16 rounded-full border border-sky-500/40" />
-              
-              {/* Crosshairs */}
-              <div className="absolute inset-x-0 top-1/2 h-px bg-sky-500/20" />
-              <div className="absolute inset-y-0 left-1/2 w-px bg-sky-500/20" />
+            {/* Left: Navigation & Title */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onNavigate?.('explore')} 
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all cursor-pointer shadow-xs touch-manipulation shrink-0"
+                title="Return to Directory"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-sky-400" />
+                <span>Explore Directory</span>
+              </button>
 
-              {/* Rotating scanner beam - speeds up during active search */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: isActivelySearching ? 1.5 : 4, ease: 'linear' }}
-                className="absolute inset-0 rounded-full origin-center pointer-events-none"
-                style={{
-                  background: isActivelySearching
-                    ? 'conic-gradient(from 0deg, rgba(56, 189, 248, 0.75) 0deg, rgba(56, 189, 248, 0) 90deg, transparent 360deg)'
-                    : 'conic-gradient(from 0deg, rgba(14, 165, 233, 0.4) 0deg, rgba(14, 165, 233, 0) 60deg, transparent 360deg)'
-                }}
-              />
+              <div className="h-5 w-px bg-slate-800 hidden sm:block" />
 
-              {/* Pulsing Sonar Ring when actively searching */}
-              {isActivelySearching && (
-                <motion.div
-                  animate={{ scale: [1, 1.7], opacity: [0.8, 0] }}
-                  transition={{ repeat: Infinity, duration: 1.5, ease: 'easeOut' }}
-                  className="absolute inset-8 rounded-full border border-sky-400 pointer-events-none shadow-[0_0_15px_rgba(56,189,248,0.4)]"
-                />
-              )}
-
-              {/* Center User Beacon */}
-              <div className="relative z-10 w-4 h-4 rounded-full bg-sky-400 ring-4 ring-sky-500/40 shadow-[0_0_15px_rgba(56,189,248,1)] flex items-center justify-center">
-                <div className="w-1.5 h-1.5 rounded-full bg-white" />
-              </div>
-
-              {/* Detected Clinic Blips on Radar */}
-              {(filteredClinics.length > 0 ? filteredClinics : nearestOutsideRadiusClinics).slice(0, 10).map((c, i) => {
-                const angle = (i * 36) * (Math.PI / 180);
-                const maxR = 90;
-                const radius = Math.min(Math.max((c.distanceKm / (maxRadiusKm || 50)) * maxR, 25), maxR);
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
-
-                const isGoogle = c.source === 'google_maps';
-
-                return (
-                  <motion.div
-                    key={c.uid}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: [0.8, 1.25, 0.9] }}
-                    transition={{ repeat: Infinity, duration: 2.2 + (i % 3) * 0.4, ease: 'easeInOut' }}
-                    style={{ transform: `translate(${x}px, ${y}px)` }}
-                    className={`absolute w-3 h-3 rounded-full ring-2 shadow-md cursor-pointer ${
-                      isGoogle
-                        ? 'bg-amber-400 ring-amber-500/40 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
-                        : 'bg-emerald-400 ring-emerald-500/40 shadow-[0_0_8px_rgba(52,211,153,0.9)]'
-                    }`}
-                    title={`${c.name} (${c.distanceKm} km · ${isGoogle ? 'Google Maps' : 'VetAxis'})`}
-                    onClick={() => {
-                      const el = document.getElementById(`clinic-${c.uid}`);
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
-                  />
-                );
-              })}
-            </div>
-
-            {/* GPS Telemetry & Scan Trigger */}
-            <div className="flex-1 space-y-4 text-center lg:text-left">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 text-xs font-mono tracking-wider">
-                  <Compass className={`w-3.5 h-3.5 ${isActivelySearching ? 'animate-spin text-amber-400' : 'text-sky-400'}`} style={{ animationDuration: isActivelySearching ? '2.5s' : '8s' }} />
-                  <span className={isActivelySearching ? 'text-amber-300 font-semibold animate-pulse' : 'text-sky-400'}>
-                    {isScanning 
-                      ? 'ACQUIRING HIGH-PRECISION GPS LOCK...' 
-                      : isFetchingGooglePlaces 
-                        ? 'PINGING GOOGLE MAPS SATELLITE NETWORK...' 
-                        : 'GOOGLE MAPS SATELLITE BEACON ACTIVE'}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                   </span>
+                  <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-1.5 font-display">
+                    <span>Smart Vet Radar</span>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                      Google Maps Live
+                    </span>
+                  </h1>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">
-                  Current Location: <span className="text-sky-300 font-mono">{userCityLabel}</span>
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400 max-w-xl">
-                  {userCoords 
-                    ? `Coordinates: ${userCoords.lat.toFixed(4)}° N, ${userCoords.lng.toFixed(4)}° E · Found ${filteredClinics.length} clinics within ${maxRadiusKm > 0 ? `${maxRadiusKm} km` : 'search perimeter'} (${googleClinics.length} directly from Google Maps).`
-                    : 'Locating nearby veterinary doctors, companion animal ICUs, and vaccine emergency units.'}
+                <p className="text-[11px] text-slate-400 hidden sm:block">
+                  Showing verified clinics registered on Google Maps &amp; VetAxis near your location
                 </p>
               </div>
+            </div>
 
-              {/* Location Refresh Trigger */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-2">
+            {/* Right: GPS Telemetry Badge & View Switcher */}
+            <div className="flex items-center gap-2.5 self-end md:self-auto flex-wrap">
+              {/* Location Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs">
+                <Compass className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-400' : 'text-sky-400'}`} />
+                <span className="text-slate-300 font-medium">
+                  {isScanning ? 'Acquiring GPS...' : userCityLabel}
+                </span>
                 <button
-                  onClick={requestLocation}
-                  disabled={isActivelySearching}
-                  className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                  type="button"
+                  onClick={() => requestLocation(true)}
+                  disabled={isScanning}
+                  title="Rescan GPS Location"
+                  className="p-1 rounded-md hover:bg-slate-800 text-sky-400 hover:text-sky-300 cursor-pointer transition-colors"
                 >
-                  <RotateCw className={`w-3.5 h-3.5 ${isActivelySearching ? 'animate-spin' : ''}`} />
-                  <span>{isActivelySearching ? 'Scanning Satellite Network...' : 'Rescan GPS Location'}</span>
+                  <RotateCw className={`w-3 h-3 ${isScanning ? 'animate-spin' : ''}`} />
                 </button>
               </div>
 
-              {/* Quick City Switcher if GPS is blocked or user wants another city */}
-              <div className="pt-3 border-t border-slate-800/80">
-                <span className="text-xs text-slate-400 block mb-2">Switch satellite radar to a major city:</span>
-                <div className="flex flex-wrap gap-1.5 justify-center lg:justify-start">
-                  {['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Peshawar', 'Faisalabad', 'Multan', 'Quetta', 'Gujranwala', 'Sialkot'].map((city) => (
+              {/* View Mode Segmented Switcher */}
+              <div className="inline-flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-700/80">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('split')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    viewMode === 'split'
+                      ? 'bg-sky-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Map & List Split View"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Split View</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('map')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    viewMode === 'map'
+                      ? 'bg-sky-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Full Google Map View"
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                  <span>Map</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    viewMode === 'list'
+                      ? 'bg-sky-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="List View with Mini Radar"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>List ({filteredClinics.length})</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          2. FILTER & RADIUS CONTROL STRIP
+         ───────────────────────────────────────────────────────────── */}
+      <div className="bg-[#13171e]/70 border-b border-slate-800 px-4 sm:px-6 py-2.5">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Filter by clinic name, area (F-7, DHA, Gulberg...), or services..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-7 py-1.5 bg-slate-900/90 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Controls: Radius & Filters */}
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {/* Radius Pills */}
+            <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 px-2 font-medium">Radius:</span>
+              {[
+                { label: '15 km', val: 15 },
+                { label: '30 km', val: 30 },
+                { label: '50 km', val: 50 },
+                { label: 'All PK', val: 0 }
+              ].map((r) => (
+                <button
+                  key={r.val}
+                  type="button"
+                  onClick={() => setMaxRadiusKm(r.val)}
+                  className={`px-2.5 py-1 text-xs rounded-lg transition-all cursor-pointer ${
+                    maxRadiusKm === r.val
+                      ? 'bg-sky-600 text-white font-bold shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Emergency Toggle */}
+            <button
+              type="button"
+              onClick={() => setEmergencyOnly(!emergencyOnly)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                emergencyOnly
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-xs'
+                  : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+              <span>24/7 Emergency</span>
+            </button>
+
+            {/* Quick City Dropdown / Switcher */}
+            <div className="hidden lg:flex items-center gap-1 pl-1">
+              {['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Peshawar'].map((city) => (
+                <button
+                  key={city}
+                  type="button"
+                  onClick={() => fallbackToCity(city)}
+                  className={`px-2.5 py-1 text-[11px] rounded-lg transition-colors cursor-pointer ${
+                    userCityLabel.includes(city)
+                      ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900/60'
+                  }`}
+                >
+                  {city}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* GPS Error or Inactive Note banner if any */}
+      {gpsError && (
+        <div className="bg-amber-950/40 border-b border-amber-800/60 px-4 py-2 text-xs text-amber-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>{gpsError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGpsError(null)}
+            className="text-amber-400 hover:text-white text-xs underline cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          3. MAIN LAYOUT: INTERACTIVE GOOGLE MAP + REGISTERED CLINICS
+         ───────────────────────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5">
+        
+        {/* Dynamic Layout based on viewMode */}
+        <div className={`grid gap-6 ${
+          viewMode === 'split' 
+            ? 'grid-cols-1 lg:grid-cols-12 items-start' 
+            : viewMode === 'map' 
+            ? 'grid-cols-1' 
+            : 'grid-cols-1'
+        }`}>
+
+          {/* ══════════════════════════════════════════════════════════
+              GOOGLE MAP CONTAINER
+             ══════════════════════════════════════════════════════════ */}
+          {viewMode !== 'list' && (
+            <div className={`relative rounded-2xl overflow-hidden border border-slate-800 bg-[#13171e] shadow-2xl transition-all ${
+              viewMode === 'map' 
+                ? 'h-[78vh] lg:h-[82vh] w-full' 
+                : 'lg:col-span-7 h-[420px] sm:h-[500px] lg:h-[680px] lg:sticky lg:top-24'
+            }`}>
+              
+              {/* Google Maps Component using official SDK */}
+              <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places', 'marker']}>
+                <GoogleMapComponent
+                  mapId={DEFAULT_MAP_ID}
+                  defaultCenter={userCoords}
+                  defaultZoom={zoomLevel}
+                  internalUsageAttributionIds={[...MAPS_ATTRIBUTION_IDS]}
+                  gestureHandling="greedy"
+                  disableDefaultUI={false}
+                  fullscreenControl={true}
+                  streetViewControl={false}
+                  mapTypeControl={false}
+                  zoomControl={true}
+                  className="w-full h-full"
+                  style={{ width: '100%', height: '100%', minHeight: '100%' }}
+                >
+                  {/* Controller handling pan, circles, and map lifecycle */}
+                  <RadarMapController
+                    userCoords={userCoords}
+                    radarRadiusKm={maxRadiusKm}
+                    selectedClinic={selectedClinic}
+                    onMapClick={() => setSelectedClinic(null)}
+                    clinics={filteredClinics}
+                  />
+
+                  {/* ─────────────────────────────────────────────────
+                      USER GPS LOCATION MARKER (High-Tech Radar Beacon)
+                     ───────────────────────────────────────────────── */}
+                  <AdvancedMarker
+                    position={userCoords}
+                    title={`Your GPS Location (${userCityLabel})`}
+                    zIndex={999}
+                  >
+                    <div className="relative flex items-center justify-center cursor-pointer group">
+                      {/* Outer pulsing sonar ring */}
+                      <span className="animate-ping absolute inline-flex h-10 w-10 rounded-full bg-sky-400 opacity-60" />
+                      {/* Secondary soft glow */}
+                      <span className="absolute inline-flex h-6 w-6 rounded-full bg-sky-500/40 ring-4 ring-sky-500/20" />
+                      {/* Center beacon core */}
+                      <div className="relative inline-flex items-center justify-center h-4 w-4 rounded-full bg-sky-500 border-2 border-white shadow-[0_0_12px_rgba(56,189,248,1)]">
+                        <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                      </div>
+                      
+                      {/* Tooltip on hover */}
+                      <div className="absolute -top-7 whitespace-nowrap px-2 py-0.5 rounded-md bg-slate-900/95 border border-sky-500/40 text-[10px] font-bold text-sky-300 shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                        You are here ({userCityLabel})
+                      </div>
+                    </div>
+                  </AdvancedMarker>
+
+                  {/* ─────────────────────────────────────────────────
+                      CLINIC MARKERS (Google Maps + VetAxis Registered)
+                     ───────────────────────────────────────────────── */}
+                  {filteredClinics.map((clinic) => {
+                    const isSelected = selectedClinic?.uid === clinic.uid;
+                    const isGoogleVerified = clinic.source === 'google_maps';
+                    
+                    return (
+                      <AdvancedMarker
+                        key={clinic.uid}
+                        position={{ lat: clinic.lat, lng: clinic.lng }}
+                        onClick={() => handleClinicSelect(clinic)}
+                        title={`${clinic.name} (${clinic.distanceKm} km)`}
+                        zIndex={isSelected ? 1000 : 10}
+                      >
+                        <div className={`cursor-pointer transition-all transform ${isSelected ? 'scale-125 -translate-y-2' : 'hover:scale-115'}`}>
+                          {isGoogleVerified ? (
+                            /* Google Maps Verified Clinic Pin (Sky-Blue theme) */
+                            <div className="relative flex items-center justify-center">
+                              <Pin
+                                background={isSelected ? '#0284c7' : '#0ea5e9'}
+                                glyphColor="#ffffff"
+                                borderColor={isSelected ? '#38bdf8' : '#0369a1'}
+                                scale={isSelected ? 1.3 : 1.05}
+                              />
+                              {clinic.isEmergency247 && (
+                                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 border border-white" />
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            /* VetAxis Platform Registered Hospital Pin (Emerald theme) */
+                            <div className="relative flex items-center justify-center">
+                              <Pin
+                                background={isSelected ? '#047857' : '#10b981'}
+                                glyphColor="#ffffff"
+                                borderColor={isSelected ? '#34d399' : '#065f46'}
+                                scale={isSelected ? 1.3 : 1.05}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </AdvancedMarker>
+                    );
+                  })}
+
+                  {/* ─────────────────────────────────────────────────
+                      INTERACTIVE INFOWINDOW FOR SELECTED CLINIC
+                     ───────────────────────────────────────────────── */}
+                  {selectedClinic && (
+                    <InfoWindow
+                      position={{ lat: selectedClinic.lat, lng: selectedClinic.lng }}
+                      onCloseClick={() => setSelectedClinic(null)}
+                      pixelOffset={[0, -40]}
+                    >
+                      <div className="p-3 max-w-xs sm:max-w-sm text-slate-900 space-y-2.5">
+                        {/* Header: Title and Badge */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {selectedClinic.source === 'google_maps' ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-300">
+                                <MapPin className="w-2.5 h-2.5 text-sky-600" />
+                                <span>Google Maps Verified</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>VetAxis Registered</span>
+                              </span>
+                            )}
+                            {selectedClinic.isEmergency247 && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                                24/7 Emergency
+                              </span>
+                            )}
+                          </div>
+                          
+                          <h4 className="text-sm font-extrabold text-slate-900 leading-snug">
+                            {selectedClinic.name}
+                          </h4>
+                          <p className="text-[11px] text-slate-600 leading-tight">
+                            {selectedClinic.formattedAddress}
+                          </p>
+                        </div>
+
+                        {/* Rating & Proximity metrics */}
+                        <div className="flex items-center justify-between text-xs py-1.5 border-y border-slate-200">
+                          <div className="flex items-center gap-1 text-amber-600 font-bold">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            <span>★ {selectedClinic.avgRating || 4.8}</span>
+                            <span className="text-slate-500 font-normal">
+                              ({selectedClinic.totalReviews || 1} reviews)
+                            </span>
+                          </div>
+
+                          <span className="inline-block px-2 py-0.5 rounded bg-sky-50 text-sky-700 font-mono font-bold text-[11px] border border-sky-200">
+                            {selectedClinic.distanceKm} km from you
+                          </span>
+                        </div>
+
+                        {/* Direct Action Buttons */}
+                        <div className="pt-1 flex items-center gap-2">
+                          <a
+                            href={getDirectionsUrl(selectedClinic.lat, selectedClinic.lng, selectedClinic.name)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 py-2 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors text-center"
+                          >
+                            <Navigation className="w-3.5 h-3.5" />
+                            <span>Directions</span>
+                          </a>
+
+                          {selectedClinic.phone && (
+                            <a
+                              href={`tel:${selectedClinic.phone}`}
+                              className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                              title="Call Clinic"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-slate-600" />
+                              <span className="hidden sm:inline">Call</span>
+                            </a>
+                          )}
+
+                          {formatWhatsAppUrl(selectedClinic.phone, selectedClinic.name) && (
+                            <a
+                              href={formatWhatsAppUrl(selectedClinic.phone, selectedClinic.name)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center transition-colors"
+                              title="WhatsApp Chat"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </InfoWindow>
+                  )}
+                </GoogleMapComponent>
+              </APIProvider>
+
+              {/* Floating Map HUD Controls overlay */}
+              <div className="absolute top-3 left-3 z-10 flex flex-col gap-2 pointer-events-auto">
+                {/* Live Coordinates Pill */}
+                <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-xl shadow-lg text-[11px] font-mono text-slate-300 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>GPS: {userCoords.lat.toFixed(4)}°N, {userCoords.lng.toFixed(4)}°E</span>
+                </div>
+
+                {/* Radar Scanning Status Pill */}
+                {isFetchingGooglePlaces && (
+                  <div className="bg-sky-950/90 backdrop-blur-md border border-sky-500/60 px-3 py-1 rounded-xl shadow-lg text-[11px] font-semibold text-sky-200 flex items-center gap-1.5 animate-pulse">
+                    <RotateCw className="w-3 h-3 animate-spin text-sky-400" />
+                    <span>Syncing Google Places radar...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Floating Recenter Map Button */}
+              <div className="absolute bottom-5 right-3 z-10 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleRecenterOnUser}
+                  className="p-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-sky-400 hover:text-sky-300 border border-slate-700/80 shadow-xl backdrop-blur-md cursor-pointer transition-all flex items-center justify-center"
+                  title="Recenter Map on My GPS Location"
+                >
+                  <Crosshair className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Legend Strip at bottom of map */}
+              <div className="absolute bottom-3 left-3 z-10 hidden sm:flex items-center gap-3 bg-slate-900/85 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] text-slate-300 shadow-md">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-sky-500/40" />
+                  <span>Google Maps Registered</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-500/40" />
+                  <span>VetAxis Registered</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500 border border-white" />
+                  <span>Your Location</span>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              CLINIC FEED & RADAR CONTROLS SIDEBAR / FEED
+             ══════════════════════════════════════════════════════════ */}
+          <div className={`space-y-4 ${
+            viewMode === 'split' ? 'lg:col-span-5' : 'w-full'
+          }`}>
+            
+            {/* Radar Telemetry Card & Status */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#13171e] border border-slate-800 shadow-lg space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <span className="text-[11px] font-mono font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 animate-pulse text-sky-400" />
+                    <span>360° Radar Scanning Perimeter</span>
+                  </span>
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {filteredClinics.length} Registered Clinics Near {userCityLabel}
+                  </h2>
+                </div>
+                <span className="px-2.5 py-1 rounded-xl bg-sky-500/10 text-sky-300 font-mono text-xs font-bold border border-sky-500/20">
+                  {maxRadiusKm > 0 ? `${maxRadiusKm} km circle` : 'All Pakistan'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Veterinary medical centers plotted on the Google Map above are authenticated clinics registered on Google Maps and VetAxis with verified coordinates. Tap any clinic to navigate or zoom in.
+              </p>
+
+              {/* City Quick Links */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <span className="text-[11px] text-slate-500 block mb-1.5">Switch city center:</span>
+                <div className="flex flex-wrap gap-1">
+                  {['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Peshawar', 'Multan', 'Faisalabad', 'Quetta', 'Gujranwala', 'Sialkot'].map((city) => (
                     <button
                       key={city}
+                      type="button"
                       onClick={() => fallbackToCity(city)}
-                      className={`px-2.5 py-1 text-xs rounded-lg transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 text-[11px] rounded-lg transition-all cursor-pointer ${
                         userCityLabel.includes(city)
-                          ? 'bg-sky-600 text-white font-semibold'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          ? 'bg-sky-600 text-white font-bold'
+                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                       }`}
                     >
                       {city}
@@ -627,456 +1020,230 @@ export function SmartVetRadar({ currentUser, initialCity, onNavigate, onSelectCl
                   ))}
                 </div>
               </div>
-
-              {gpsError && (
-                <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-800/60 text-xs text-amber-200 text-left">
-                  {gpsError}
-                </div>
-              )}
             </div>
 
-          </div>
-        </section>
-
-        {/* Filter Controls Bar */}
-        <section className="bg-[#181c22] rounded-xl border border-slate-800 p-4 space-y-4 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search clinic name, neighborhood (DHA, Gulberg, Clifton, G-10...), or specialty..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Source Segmented Selector */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700/80 shrink-0">
-              <button
-                onClick={() => setSourceFilter('all')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
-                  sourceFilter === 'all'
-                    ? 'bg-sky-600 text-white font-semibold shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                All ({calculatedClinics.length})
-              </button>
-              <button
-                onClick={() => setSourceFilter('google')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                  sourceFilter === 'google'
-                    ? 'bg-amber-600 text-white font-semibold shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <span>📍 Google Maps</span>
-                <span className="text-[10px] opacity-80">({googleClinics.length})</span>
-              </button>
-              <button
-                onClick={() => setSourceFilter('vetaxis')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                  sourceFilter === 'vetaxis'
-                    ? 'bg-emerald-600 text-white font-semibold shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <span>🩺 VetAxis Verified</span>
-                <span className="text-[10px] opacity-80">({platformClinics.length})</span>
-              </button>
-            </div>
-
-            {/* Radius Segmented Controls */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-              <span className="text-xs text-slate-400 whitespace-nowrap">Radius:</span>
-              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700/80">
-                {[
-                  { label: '15 km', val: 15 },
-                  { label: '30 km', val: 30 },
-                  { label: '50 km', val: 50 },
-                  { label: '100 km', val: 100 },
-                  { label: 'All PK (Nearest)', val: 0 }
-                ].map((r) => (
-                  <button
-                    key={r.val}
-                    onClick={() => setMaxRadiusKm(r.val)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer whitespace-nowrap ${
-                      maxRadiusKm === r.val
-                        ? 'bg-sky-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Toggle Filters */}
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800">
-            <button
-              onClick={() => setEmergencyOnly(!emergencyOnly)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border ${
-                emergencyOnly
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-xs'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-              <span>24/7 Emergency &amp; Trauma Only</span>
-            </button>
-
-            <button
-              onClick={() => setHomeVisitOnly(!homeVisitOnly)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border ${
-                homeVisitOnly
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 shadow-xs'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Home Visit &amp; Mobile Vet Available</span>
-            </button>
-
-            <div className="ml-auto text-xs text-slate-400 flex items-center gap-2">
-              <span>Showing <span className="font-mono text-slate-200 font-semibold">{filteredClinics.length}</span> clinics</span>
-              <span className="text-slate-600">·</span>
-              <span className="text-[11px] text-slate-500">Google Places API Live</span>
-            </div>
-          </div>
-        </section>
-
-        {/* Results List */}
-        <section className="space-y-6">
-          {/* Subtle Live Syncing Notice when results already exist and background Google Places is updating */}
-          {isFetchingGooglePlaces && combinedClinics.length > 0 && !isActivelySearching && (
-            <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/30 text-xs text-sky-200 shadow-sm animate-pulse">
-              <div className="flex items-center gap-2.5">
-                <RotateCw className="w-4 h-4 animate-spin text-sky-400 shrink-0" />
-                <span>Syncing live Google Maps pins and veterinary practices around <strong>{userCityLabel}</strong>...</span>
-              </div>
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 shrink-0">
-                LIVE REFRESH
-              </span>
-            </div>
-          )}
-
-          {isActivelySearching ? (
-            /* Visual Loading State: Actively Searching for nearby clinics */
-            <div className="space-y-6">
-              {/* Animated Sonar Radar Sweeping Banner */}
-              <div className="relative overflow-hidden rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-950/50 via-[#181c22] to-sky-950/40 p-6 shadow-xl">
-                <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full bg-sky-500/10 blur-3xl pointer-events-none animate-pulse" />
-                <div className="flex flex-col sm:flex-row items-center gap-5 relative z-10">
-                  {/* Sonar Beacon Graphic */}
-                  <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
-                    <span className="absolute inset-0 rounded-full border border-sky-400/30 animate-ping" />
-                    <span className="absolute inset-2 rounded-full border border-sky-400/50 animate-pulse" />
-                    <div className="w-12 h-12 rounded-full bg-sky-500/20 border border-sky-400 flex items-center justify-center text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.5)]">
-                      <Radio className="w-6 h-6 animate-spin text-sky-400" style={{ animationDuration: '4s' }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 text-center sm:text-left flex-1">
-                    <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40">
-                      <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
-                      <span>SEARCHING RADAR RADIUS · {maxRadiusKm > 0 ? `${maxRadiusKm} KM` : 'ALL DISTRICTS'}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white">
-                      Scanning for Veterinary Clinics &amp; Emergency Care...
-                    </h3>
-                    <p className="text-xs text-slate-300">
-                      Querying live Google Maps satellite database and certified VetAxis partner hospitals around{' '}
-                      <span className="text-sky-300 font-semibold">{userCityLabel}</span>.
-                    </p>
-                  </div>
-
-                  <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs text-slate-300 font-mono">
-                    <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-400" />
-                    <span>Pinging Radar</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shimmering Skeleton Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map((idx) => (
-                  <div
-                    key={idx}
-                    className="p-5 rounded-2xl bg-[#181c22] border border-slate-800 space-y-4 shadow-sm animate-pulse"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2 flex-1">
-                        <div className="h-5 bg-slate-800 rounded-md w-3/4" />
-                        <div className="h-3.5 bg-slate-800/60 rounded-md w-1/2" />
+            {/* Clinic Cards List */}
+            <div className="space-y-3">
+              {isLoadingClinics && filteredClinics.length === 0 ? (
+                /* Skeleton Loader */
+                <div className="space-y-3">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="p-4 rounded-2xl bg-[#13171e] border border-slate-800 animate-pulse space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="h-5 bg-slate-800 rounded w-2/3" />
+                        <div className="h-5 bg-slate-800 rounded w-16" />
                       </div>
-                      <div className="h-6 w-20 bg-sky-950/60 border border-sky-800/40 rounded-full" />
+                      <div className="h-3 bg-slate-800/60 rounded w-4/5" />
+                      <div className="h-8 bg-slate-900 rounded-xl" />
                     </div>
-                    <div className="space-y-2 pt-1">
-                      <div className="h-3.5 bg-slate-800/70 rounded-md w-full" />
-                      <div className="h-3.5 bg-slate-800/50 rounded-md w-5/6" />
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <div className="h-8 bg-slate-800/80 rounded-xl flex-1" />
-                      <div className="h-8 bg-slate-800/80 rounded-xl flex-1" />
-                      <div className="h-8 w-10 bg-slate-800/80 rounded-xl" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : filteredClinics.length === 0 ? (
-            /* Empty State: Custom illustration and message if no clinics within search radius */
-            <div className="p-8 sm:p-12 text-center bg-[#181c22] rounded-2xl border border-slate-800 space-y-6 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-sky-500/5 blur-3xl pointer-events-none rounded-full" />
-
-              {/* Custom High-Fidelity Radar Illustration */}
-              <div className="relative mx-auto w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center">
-                <svg
-                  viewBox="0 0 200 200"
-                  className="w-full h-full drop-shadow-[0_4px_25px_rgba(56,189,248,0.2)]"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {/* Outer search perimeter ring */}
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="88"
-                    stroke="#38bdf8"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
-                    strokeOpacity="0.3"
-                  />
-                  {/* Secondary concentric radius */}
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="64"
-                    stroke="#38bdf8"
-                    strokeWidth="1.2"
-                    strokeOpacity="0.35"
-                  />
-                  {/* Inner core range */}
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="40"
-                    stroke="#38bdf8"
-                    strokeWidth="1"
-                    strokeOpacity="0.45"
-                  />
-                  {/* Scope crosshairs */}
-                  <line x1="12" y1="100" x2="188" y2="100" stroke="#38bdf8" strokeWidth="0.8" strokeOpacity="0.25" />
-                  <line x1="100" y1="12" x2="100" y2="188" stroke="#38bdf8" strokeWidth="0.8" strokeOpacity="0.25" />
-
-                  {/* Sweeping radar sector angle */}
-                  <path
-                    d="M 100 100 L 162 38 A 88 88 0 0 0 100 12 Z"
-                    fill="url(#radarSweepGrad)"
-                    fillOpacity="0.35"
-                  />
-
-                  {/* Center Radar Scanner Dish & Antenna */}
-                  <circle cx="100" cy="100" r="18" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
-                  <circle cx="100" cy="100" r="8" fill="#38bdf8" />
-                  <circle cx="100" cy="100" r="3" fill="#ffffff" />
-
-                  {/* Emitted signal waves */}
-                  <path
-                    d="M 125 80 A 35 35 0 0 1 135 110"
-                    stroke="#fbbf24"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeOpacity="0.85"
-                  />
-                  <path
-                    d="M 137 70 A 50 50 0 0 1 150 115"
-                    stroke="#fbbf24"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeOpacity="0.5"
-                  />
-
-                  {/* Subtle Pet Silhouette inside scope */}
-                  <path
-                    d="M 68 64 C 69 62 72 62 73 64 C 74 66 72 68 70 68 C 68 68 67 66 68 64 Z
-                       M 77 60 C 78 58 81 58 82 60 C 83 62 81 64 79 64 C 77 64 76 62 77 60 Z
-                       M 86 64 C 87 62 90 62 91 64 C 92 66 90 68 88 68 C 86 68 85 66 86 64 Z
-                       M 74 72 C 72 70 85 70 83 72 C 81 77 76 77 74 72 Z"
-                    fill="#38bdf8"
-                    fillOpacity="0.5"
-                  />
-
-                  {/* Zero Pings Alert Icon Badge */}
-                  <g transform="translate(142, 142)">
-                    <circle cx="14" cy="14" r="14" fill="#1e293b" stroke="#f59e0b" strokeWidth="1.5" />
-                    <text x="14" y="19" textAnchor="middle" fill="#f59e0b" fontSize="13" fontWeight="bold">!</text>
-                  </g>
-
-                  <defs>
-                    <radialGradient id="radarSweepGrad" cx="100" cy="100" r="88" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.5" />
-                      <stop offset="70%" stopColor="#0ea5e9" stopOpacity="0.15" />
-                      <stop offset="100%" stopColor="#0284c7" stopOpacity="0" />
-                    </radialGradient>
-                  </defs>
-                </svg>
-              </div>
-
-              {/* Empty State Message */}
-              <div className="space-y-2 max-w-lg mx-auto">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>0 CLINICS WITHIN {maxRadiusKm > 0 ? `${maxRadiusKm} KM` : 'SEARCH PERIMETER'}</span>
-                </div>
-                <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                  No Clinics Found Near {userCityLabel}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  No registered veterinary practices or emergency animal hospitals were located within your current{' '}
-                  <span className="text-amber-300 font-semibold">{maxRadiusKm > 0 ? `${maxRadiusKm} km radius` : 'selected filters'}</span>.
-                  Expand your scanning perimeter or select a neighboring city to view certified clinics.
-                </p>
-
-                {/* Active filter reminder if filters are restricting */}
-                {(emergencyOnly || homeVisitOnly || searchQuery || sourceFilter !== 'all') && (
-                  <div className="pt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-slate-400">
-                    <span className="text-slate-500 font-medium">Active filters:</span>
-                    {emergencyOnly && <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">24/7 Emergency</span>}
-                    {homeVisitOnly && <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">Home Visit</span>}
-                    {sourceFilter !== 'all' && <span className="bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded">{sourceFilter.toUpperCase()}</span>}
-                    {searchQuery && <span className="bg-slate-800 text-slate-200 px-2 py-0.5 rounded">"{searchQuery}"</span>}
-                  </div>
-                )}
-              </div>
-
-              {/* Recovery Action Buttons */}
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    setMaxRadiusKm(100);
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>Expand Radius to 100 km</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setMaxRadiusKm(0);
-                    setSourceFilter('all');
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
-                >
-                  <Map className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Scan All Pakistan Clinics</span>
-                </button>
-                {(emergencyOnly || homeVisitOnly || searchQuery || sourceFilter !== 'all') && (
-                  <button
-                    onClick={() => {
-                      setEmergencyOnly(false);
-                      setHomeVisitOnly(false);
-                      setSearchQuery('');
-                      setSourceFilter('all');
-                    }}
-                    className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors border border-slate-800 cursor-pointer"
-                  >
-                    Reset Filters
-                  </button>
-                )}
-              </div>
-
-              {/* Quick City Switcher inside empty state */}
-              <div className="pt-4 border-t border-slate-800/80 max-w-xl mx-auto">
-                <span className="text-xs text-slate-400 block mb-2.5">Or jump directly to a major veterinary hub:</span>
-                <div className="flex flex-wrap gap-1.5 justify-center">
-                  {['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Peshawar', 'Faisalabad', 'Multan', 'Quetta', 'Gujranwala', 'Sialkot'].map((city) => (
-                    <button
-                      key={city}
-                      onClick={() => fallbackToCity(city)}
-                      className="px-2.5 py-1 text-xs rounded-lg bg-slate-800/80 text-slate-300 hover:bg-sky-600 hover:text-white transition-all cursor-pointer border border-slate-700/60"
-                    >
-                      {city}
-                    </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Nearest Clinics Outside Radius Recommendations (Guaranteeing mobile users always have access) */}
-              {nearestOutsideRadiusClinics.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-slate-800 text-left max-w-5xl mx-auto space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 mb-1">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        <span>CLOSEST AVAILABLE FACILITIES ACROSS PAKISTAN</span>
-                      </div>
-                      <h4 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 font-display">
-                        <span>Nearest Emergency Hospitals &amp; Clinics (Starting at {nearestOutsideRadiusClinics[0].distanceKm} km away)</span>
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        While no clinics were found within your {maxRadiusKm > 0 ? `${maxRadiusKm} km circle` : 'selected filters'}, here are the certified clinics closest to your device coordinates:
-                      </p>
-                    </div>
-
+              ) : filteredClinics.length === 0 ? (
+                /* Empty state */
+                <div className="p-8 rounded-2xl bg-[#13171e] border border-slate-800 text-center space-y-4">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-sky-400">
+                    <Compass className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-white">
+                      No Clinics Found in {maxRadiusKm > 0 ? `${maxRadiusKm} km` : 'Selected Filters'}
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      Try expanding your search radius to 50 km or switch to another major city like Lahore, Karachi, or Islamabad.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 pt-2">
                     <button
-                      onClick={() => setMaxRadiusKm(0)}
-                      className="px-3.5 py-2 rounded-xl bg-sky-600/30 hover:bg-sky-600 text-sky-200 hover:text-white border border-sky-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+                      type="button"
+                      onClick={() => setMaxRadiusKm(50)}
+                      className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors cursor-pointer"
                     >
-                      <Compass className="w-3.5 h-3.5" />
-                      <span>Scan All ({calculatedClinics.length})</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      Expand to 50 km
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMaxRadiusKm(0)}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Show All PK
                     </button>
                   </div>
+                </div>
+              ) : (
+                /* Clinic Cards */
+                <div className={`space-y-3 ${viewMode === 'list' ? 'grid grid-cols-1 md:grid-cols-2 gap-4 space-y-0' : ''}`}>
+                  {filteredClinics.map((clinic) => {
+                    const isSelected = selectedClinic?.uid === clinic.uid;
+                    const googleDirectionsUrl = getDirectionsUrl(clinic.lat, clinic.lng, clinic.name);
+                    const waUrl = formatWhatsAppUrl(clinic.phone, clinic.name);
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                    {nearestOutsideRadiusClinics.map((clinic) => renderClinicCard(clinic))}
-                  </div>
+                    return (
+                      <motion.div
+                        key={clinic.uid}
+                        id={`clinic-card-${clinic.uid}`}
+                        layout
+                        onClick={() => handleClinicSelect(clinic)}
+                        className={`p-4 sm:p-5 rounded-2xl transition-all cursor-pointer border shadow-sm ${
+                          isSelected
+                            ? 'bg-slate-900 border-sky-500 ring-2 ring-sky-500/30'
+                            : 'bg-[#13171e] border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                        }`}
+                      >
+                        {/* Top: Badges & Distance */}
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {clinic.source === 'google_maps' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                  <MapPin className="w-2.5 h-2.5 text-sky-400" />
+                                  <span>Google Maps Registered</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>VetAxis Registered</span>
+                                </span>
+                              )}
+                              {clinic.isEmergency247 && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  24/7 Emergency
+                                </span>
+                              )}
+                            </div>
+
+                            <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-sky-300 transition-colors line-clamp-1">
+                              {clinic.name}
+                            </h3>
+                          </div>
+
+                          {/* Distance Badge */}
+                          <div className="text-right shrink-0">
+                            <span className={`inline-block px-2.5 py-1 rounded-xl text-xs font-mono font-bold tabular-nums ${
+                              clinic.distanceKm < 5
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : clinic.distanceKm < 20
+                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                : 'bg-slate-800 text-slate-300 border border-slate-700'
+                            }`}>
+                              {clinic.distanceKm} km
+                            </span>
+                            <span className="block text-[10px] text-slate-500 mt-0.5">from you</span>
+                          </div>
+                        </div>
+
+                        {/* Address & Reviews */}
+                        <div className="space-y-1.5 text-xs text-slate-400 mb-3">
+                          <div className="flex items-start gap-1.5 text-slate-300">
+                            <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
+                            <span className="line-clamp-2">{clinic.formattedAddress}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-0.5 text-[11px]">
+                            {clinic.avgRating ? (
+                              <div className="flex items-center gap-1 text-amber-400 font-bold">
+                                <Star className="w-3 h-3 fill-amber-400" />
+                                <span>★ {clinic.avgRating}</span>
+                                <span className="text-slate-500 font-normal">
+                                  ({clinic.totalReviews || 1} Google reviews)
+                                </span>
+                              </div>
+                            ) : null}
+                            <span className="text-slate-600">·</span>
+                            <span className="text-slate-400 font-mono">
+                              {clinic.isOpenNow ? '🟢 Open Now' : '⚪ Regular Hours'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2">
+                          {/* Pinpoint on Map */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleClinicSelect(clinic);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-sky-400" />
+                            <span>Show on Map</span>
+                          </button>
+
+                          {/* Google Maps Turn-by-Turn Directions */}
+                          <a
+                            href={googleDirectionsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                            title="Open Google Maps Turn-by-turn Navigation"
+                          >
+                            <Navigation className="w-3.5 h-3.5" />
+                            <span>Directions</span>
+                          </a>
+
+                          {/* Direct Phone Call */}
+                          {clinic.phone && (
+                            <a
+                              href={`tel:${clinic.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+                              title={`Call ${clinic.phone}`}
+                            >
+                              <Phone className="w-4 h-4 text-slate-400" />
+                            </a>
+                          )}
+
+                          {/* WhatsApp */}
+                          {waUrl && (
+                            <a
+                              href={waUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/60 transition-colors"
+                              title="Chat on WhatsApp"
+                            >
+                              <MessageCircle className="w-4 h-4 text-emerald-400" />
+                            </a>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredClinics.map((clinic) => renderClinicCard(clinic))}
+
+          </div>
+
+        </div>
+
+        {/* ─────────────────────────────────────────────────────────────
+            4. EMERGENCY PROTOCOL & INSTRUCTIONS FOOTER
+           ───────────────────────────────────────────────────────────── */}
+        <section className="mt-10 p-6 rounded-2xl bg-gradient-to-r from-[#181c22] via-[#13171e] to-[#181c22] border border-slate-800 space-y-3">
+          <div className="flex items-center gap-2 text-amber-400 text-sm font-bold">
+            <ShieldAlert className="w-4.5 h-4.5" />
+            <span>Smart Radar &amp; Emergency Navigation Protocol</span>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
+            VetAxis Smart Radar combines live device geolocation with the official Google Maps Places API to locate verified veterinary care facilities across Pakistan. Tap <strong>"Directions"</strong> on any clinic card or marker to launch turn-by-turn driving navigation in Google Maps. For severe trauma, Parvovirus, poisoning, or bloat, always phone ahead so the emergency triage team can ready intravenous lines and oxygen.
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+            <div className="flex flex-wrap items-center gap-3">
+              <span>· Live GPS Proximity Calculation</span>
+              <span>· Google Maps Places Verified Listings</span>
+              <span>· Direct Navigation &amp; Triage Calling</span>
             </div>
-          )}
+            <span className="text-[11px] text-slate-500 font-mono">
+              VetAxis 360 Emergency Network
+            </span>
+          </div>
         </section>
 
-        {/* Emergency First-Aid Triage Guidance Banner */}
-        <footer className="p-6 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-800/40 space-y-3">
-          <div className="flex items-center gap-2 text-amber-400 text-sm font-bold">
-            <ShieldAlert className="w-4 h-4" />
-            <span>Critical Pet Emergency Protocol &amp; Navigation</span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            All registered veterinary clinics shown on VetAxis 360 are synced directly with Google Maps Platform and our verified veterinary directory. For life-threatening symptoms (heavy bleeding, poisoning, Parvo dehydration, GDV bloat), tap "Directions" to start instant GPS routing with live traffic.
-          </p>
-          <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400 pt-1 border-t border-slate-800/60">
-            <div className="flex flex-wrap items-center gap-3">
-              <span>· Tap "Directions" on any clinic card for live GPS turn-by-turn routing</span>
-              <span>· Call ahead so emergency triage prepares oxygen &amp; IV fluids</span>
-            </div>
-            <div className="text-[11px] text-slate-500 flex items-center gap-1">
-              <span>Map data &copy; Google Maps Platform</span>
-            </div>
-          </div>
-        </footer>
-
-      </div>
+      </main>
     </div>
   );
 }
